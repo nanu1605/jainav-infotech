@@ -79,7 +79,7 @@ const COPY = {
     hi: 'नहीं। VYRO किसी थर्ड-पार्टी मॉनिटरिंग टूल के बिना सीधे आपके सेंसर पढ़ता है।',
   },
   q2: {
-    en: 'Who collects the payment for food orders in MenuMesh?',
+    en: 'Who collects the payment for food orders in MenuMesh, and how is the bill printed?',
     hi: 'MenuMesh में खाने के ऑर्डर का पेमेंट कौन लेता है, और बिल कैसे प्रिंट होता है?',
   },
   a2: {
