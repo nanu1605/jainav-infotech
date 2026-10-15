@@ -1,0 +1,24 @@
+{
+  "metadata": {
+    "title": "Jainav Infotech: software products and custom software",
+    "description": "Jainav Infotech builds its own software products, MenuMesh, VYRO and Baby, and custom software for businesses. Based in Indore, India."
+  },
+  "site": {
+    "name": "Jainav",
+    "legalName": "Jainav Infotech Private Limited",
+    "skipToContent": "Skip to content"
+  },
+  "home": {
+    "eyebrow": "Coming soon",
+    "title": "Software we build, and software we build for you.",
+    "subtitle": "Products like MenuMesh, VYRO and Baby, plus custom software for your business. The full site is on its way."
+  },
+  "theme": {
+    "toggle": "Switch between light and dark theme"
+  },
+  "language": {
+    "label": "Language",
+    "en": "EN",
+    "hi": "हिंदी"
+  }
+}
