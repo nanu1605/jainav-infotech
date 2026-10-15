@@ -53,7 +53,8 @@ export const Products: CollectionConfig = {
         {
           label: 'Basics',
           fields: [
-            { name: 'name', type: 'text', localized: true, required: true },
+            // Brand names are the same in every language (spec §9.1: not localized).
+            { name: 'name', type: 'text', required: true },
             { name: 'tagline', type: 'text', localized: true, required: true },
             { name: 'summary', type: 'textarea', localized: true },
             {

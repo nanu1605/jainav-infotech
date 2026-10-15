@@ -2359,6 +2359,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   
   CREATE TABLE "products" (
   	"id" serial PRIMARY KEY NOT NULL,
+  	"name" varchar,
   	"type" "enum_products_type",
   	"category" "enum_products_category" DEFAULT 'other',
   	"status" "enum_products_lifecycle" DEFAULT 'coming-soon',
@@ -2389,7 +2390,6 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   );
   
   CREATE TABLE "products_locales" (
-  	"name" varchar,
   	"tagline" varchar,
   	"summary" varchar,
   	"primary_button_label_override" varchar,
@@ -3000,6 +3000,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   CREATE TABLE "_products_v" (
   	"id" serial PRIMARY KEY NOT NULL,
   	"parent_id" integer,
+  	"version_name" varchar,
   	"version_type" "enum__products_v_version_type",
   	"version_category" "enum__products_v_version_category" DEFAULT 'other',
   	"version_status" "enum__products_v_version_lifecycle" DEFAULT 'coming-soon',
@@ -3035,7 +3036,6 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   );
   
   CREATE TABLE "_products_v_locales" (
-  	"version_name" varchar,
   	"version_tagline" varchar,
   	"version_summary" varchar,
   	"version_primary_button_label_override" varchar,

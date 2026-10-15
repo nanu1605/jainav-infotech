@@ -26545,6 +26545,12 @@
           "primaryKey": true,
           "notNull": true
         },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
         "type": {
           "name": "type",
           "type": "enum_products_type",
@@ -26986,12 +26992,6 @@
       "name": "products_locales",
       "schema": "",
       "columns": {
-        "name": {
-          "name": "name",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
         "tagline": {
           "name": "tagline",
           "type": "varchar",
@@ -33939,6 +33939,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "version_name": {
+          "name": "version_name",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
         "version_type": {
           "name": "version_type",
           "type": "enum__products_v_version_type",
@@ -34514,12 +34520,6 @@
       "name": "_products_v_locales",
       "schema": "",
       "columns": {
-        "version_name": {
-          "name": "version_name",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
         "version_tagline": {
           "name": "version_tagline",
           "type": "varchar",
@@ -41721,6 +41721,6 @@
     "tables": {},
     "columns": {}
   },
-  "id": "ada01fcb-b39a-4bd4-9a12-512d3d53f766",
+  "id": "18f6f9f8-bdb7-4551-8b65-cb20962741c2",
   "prevId": "00000000-0000-0000-0000-000000000000"
 }
