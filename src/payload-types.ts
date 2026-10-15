@@ -14,7 +14,7 @@ export type Stats =
   | {
       source: 'manual' | 'downloads';
       value?: string | null;
-      label: string;
+      label?: string | null;
       id?: string | null;
     }[]
   | null;
@@ -187,7 +187,7 @@ export interface UserAuthOperations {
  */
 export interface Page {
   id: number;
-  title: string;
+  title?: string | null;
   layout?:
     | (
         | PageHeroBlock
@@ -231,7 +231,7 @@ export interface Page {
  * via the `definition` "PageHeroBlock".
  */
 export interface PageHeroBlock {
-  headline: string;
+  headline?: string | null;
   subheadline?: string | null;
   primary?: {
     label?: string | null;
@@ -246,7 +246,7 @@ export interface PageHeroBlock {
    */
   chips?:
     | {
-        label: string;
+        label?: string | null;
         href: string;
         id?: string | null;
       }[]
@@ -275,7 +275,7 @@ export interface PageProductShowcaseBlock {
 export interface Product {
   id: number;
   name: string;
-  tagline: string;
+  tagline?: string | null;
   summary?: string | null;
   type: 'saas' | 'desktop' | 'mobile' | 'web' | 'api';
   category: 'restaurants' | 'pc-tools' | 'assistants' | 'other';
@@ -402,7 +402,7 @@ export interface Product {
  */
 export interface Media {
   id: number;
-  alt: string;
+  alt?: string | null;
   caption?: string | null;
   prefix?: string | null;
   _objectKey?: string | null;
@@ -503,7 +503,7 @@ export interface ProductProblemSolutionBlock {
   solution?: string | null;
   points?:
     | {
-        text: string;
+        text?: string | null;
         id?: string | null;
       }[]
     | null;
@@ -522,7 +522,7 @@ export interface ProductFeatureScrollerBlock {
    */
   items?:
     | {
-        title: string;
+        title?: string | null;
         text?: string | null;
         media?: (number | null) | Media;
         id?: string | null;
@@ -545,7 +545,7 @@ export interface ProductFeatureGridBlock {
          * Lucide icon name, e.g. shield-check.
          */
         icon?: string | null;
-        title: string;
+        title?: string | null;
         text?: string | null;
         id?: string | null;
       }[]
@@ -595,7 +595,7 @@ export interface ProductHowItWorksBlock {
   heading?: string | null;
   steps?:
     | {
-        title: string;
+        title?: string | null;
         text?: string | null;
         media?: (number | null) | Media;
         id?: string | null;
@@ -617,7 +617,7 @@ export interface ProductUseCasesBlock {
          * Lucide icon name, e.g. shield-check.
          */
         icon?: string | null;
-        title: string;
+        title?: string | null;
         text?: string | null;
         id?: string | null;
       }[]
@@ -635,14 +635,14 @@ export interface ProductPricingBlock {
   source: 'plans' | 'manual';
   tiers?:
     | {
-        name: string;
+        name?: string | null;
         /**
          * Display only.
          */
         price?: string | null;
         features?:
           | {
-              text: string;
+              text?: string | null;
               id?: string | null;
             }[]
           | null;
@@ -663,13 +663,13 @@ export interface ProductPrivacyBlock {
   heading?: string | null;
   local?:
     | {
-        text: string;
+        text?: string | null;
         id?: string | null;
       }[]
     | null;
   cloud?:
     | {
-        text: string;
+        text?: string | null;
         id?: string | null;
       }[]
     | null;
@@ -686,7 +686,7 @@ export interface ProductRequirementsBlock {
   heading?: string | null;
   rows?:
     | {
-        label: string;
+        label?: string | null;
         minimum?: string | null;
         recommended?: string | null;
         id?: string | null;
@@ -745,8 +745,8 @@ export interface ProductFaqBlock {
  */
 export interface Faq {
   id: number;
-  question: string;
-  answer: string;
+  question?: string | null;
+  answer?: string | null;
   /**
    * Leave empty for a company-wide question.
    */
@@ -777,7 +777,7 @@ export interface ProductTestimonialsBlock {
  */
 export interface Testimonial {
   id: number;
-  quote: string;
+  quote?: string | null;
   name: string;
   role?: string | null;
   company?: string | null;
@@ -803,14 +803,14 @@ export interface ProductComparisonBlock {
   heading?: string | null;
   columns?:
     | {
-        label: string;
+        label?: string | null;
         highlight?: boolean | null;
         id?: string | null;
       }[]
     | null;
   rows?:
     | {
-        feature: string;
+        feature?: string | null;
         /**
          * One cell per column, in column order.
          */
@@ -852,7 +852,7 @@ export interface ProductCtaBandBlock {
  * via the `definition` "ProductRichTextBlock".
  */
 export interface ProductRichTextBlock {
-  content: {
+  content?: {
     root: {
       type: string;
       children: {
@@ -866,7 +866,7 @@ export interface ProductRichTextBlock {
       version: number;
     };
     [k: string]: unknown;
-  };
+  } | null;
   id?: string | null;
   blockName?: string | null;
   blockType: 'richText';
@@ -889,7 +889,7 @@ export interface ProductEmbedBlock {
   /**
    * Describes the embed for screen readers (iframe title).
    */
-  title: string;
+  title?: string | null;
   /**
    * Allowed: www.youtube-nocookie.com, www.youtube.com, player.vimeo.com, www.loom.com, cal.com, calendly.com
    */
@@ -912,7 +912,7 @@ export interface Plan {
    * Unique per product, e.g. free or pro.
    */
   code: string;
-  name: string;
+  name?: string | null;
   description?: string | null;
   billing: 'one_time' | 'yearly' | 'monthly';
   /**
@@ -925,7 +925,7 @@ export interface Plan {
   priceUSD?: number | null;
   features?:
     | {
-        text: string;
+        text?: string | null;
         id?: string | null;
       }[]
     | null;
@@ -970,21 +970,21 @@ export interface PageServicesOverviewBlock {
  */
 export interface Service {
   id: number;
-  title: string;
-  summary: string;
+  title?: string | null;
+  summary?: string | null;
   /**
    * Lucide icon name in kebab-case, e.g. cloud-cog (lucide.dev/icons).
    */
   icon?: string | null;
   capabilities?:
     | {
-        text: string;
+        text?: string | null;
         id?: string | null;
       }[]
     | null;
   deliverables?:
     | {
-        text: string;
+        text?: string | null;
         id?: string | null;
       }[]
     | null;
@@ -1040,7 +1040,7 @@ export interface PagePrinciplesBlock {
          * Lucide icon name, e.g. shield-check.
          */
         icon?: string | null;
-        title: string;
+        title?: string | null;
         text?: string | null;
         id?: string | null;
       }[]
@@ -1072,7 +1072,7 @@ export interface PageProcessBlock {
   heading?: string | null;
   steps?:
     | {
-        title: string;
+        title?: string | null;
         text?: string | null;
         id?: string | null;
       }[]
@@ -1098,7 +1098,7 @@ export interface PageLatestBlock {
  * via the `definition` "PageCtaBlock".
  */
 export interface PageCtaBlock {
-  heading: string;
+  heading?: string | null;
   text?: string | null;
   primary?: {
     label?: string | null;
@@ -1118,7 +1118,7 @@ export interface PageCtaBlock {
  * via the `definition` "PageRichTextBlock".
  */
 export interface PageRichTextBlock {
-  content: {
+  content?: {
     root: {
       type: string;
       children: {
@@ -1132,7 +1132,7 @@ export interface PageRichTextBlock {
       version: number;
     };
     [k: string]: unknown;
-  };
+  } | null;
   id?: string | null;
   blockName?: string | null;
   blockType: 'richText';
@@ -1146,7 +1146,7 @@ export interface PageTimelineBlock {
   items?:
     | {
         date?: string | null;
-        title: string;
+        title?: string | null;
         text?: string | null;
         id?: string | null;
       }[]
@@ -1224,10 +1224,10 @@ export interface PageFaqBlock {
  */
 export interface Post {
   id: number;
-  title: string;
+  title?: string | null;
   excerpt?: string | null;
   cover?: (number | null) | Media;
-  body: {
+  body?: {
     root: {
       type: string;
       children: {
@@ -1241,7 +1241,7 @@ export interface Post {
       version: number;
     };
     [k: string]: unknown;
-  };
+  } | null;
   tags?: string[] | null;
   author?: (number | null) | Team;
   meta?: {
@@ -1275,7 +1275,7 @@ export interface Post {
  */
 export interface Job {
   id: number;
-  title: string;
+  title?: string | null;
   type: 'full-time' | 'part-time' | 'internship' | 'contract';
   workMode: 'onsite' | 'remote' | 'hybrid';
   location?: string | null;
@@ -1316,7 +1316,7 @@ export interface Job {
  */
 export interface LegalPage {
   id: number;
-  title: string;
+  title?: string | null;
   body?: {
     root: {
       type: string;
@@ -1341,7 +1341,7 @@ export interface LegalPage {
    * Shown on the page, e.g. 1.0. Bump it on every change.
    */
   version: string;
-  effectiveDate?: string | null;
+  effectiveDate: string;
   /**
    * Ready: the Hindi page is indexed and paired with English via hreflang.
    */
@@ -1420,7 +1420,7 @@ export interface Installer {
  */
 export interface Doc {
   id: number;
-  title: string;
+  title?: string | null;
   body?: {
     root: {
       type: string;
@@ -1461,7 +1461,7 @@ export interface Doc {
  */
 export interface Changelog {
   id: number;
-  title: string;
+  title?: string | null;
   body?: {
     root: {
       type: string;
@@ -1611,6 +1611,7 @@ export interface ShortLink {
 export interface AuditLog {
   id: number;
   actor?: (number | null) | User;
+  actorEmail?: string | null;
   action: 'create' | 'update' | 'delete';
   entity: string;
   docId?: string | null;
@@ -2920,6 +2921,7 @@ export interface UsersSelect<T extends boolean = true> {
  */
 export interface AuditLogSelect<T extends boolean = true> {
   actor?: T;
+  actorEmail?: T;
   action?: T;
   entity?: T;
   docId?: T;
@@ -3055,7 +3057,7 @@ export interface Navigation {
   id: number;
   header?:
     | {
-        label: string;
+        label?: string | null;
         href: string;
         megaMenu?: ('none' | 'products') | null;
         id?: string | null;
@@ -3063,10 +3065,10 @@ export interface Navigation {
     | null;
   footer?:
     | {
-        title: string;
+        title?: string | null;
         links?:
           | {
-              label: string;
+              label?: string | null;
               href: string;
               id?: string | null;
             }[]

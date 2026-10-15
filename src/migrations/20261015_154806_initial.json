@@ -17227,13 +17227,13 @@
           "name": "question",
           "type": "varchar",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "answer": {
           "name": "answer",
           "type": "varchar",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "id": {
           "name": "id",
@@ -20053,7 +20053,7 @@
           "name": "alt",
           "type": "varchar",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "caption": {
           "name": "caption",
@@ -34909,7 +34909,7 @@
           "name": "text",
           "type": "varchar",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "id": {
           "name": "id",
@@ -35162,7 +35162,7 @@
           "name": "name",
           "type": "varchar",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "description": {
           "name": "description",
@@ -37074,7 +37074,7 @@
           "name": "title",
           "type": "varchar",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "body": {
           "name": "body",
@@ -38079,6 +38079,12 @@
         "actor_id": {
           "name": "actor_id",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actor_email": {
+          "name": "actor_email",
+          "type": "varchar",
           "primaryKey": false,
           "notNull": false
         },
@@ -40396,7 +40402,7 @@
           "name": "label",
           "type": "varchar",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "id": {
           "name": "id",
@@ -40552,7 +40558,7 @@
           "name": "label",
           "type": "varchar",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "id": {
           "name": "id",
@@ -40702,7 +40708,7 @@
           "name": "title",
           "type": "varchar",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "id": {
           "name": "id",
@@ -41721,6 +41727,6 @@
     "tables": {},
     "columns": {}
   },
-  "id": "18f6f9f8-bdb7-4551-8b65-cb20962741c2",
+  "id": "eaacbd41-5417-4207-bda8-d18b0a7de5b1",
   "prevId": "00000000-0000-0000-0000-000000000000"
 }

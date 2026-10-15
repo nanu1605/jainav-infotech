@@ -14,7 +14,7 @@ type Entry<S extends CollectionSlug> = {
   collection: S
   label: string
   where: Where
-  en: RequiredDataFromCollectionSlug<S>
+  en: RequiredDataFromCollectionSlug<S> | Partial<RequiredDataFromCollectionSlug<S>>
   hi: HiPatch
   /** Localized values written as a whole (rich text has no row ids to match). */
   hiRaw?: Record<string, unknown>
@@ -88,6 +88,7 @@ export async function seed(payload: Payload): Promise<SeedSummary> {
           name: 'Dev owner',
           roles: ['owner'],
         },
+        depth: 0,
         context,
         overrideAccess: true,
       })
@@ -134,6 +135,7 @@ export async function seed(payload: Payload): Promise<SeedSummary> {
       id: vyro.id,
       data: { secondaryButton: { type: 'buy', plan: planIds.pro } },
       draft: true,
+      depth: 0,
       context,
       overrideAccess: true,
     })

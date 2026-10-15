@@ -1557,8 +1557,8 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   );
   
   CREATE TABLE "faqs_locales" (
-  	"question" varchar NOT NULL,
-  	"answer" varchar NOT NULL,
+  	"question" varchar,
+  	"answer" varchar,
   	"id" serial PRIMARY KEY NOT NULL,
   	"_locale" "_locales" NOT NULL,
   	"_parent_id" integer NOT NULL
@@ -1800,7 +1800,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   );
   
   CREATE TABLE "media_locales" (
-  	"alt" varchar NOT NULL,
+  	"alt" varchar,
   	"caption" varchar,
   	"id" serial PRIMARY KEY NOT NULL,
   	"_locale" "_locales" NOT NULL,
@@ -3064,7 +3064,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   );
   
   CREATE TABLE "plans_features_locales" (
-  	"text" varchar NOT NULL,
+  	"text" varchar,
   	"id" serial PRIMARY KEY NOT NULL,
   	"_locale" "_locales" NOT NULL,
   	"_parent_id" varchar NOT NULL
@@ -3087,7 +3087,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   );
   
   CREATE TABLE "plans_locales" (
-  	"name" varchar NOT NULL,
+  	"name" varchar,
   	"description" varchar,
   	"id" serial PRIMARY KEY NOT NULL,
   	"_locale" "_locales" NOT NULL,
@@ -3224,7 +3224,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   );
   
   CREATE TABLE "changelog_locales" (
-  	"title" varchar NOT NULL,
+  	"title" varchar,
   	"body" jsonb,
   	"id" serial PRIMARY KEY NOT NULL,
   	"_locale" "_locales" NOT NULL,
@@ -3324,6 +3324,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   CREATE TABLE "audit_log" (
   	"id" serial PRIMARY KEY NOT NULL,
   	"actor_id" integer,
+  	"actor_email" varchar,
   	"action" "enum_audit_log_action" NOT NULL,
   	"entity" varchar NOT NULL,
   	"doc_id" varchar,
@@ -3479,7 +3480,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   );
   
   CREATE TABLE "navigation_header_locales" (
-  	"label" varchar NOT NULL,
+  	"label" varchar,
   	"id" serial PRIMARY KEY NOT NULL,
   	"_locale" "_locales" NOT NULL,
   	"_parent_id" varchar NOT NULL
@@ -3493,7 +3494,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   );
   
   CREATE TABLE "navigation_footer_links_locales" (
-  	"label" varchar NOT NULL,
+  	"label" varchar,
   	"id" serial PRIMARY KEY NOT NULL,
   	"_locale" "_locales" NOT NULL,
   	"_parent_id" varchar NOT NULL
@@ -3506,7 +3507,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   );
   
   CREATE TABLE "navigation_footer_locales" (
-  	"title" varchar NOT NULL,
+  	"title" varchar,
   	"id" serial PRIMARY KEY NOT NULL,
   	"_locale" "_locales" NOT NULL,
   	"_parent_id" varchar NOT NULL

@@ -9,6 +9,11 @@ import { richText } from './richText'
 
 /** Hindi values for localized leaf fields; arrays are matched to the English rows by index. */
 export type HiPatch = { [key: string]: string | HiPatch | HiPatch[] | undefined }
+/** Seeded as drafts, so fields required only on publish (e.g. a legal page's effective date) may be empty. */
+export type DraftSeedDoc<S extends CollectionSlug> = {
+  en: Partial<RequiredDataFromCollectionSlug<S>>
+  hi: HiPatch
+}
 export type SeedDoc<S extends CollectionSlug> = {
   en: RequiredDataFromCollectionSlug<S>
   hi: HiPatch
@@ -707,7 +712,7 @@ const legalPlaceholder = {
   ),
 }
 
-export const legalPages: SeedDoc<'legal-pages'>[] = [
+export const legalPages: DraftSeedDoc<'legal-pages'>[] = [
   ['privacy', 'Privacy Policy', 'गोपनीयता नीति'],
   ['terms', 'Terms of Service', 'सेवा की शर्तें'],
   ['refunds-cancellation', 'Refunds and Cancellation', 'रिफ़ंड और रद्दीकरण'],

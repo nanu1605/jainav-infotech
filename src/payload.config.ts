@@ -39,6 +39,8 @@ import { revalidateCollection } from './hooks/revalidate'
 import { publicPath, type RoutedCollection } from './lib/routes'
 import { migrations } from './migrations'
 import { auditPlugin } from './plugins/audit'
+import { defaultLocaleRequiredPlugin } from './plugins/defaultLocaleRequired'
+import { liveDocPlugin } from './plugins/liveDoc'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
@@ -146,6 +148,8 @@ export default buildConfig({
   },
   sharp,
   plugins: [
+    // First: rewrites `required` on the localized fields defined above (spec §6).
+    defaultLocaleRequiredPlugin,
     seoPlugin({
       collections: [...SEO_COLLECTIONS],
       uploadsCollection: 'media',
@@ -192,7 +196,8 @@ export default buildConfig({
         },
       },
     }),
-    // Last, so collections added by the plugins above are audited too.
+    // Last, so collections added by the plugins above are covered too.
+    liveDocPlugin,
     auditPlugin,
   ],
 })
