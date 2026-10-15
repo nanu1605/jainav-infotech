@@ -35,6 +35,87 @@
       "web": "Web",
       "android": "Android",
       "ios": "iOS"
+    },
+    "announcement": {
+      "label": "Announcement",
+      "dismiss": "Dismiss announcement"
+    },
+    "breadcrumbs": {
+      "label": "Breadcrumb"
+    },
+    "dialog": {
+      "close": "Close"
+    },
+    "footer": {
+      "label": "Footer",
+      "cin": "CIN: {cin}",
+      "registeredOffice": "Registered office: {address}",
+      "social": "Jainav Infotech on {platform}"
+    },
+    "gallery": {
+      "open": "View larger: {alt}"
+    },
+    "header": {
+      "mainNav": "Main",
+      "menu": "Menu",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu",
+      "allProducts": "All products",
+      "account": "Account",
+      "cta": "Start a project"
+    },
+    "languageSuggestion": {
+      "label": "Language suggestion",
+      "prompt": "हिंदी में देखें?",
+      "dismiss": "Keep English"
+    },
+    "lightbox": {
+      "title": "Image viewer",
+      "close": "Close",
+      "previous": "Previous image",
+      "next": "Next image",
+      "counter": "{current} of {total}"
+    },
+    "marquee": {
+      "pause": "Pause scrolling"
+    },
+    "multiStep": {
+      "back": "Back",
+      "next": "Next",
+      "submit": "Submit",
+      "completed": "completed",
+      "progress": "Step {current} of {total}"
+    },
+    "productCard": {
+      "waitlist": "Join the waitlist"
+    },
+    "productSubNav": {
+      "label": "{name} sections",
+      "overview": "Overview",
+      "pricing": "Pricing",
+      "download": "Download",
+      "changelog": "Changelog",
+      "docs": "Docs",
+      "support": "Support"
+    },
+    "spinner": {
+      "loading": "Loading…"
+    },
+    "toast": {
+      "label": "Notification",
+      "close": "Close",
+      "viewport": "Notifications ({hotkey})"
+    },
+    "video": {
+      "captions": "English",
+      "play": "Play video",
+      "pause": "Pause video"
+    },
+    "callout": {
+      "info": "Note",
+      "success": "Success",
+      "warning": "Warning",
+      "danger": "Important"
     }
   },
   "styleguide": {
