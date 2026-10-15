@@ -4,8 +4,10 @@
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
 /* shadcn/ui variables mapped onto Jainav tokens (spec §5.2). Our brand color is
-   --brand-accent; shadcn's --accent is the hover/selected background. */
-:root {
+   --brand-accent; shadcn's --accent is the hover/selected background. Declared on every
+   themed element too, so nested `data-theme` wrappers re-resolve them. */
+:root,
+[data-theme] {
   --background: var(--bg);
   --foreground: var(--fg);
   --card: var(--surface);

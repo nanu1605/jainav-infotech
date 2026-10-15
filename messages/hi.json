@@ -20,5 +20,39 @@
     "label": "भाषा",
     "en": "EN",
     "hi": "हिंदी"
+  },
+  "ui": {
+    "status": {
+      "live": "उपलब्ध",
+      "beta": "बीटा",
+      "coming-soon": "जल्द आ रहा है",
+      "retired": "बंद"
+    },
+    "platform": {
+      "windows": "Windows",
+      "macos": "macOS",
+      "linux": "Linux",
+      "web": "वेब",
+      "android": "Android",
+      "ios": "iOS"
+    }
+  },
+  "styleguide": {
+    "title": "स्टाइलगाइड",
+    "intro": "हर कंपोनेंट लाइट और डार्क थीम में। हिंदी देखने के लिए भाषा बदलें।",
+    "light": "लाइट",
+    "dark": "डार्क",
+    "sections": "सेक्शन",
+    "areas": {
+      "actions": "एक्शन",
+      "content": "कंटेंट",
+      "media": "मीडिया",
+      "forms": "फ़ॉर्म",
+      "feedback": "फ़ीडबैक",
+      "layout": "लेआउट",
+      "navigation": "नेविगेशन",
+      "motion": "मोशन",
+      "product": "प्रोडक्ट"
+    }
   }
 }

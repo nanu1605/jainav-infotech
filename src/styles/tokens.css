@@ -98,7 +98,10 @@
   --info-800: #00457d;
   --info-900: #00305a;
   --info-950: #002140;
+}
 
+:root,
+[data-theme='light'] {
   --bg: var(--neutral-0);
   --bg-subtle: var(--neutral-50);
   --surface: var(--neutral-0);

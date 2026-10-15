@@ -166,7 +166,10 @@ export function buildTokens(config: BrandConfig) {
     ...Object.entries(scales).flatMap(([scale, steps]) =>
       Object.entries(steps).map(([step, hex]) => `  --${cssScaleName(scale)}-${step}: ${hex};`),
     ),
+    '}',
     '',
+    // Theme blocks also apply to nested `data-theme` wrappers (e.g. the styleguide's panels).
+    ":root,\n[data-theme='light'] {",
     ...themeBlock(themes[0]),
     '}',
     '',

@@ -20,5 +20,39 @@
     "label": "Language",
     "en": "EN",
     "hi": "हिंदी"
+  },
+  "ui": {
+    "status": {
+      "live": "Live",
+      "beta": "Beta",
+      "coming-soon": "Coming soon",
+      "retired": "Retired"
+    },
+    "platform": {
+      "windows": "Windows",
+      "macos": "macOS",
+      "linux": "Linux",
+      "web": "Web",
+      "android": "Android",
+      "ios": "iOS"
+    }
+  },
+  "styleguide": {
+    "title": "Styleguide",
+    "intro": "Every component in light and dark themes. Switch language to check Hindi.",
+    "light": "Light",
+    "dark": "Dark",
+    "sections": "Sections",
+    "areas": {
+      "actions": "Actions",
+      "content": "Content",
+      "media": "Media",
+      "forms": "Forms",
+      "feedback": "Feedback",
+      "layout": "Layout",
+      "navigation": "Navigation",
+      "motion": "Motion",
+      "product": "Product"
+    }
   }
 }
