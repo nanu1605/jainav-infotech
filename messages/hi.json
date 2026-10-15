@@ -84,7 +84,8 @@
       "next": "आगे",
       "submit": "भेजें",
       "completed": "पूरा हुआ",
-      "progress": "चरण {current} / {total}"
+      "progress": "चरण {current} / {total}",
+      "sending": "भेजा जा रहा है…"
     },
     "productCard": {
       "waitlist": "वेटलिस्ट में जुड़ें"

@@ -67,7 +67,7 @@ export function ToastList({ list }: { list: ToastItem[] }) {
       })}
       <ToastPrimitive.Viewport
         label={t('viewport', { hotkey: 'F8' })}
-        className="pointer-events-none fixed end-0 bottom-0 z-100 flex w-full flex-col gap-2 p-4 outline-none sm:max-w-sm"
+        className="pointer-events-none fixed end-0 bottom-0 z-100 flex w-full flex-col gap-2 p-4 focus-visible:-outline-offset-2 sm:max-w-sm"
       />
     </ToastPrimitive.Provider>
   )

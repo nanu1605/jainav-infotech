@@ -87,10 +87,20 @@ export function MultiStepForm<TIn extends FieldValues, TOut>({
         className={cn('grid gap-6', className)}
         onSubmit={
           last
-            ? submit
+            ? (e) => {
+                // The button stays enabled (aria-disabled) so it keeps focus: block double submits.
+                if (isSubmitting) e.preventDefault()
+                else void submit(e)
+              }
             : async (e) => {
                 e.preventDefault()
-                if (await form.trigger(step.fields, { shouldFocus: true })) go(index + 1)
+                // Touching the fields makes onTouched re-validate as the visitor types, so the
+                // error clears before they click Next again (no layout jump under the pointer).
+                const valid = await form.trigger(step.fields, {
+                  shouldFocus: true,
+                  shouldTouch: true,
+                })
+                if (valid) go(index + 1)
               }
         }
       >
@@ -155,7 +165,10 @@ export function MultiStepForm<TIn extends FieldValues, TOut>({
               {t('back')}
             </Button>
           )}
-          <Button type="submit" disabled={isSubmitting} className="ms-auto">
+          <span role="status" className="sr-only">
+            {isSubmitting ? t('sending') : null}
+          </span>
+          <Button type="submit" aria-disabled={isSubmitting || undefined} className="ms-auto">
             {last ? (
               <>
                 {isSubmitting && <LoaderCircle aria-hidden className="animate-spin" />}

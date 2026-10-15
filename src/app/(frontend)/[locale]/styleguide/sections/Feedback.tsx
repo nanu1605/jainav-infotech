@@ -126,7 +126,12 @@ function ProductsDemo({ c }: { c: Localize }) {
       <div className="mb-4 flex items-center justify-between gap-3">
         <CardTitle as="h4">{c(COPY.ourProducts)}</CardTitle>
         <div className="flex items-center gap-2">
-          {loading && <Spinner label={c(COPY.loadingProducts)} />}
+          {loading && <Spinner aria-hidden />}
+          {/* Mounted before its text changes, so screen readers announce it (a live region added
+              together with its text often is not). */}
+          <span role="status" className="sr-only">
+            {loading ? c(COPY.loadingProducts) : null}
+          </span>
           {/* The tooltip repeats the button's name; title={undefined} avoids a second, native tooltip. */}
           <Tooltip content={c(COPY.refresh)}>
             <IconButton

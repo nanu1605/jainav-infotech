@@ -50,7 +50,7 @@ export function AnnouncementBar({ id, text, link }: AnnouncementBarProps) {
       role="region"
       aria-label={t('label')}
       suppressHydrationWarning
-      className="relative bg-fg text-fg-inverse"
+      className="relative bg-fg text-fg-inverse [--ring:var(--fg-inverse)]"
     >
       {/* Runs from the server HTML: no flash and no layout shift for visitors who dismissed it. */}
       <script dangerouslySetInnerHTML={{ __html: hideIfDismissed }} />
@@ -70,7 +70,7 @@ export function AnnouncementBar({ id, text, link }: AnnouncementBarProps) {
         label={t('dismiss')}
         size="sm"
         onClick={dismiss}
-        className="absolute top-1/2 right-1 -translate-y-1/2 text-fg-inverse hover:bg-fg-inverse/10 hover:text-fg-inverse sm:right-2"
+        className="absolute top-1/2 right-1 -translate-y-1/2 text-fg-inverse hover:bg-fg-inverse/10 hover:text-fg-inverse focus-visible:outline-offset-0 sm:right-2"
       >
         <X aria-hidden />
       </IconButton>

@@ -9,13 +9,19 @@ export type SpinnerProps = Omit<ComponentProps<'span'>, 'children'> & {
 }
 
 /**
- * Busy indicator with an accessible name (a `status` region). Static under reduced motion.
- * Inside a button that already says what's happening, pass `aria-hidden` instead.
+ * Busy indicator with an accessible name. Static under reduced motion. It is not a live region: to
+ * announce loading, keep a `role="status"` element mounted and change only its text. Inside a
+ * button or next to a status that already says what's happening, pass `aria-hidden`.
  */
 export function Spinner({ label, className, ...props }: SpinnerProps) {
   const t = useTranslations('ui.spinner')
   return (
-    <span role="status" className={cn('inline-flex size-5 text-fg-muted', className)} {...props}>
+    <span
+      role="img"
+      aria-label={label ?? t('loading')}
+      className={cn('inline-flex size-5 text-fg-muted', className)}
+      {...props}
+    >
       <svg
         viewBox="0 0 24 24"
         fill="none"
@@ -37,7 +43,6 @@ export function Spinner({ label, className, ...props }: SpinnerProps) {
           strokeLinecap="round"
         />
       </svg>
-      <span className="sr-only">{label ?? t('loading')}</span>
     </span>
   )
 }

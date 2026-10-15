@@ -84,7 +84,8 @@
       "next": "Next",
       "submit": "Submit",
       "completed": "completed",
-      "progress": "Step {current} of {total}"
+      "progress": "Step {current} of {total}",
+      "sending": "Sending…"
     },
     "productCard": {
       "waitlist": "Join the waitlist"
