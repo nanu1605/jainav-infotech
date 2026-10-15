@@ -42,6 +42,12 @@ export const href: TextFieldSingleValidation = (value, options) => {
   return validateText(value, options)
 }
 
+/** WhatsApp number as wa.me expects it: digits only, country code first (spec §8.1). */
+export const whatsappNumber: TextFieldSingleValidation = (value, options) =>
+  value && !/^[1-9]\d{9,14}$/.test(value)
+    ? 'Digits only, starting with the country code, e.g. 919876543210'
+    : validateText(value, options)
+
 /** YYYY-MM-DD, used for IST business dates stored as text (spec §3). */
 export const isoDate: TextFieldSingleValidation = (value, options) =>
   value && !/^\d{4}-\d{2}-\d{2}$/.test(value) ? 'Use YYYY-MM-DD' : validateText(value, options)

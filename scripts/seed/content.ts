@@ -461,7 +461,7 @@ export const services: (SeedDoc<'services'> & { related: string[] })[] = [
 
 export const founder: SeedDoc<'team'> = {
   en: {
-    name: '{{FOUNDER_FULL_NAME}}',
+    name: 'Tanishq Jain',
     role: 'Founder',
     bio: 'Software engineer, previously at Bosch Global Software Technologies (DevOps); Google Summer of Code 2022 contributor.', // {{CONFIRM_WORDING}}
     founder: true,
@@ -735,9 +735,10 @@ export const siteSettings = {
     company: {
       legalName: 'Jainav Infotech Private Limited',
       cin: '{{CIN}}',
-      registeredAddress: '{{REGISTERED_ADDRESS}}',
-      phone: '{{PHONE}}',
-      whatsapp: '{{WHATSAPP_NUMBER}}',
+      registeredAddress:
+        '8A Brejeshwary annex, near bangali square, Indore, Madhya Pradesh, 452016',
+      phone: '+91 92441 17127',
+      whatsapp: '919244117127',
     },
     storeEnabled: false,
     maintenanceMode: false,

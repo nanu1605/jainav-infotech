@@ -1,7 +1,7 @@
 import type { GlobalConfig } from 'payload'
 
 import { anyone, ownerOnly } from '@/access/roles'
-import { href, httpUrl } from '@/fields/validators'
+import { href, httpUrl, whatsappNumber } from '@/fields/validators'
 import { revalidateGlobal } from '@/hooks/revalidate'
 
 /** Company details, socials and site-wide switches (spec §9.2); the owner enters real values. */
@@ -30,7 +30,11 @@ export const SiteSettings: GlobalConfig = {
                 { name: 'gstin', label: 'GSTIN', type: 'text' },
                 { name: 'incorporationDate', type: 'date' },
                 { name: 'registeredAddress', type: 'textarea' },
-                { name: 'phone', type: 'text' },
+                {
+                  name: 'phone',
+                  type: 'text',
+                  admin: { description: 'As shown on the site, e.g. +91 98765 43210.' },
+                },
                 {
                   name: 'emails',
                   type: 'group',
@@ -42,7 +46,13 @@ export const SiteSettings: GlobalConfig = {
                     { name: 'privacy', type: 'email' },
                   ],
                 },
-                { name: 'whatsapp', label: 'WhatsApp', type: 'text' },
+                {
+                  name: 'whatsapp',
+                  label: 'WhatsApp',
+                  type: 'text',
+                  validate: whatsappNumber,
+                  admin: { description: 'Digits only with the country code, e.g. 919876543210.' },
+                },
               ],
             },
           ],
