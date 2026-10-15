@@ -19,15 +19,15 @@ Tasks from spec §20. Each phase ends with all checks green, a phase report, and
 
 ### Phase 1 — Content model and admin
 
-- [ ] Payload localization (`en`, `hi`, fallback on).
-- [ ] Collections: users (owner, editor, support; login lockout), media, installers, products, plans, releases, docs, services, pages, posts, changelog, testimonials, faqs, team, jobs, legalPages, shortLinks, leads, dataRequests, auditLog, dailyStats. Globals: siteSettings, navigation.
-- [ ] Page blocks (§8.2) and product blocks (§8.4) with localized inner text fields; product button fields and validation (§8.5); `hiStatus` (§6).
-- [ ] Release hooks: compute SHA-256 and size from the installer.
-- [ ] Access control (§9.3); GraphQL disabled; drafts on products, services, pages, posts, docs, jobs, legalPages, testimonials.
-- [ ] Plugins: SEO, redirects; R2 storage for media and installers (local disk in development).
-- [ ] Audit-log hooks; revalidation hooks for both locales (skipped when `req.context.disableRevalidate`).
-- [ ] Admin navigation groups; placeholder admin branding.
-- [ ] Idempotent seed script (sets `disableRevalidate`): settings with placeholders, navigation, pages, services, the products and plans in Appendix A, sample FAQs, legal drafts. English copy plus draft Hindi (`hiStatus = draft`).
+- [x] Payload localization (`en`, `hi`, fallback on).
+- [x] Collections: users (owner, editor, support; login lockout), media, installers, products, plans, releases, docs, services, pages, posts, changelog, testimonials, faqs, team, jobs, legalPages, shortLinks, leads, dataRequests, auditLog, dailyStats. Globals: siteSettings, navigation.
+- [x] Page blocks (§8.2) and product blocks (§8.4) with localized inner text fields; product button fields and validation (§8.5); `hiStatus` (§6).
+- [x] Release hooks: compute SHA-256 and size from the installer.
+- [x] Access control (§9.3); GraphQL disabled; drafts on products, services, pages, posts, docs, jobs, legalPages, testimonials.
+- [x] Plugins: SEO, redirects; R2 storage for media and installers (local disk in development).
+- [x] Audit-log hooks; revalidation hooks for both locales (skipped when `req.context.disableRevalidate`).
+- [x] Admin navigation groups; placeholder admin branding.
+- [x] Idempotent seed script (sets `disableRevalidate`): settings with placeholders, navigation, pages, services, the products and plans in Appendix A, sample FAQs, legal drafts. English copy plus draft Hindi (`hiStatus = draft`).
 
 ### Phase 2 — Design system and motion
 
