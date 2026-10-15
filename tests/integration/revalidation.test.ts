@@ -79,4 +79,19 @@ describe('product revalidation', () => {
       expect.arrayContaining([`/en/products/${run}-b`, `/hi/products/${run}-b`]),
     )
   })
+
+  it('treats bulk "Publish many" (draft flag plus published status) as a publish', async () => {
+    await payload.update({ collection: 'products', id, draft: true, data: { slug: `${run}-c` } })
+    expect(revalidatePath).not.toHaveBeenCalled()
+
+    await payload.update({
+      collection: 'products',
+      where: { id: { equals: id } },
+      draft: true,
+      data: { _status: 'published' },
+    })
+    expect(paths()).toEqual(
+      expect.arrayContaining([`/en/products/${run}-c`, `/hi/products/${run}-c`]),
+    )
+  })
 })

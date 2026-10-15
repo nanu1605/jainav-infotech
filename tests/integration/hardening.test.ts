@@ -99,6 +99,24 @@ describe('installers', () => {
   })
 })
 
+describe('installer facts', () => {
+  it('ignores API edits to an installer file size', async () => {
+    const installer = await payload.create({
+      collection: 'installers',
+      data: { product: productId, version: '1.0.1' },
+      file: file(`${run}-size.exe`, exe, 'application/x-msdownload'),
+    })
+    cleanup.push({ collection: 'installers', id: installer.id })
+    const updated = await payload.update({
+      collection: 'installers',
+      id: installer.id,
+      data: { filesize: 1 },
+      ...as('editor'),
+    })
+    expect(updated.filesize).toBe(exe.length)
+  })
+})
+
 describe('records and accounts', () => {
   it('ignores staff edits to what a visitor submitted and consented to', async () => {
     const lead = await payload.create({
@@ -143,6 +161,27 @@ describe('records and accounts', () => {
     ).rejects.toThrow(/consent/i)
   })
 
+  it('does not let restoring an old version re-grant withdrawn consent', async () => {
+    const t = await payload.create({
+      collection: 'testimonials',
+      data: { quote: 'Consented', name: 'C', consentReceived: true, _status: 'published' },
+    })
+    cleanup.push({ collection: 'testimonials', id: t.id })
+    const { docs } = await payload.findVersions({
+      collection: 'testimonials',
+      where: { parent: { equals: t.id } },
+      depth: 0,
+    })
+    await payload.update({
+      collection: 'testimonials',
+      id: t.id,
+      data: { consentReceived: false, _status: 'draft' },
+    })
+    await expect(
+      payload.restoreVersion({ collection: 'testimonials', id: String(docs[0]!.id) }),
+    ).rejects.toThrow(/consent/i)
+  })
+
   it('requires an effective date before a legal page is published', async () => {
     await expect(
       payload.create({
@@ -178,9 +217,31 @@ describe('media', () => {
       }),
     ).rejects.toThrow()
   })
+
+  it('rejects SVG content under an image extension', async () => {
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>')
+    await expect(
+      payload.create({
+        collection: 'media',
+        data: { alt: 'Renamed SVG' },
+        file: file(`${run}-logo.png`, svg, 'image/png'),
+      }),
+    ).rejects.toThrow()
+  })
 })
 
 describe('partial Hindi (spec §6)', () => {
+  it('still requires the fields when a document is created from the Hindi admin', async () => {
+    await expect(
+      payload.create({
+        collection: 'faqs',
+        locale: 'hi',
+        data: { category: 'general' } as never,
+        ...as('editor'),
+      }),
+    ).rejects.toThrow(/question|answer/i)
+  })
+
   it('saves a partly translated plan and still requires English', async () => {
     const plan = await payload.create({
       collection: 'plans',
@@ -245,6 +306,19 @@ describe('audit log', () => {
       depth: 0,
     })
     expect(leadLog.docs[0]?.summary).not.toContain('@')
+
+    const t = await payload.create({
+      collection: 'testimonials',
+      data: { quote: 'Q', name: `Person ${run}`, consentReceived: true },
+      draft: true,
+    })
+    cleanup.push({ collection: 'testimonials', id: t.id })
+    const tLog = await payload.find({
+      collection: 'audit-log',
+      where: { and: [{ entity: { equals: 'testimonials' } }, { docId: { equals: String(t.id) } }] },
+      depth: 0,
+    })
+    expect(tLog.docs[0]?.summary).not.toContain(`Person ${run}`)
 
     await payload.update({
       collection: 'products',
