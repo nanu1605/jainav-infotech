@@ -1,9 +1,10 @@
 'use client'
 
+import NextLink from 'next/link'
 import { useLocale, useTranslations } from 'next-intl'
 import { Fragment } from 'react'
 
-import { Link, usePathname } from '@/i18n/navigation'
+import { getPathname, usePathname } from '@/i18n/navigation'
 import { routing, type Locale } from '@/i18n/routing'
 import { cn } from '@/lib/cn'
 
@@ -31,9 +32,10 @@ export function LanguageSwitch({ className }: { className?: string }) {
               |
             </span>
           )}
-          <Link
-            href={pathname}
-            locale={locale}
+          {/* next/link on purpose: given `locale`, next-intl's Link forces /en/… for English,
+              which only 307-redirects here (docs/decisions.md). */}
+          <NextLink
+            href={getPathname({ href: pathname, locale })}
             lang={locale}
             hrefLang={locale}
             aria-current={locale === current ? 'true' : undefined}
@@ -41,7 +43,7 @@ export function LanguageSwitch({ className }: { className?: string }) {
             className="inline-flex h-10 min-w-10 items-center justify-center rounded-md px-2 text-fg-muted transition-colors duration-(--duration-fast) hover:text-fg aria-[current=true]:font-semibold aria-[current=true]:text-fg"
           >
             {t(locale)}
-          </Link>
+          </NextLink>
         </Fragment>
       ))}
     </nav>
