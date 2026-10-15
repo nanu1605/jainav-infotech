@@ -7,8 +7,16 @@ import type {
   Plugin,
 } from 'payload'
 
+import { isDraftWrite, liveBefore } from './liveDoc'
+
 /** Collections whose writes are not audited: the log itself and high-volume counters. */
 const SKIP = new Set(['audit-log', 'daily-stats'])
+
+/**
+ * Their titles are personal data (emails). The log can't be edited or deleted, so it must not
+ * hold them, or erasure requests could never be completed (spec §3, §16). The id is enough.
+ */
+const PERSONAL = new Set(['leads', 'data-requests', 'users'])
 
 type Entry = {
   action: 'create' | 'update' | 'delete'
@@ -22,11 +30,19 @@ type Entry = {
 const record = (req: PayloadRequest, entry: Entry) =>
   req.payload.create({
     collection: 'audit-log',
-    data: { ...entry, actor: req.user?.id ?? null },
+    data: { ...entry, actor: req.user?.id ?? null, actorEmail: req.user?.email ?? null },
+    overrideAccess: true,
     req,
   })
 
-const isAutosave = (req: PayloadRequest) => String(req.query?.autosave) === 'true'
+type Status = 'draft' | 'published' | null | undefined
+
+/** Publishing state as the public sees it: a draft save never changes it. */
+const describeStatus = (draftWrite: boolean, before: Status, after: Status) => {
+  if (!after) return ''
+  if (draftWrite) return ' [draft saved]'
+  return before !== after ? ` [${before ?? 'new'} → ${after}]` : ` [${after}]`
+}
 
 const afterChange: CollectionAfterChangeHook = async ({
   collection,
@@ -35,16 +51,15 @@ const afterChange: CollectionAfterChangeHook = async ({
   operation,
   req,
 }) => {
-  if (SKIP.has(collection.slug) || isAutosave(req)) return
+  if (SKIP.has(collection.slug)) return
   const titleField = collection.admin?.useAsTitle
-  const title = titleField && titleField !== 'id' ? doc[titleField] : undefined
-  const from = previousDoc?._status
-  const status =
-    doc._status && from !== doc._status
-      ? ` [${from ?? 'new'} → ${doc._status}]`
-      : doc._status
-        ? ` [${doc._status}]`
-        : ''
+  const title =
+    !PERSONAL.has(collection.slug) && titleField && titleField !== 'id'
+      ? doc[titleField]
+      : undefined
+  const live = liveBefore(req, collection.slug, doc.id)
+  const before = (live === undefined ? previousDoc?._status : live?._status) as Status
+  const status = describeStatus(isDraftWrite(req, collection.slug), before, doc._status as Status)
   await record(req, {
     action: operation,
     entity: collection.slug,
@@ -64,7 +79,6 @@ const afterDelete: CollectionAfterDeleteHook = async ({ collection, id, req }) =
 }
 
 const afterGlobalChange: GlobalAfterChangeHook = async ({ global, req }) => {
-  if (isAutosave(req)) return
   await record(req, {
     action: 'update',
     entity: `global:${global.slug}`,

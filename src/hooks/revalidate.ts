@@ -7,6 +7,7 @@ import type {
 } from 'payload'
 
 import { routing } from '@/i18n/routing'
+import { isDraftWrite, liveBefore } from '@/plugins/liveDoc'
 
 type Doc = { _status?: 'draft' | 'published' | null; slug?: string | null } & Record<
   string,
@@ -37,7 +38,7 @@ export function revalidate(
   }
 }
 
-const isLive = (doc: Doc | undefined): doc is Doc =>
+const isLive = (doc: Doc | null | undefined): doc is Doc =>
   Boolean(
     doc &&
     Object.keys(doc).length > 0 &&
@@ -47,7 +48,7 @@ const isLive = (doc: Doc | undefined): doc is Doc =>
 /**
  * Revalidates a collection's cache tag and, for documents with URLs, their pages in both locales.
  * `paths` returns public (unprefixed) paths for a document. Draft-only saves are skipped; an
- * unpublish or slug change also revalidates the previous URL.
+ * unpublish or slug change also revalidates the URL that was live before the write.
  * Returns hook arrays: `hooks: { ...revalidateCollection({ tag: 'faqs' }) }`, or concatenate
  * with a collection's own hooks.
  */
@@ -58,9 +59,13 @@ export function revalidateCollection({
   tag: string
   paths?: (doc: Doc) => string[]
 }): { afterChange: CollectionAfterChangeHook[]; afterDelete: CollectionAfterDeleteHook[] } {
-  const afterChange: CollectionAfterChangeHook = ({ doc, previousDoc, req }) => {
+  const afterChange: CollectionAfterChangeHook = ({ collection, doc, previousDoc, req }) => {
+    // A draft save leaves the live row, and so every cached page, unchanged.
+    if (isDraftWrite(req, collection.slug)) return doc
     const current = doc as Doc
-    const previous = previousDoc as Doc | undefined
+    // previousDoc may be an unpublished draft version; compare with what was actually live.
+    const live = liveBefore(req, collection.slug, doc.id)
+    const previous = (live === undefined ? previousDoc : live) as Doc | null | undefined
     if (!isLive(current) && !isLive(previous)) return doc
     const publicPaths = new Set<string>()
     if (isLive(current)) paths(current).forEach((p) => publicPaths.add(p))

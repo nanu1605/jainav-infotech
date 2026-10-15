@@ -8,7 +8,7 @@ export const AuditLog: CollectionConfig = {
   admin: {
     group: 'System',
     useAsTitle: 'summary',
-    defaultColumns: ['summary', 'actor', 'createdAt'],
+    defaultColumns: ['summary', 'actorEmail', 'createdAt'],
     listSearchableFields: ['summary', 'entity', 'docId'],
   },
   access: {
@@ -21,6 +21,8 @@ export const AuditLog: CollectionConfig = {
   disableDuplicate: true,
   fields: [
     { name: 'actor', type: 'relationship', relationTo: 'users' },
+    // Snapshot: the relationship is cleared if the user is deleted later.
+    { name: 'actorEmail', type: 'text' },
     { name: 'action', type: 'select', options: ['create', 'update', 'delete'], required: true },
     { name: 'entity', type: 'text', required: true, index: true },
     { name: 'docId', type: 'text', index: true },
