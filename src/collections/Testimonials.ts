@@ -12,7 +12,11 @@ const requireConsentToPublish: CollectionBeforeChangeHook = ({ data, originalDoc
   // An explicit null must not fall back to the stored consent.
   const consent =
     data.consentReceived !== undefined ? data.consentReceived : originalDoc?.consentReceived
-  if (status === 'published' && consent !== true) {
+  // Restoring an old version must not re-grant consent withdrawn since then: during a restore,
+  // originalDoc is the current latest version (Payload sets context.isRestoringVersion).
+  const restoringWithoutConsent =
+    req.context.isRestoringVersion === true && originalDoc?.consentReceived !== true
+  if (status === 'published' && (consent !== true || restoringWithoutConsent)) {
     throw new ValidationError(
       {
         collection: 'testimonials',

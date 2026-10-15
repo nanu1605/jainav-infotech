@@ -51,10 +51,10 @@ export const Leads: CollectionConfig = {
     },
     { name: 'notes', type: 'textarea', admin: { position: 'sidebar' } },
     {
-      // What the visitor submitted and agreed to is a record, not something staff edit.
+      // What the visitor submitted and agreed to is a record: those fields deny updates (and so
+      // render read-only); withdrawnAt and unsubscribedAt stay editable for staff.
       type: 'collapsible',
       label: 'Submission',
-      admin: { readOnly: true },
       fields: [
         {
           name: 'type',

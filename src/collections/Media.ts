@@ -1,4 +1,9 @@
-import { APIError, type CollectionBeforeChangeHook, type CollectionConfig } from 'payload'
+import {
+  APIError,
+  type CollectionBeforeChangeHook,
+  type CollectionBeforeOperationHook,
+  type CollectionConfig,
+} from 'payload'
 
 import { anyone, contentEditors } from '@/access/roles'
 import { revalidateCollection } from '@/hooks/revalidate'
@@ -8,10 +13,20 @@ import { revalidateCollection } from '@/hooks/revalidate'
 // carry scripts, and media is served from the site origin in development.
 const ALLOWED_EXT = /\.(avif|gif|jpe?g|png|webp|mp4|webm|vtt)$/i
 
-const checkExtension: CollectionBeforeChangeHook = ({ data, req }) => {
+const UNSUPPORTED = 'Upload an image, an MP4/WebM video or a .vtt caption file.'
+
+// Runs before Payload writes anything: on update it stores the new file before beforeChange.
+const checkFileName: CollectionBeforeOperationHook = ({ args, operation, req }) => {
+  const writes = operation === 'create' || operation === 'update'
+  if (writes && req.file && !ALLOWED_EXT.test(req.file.name)) throw new APIError(UNSUPPORTED, 400)
+  return args
+}
+
+// After type detection: catches renamed SVGs and files fetched from a URL.
+const checkDetectedType: CollectionBeforeChangeHook = ({ data, req }) => {
   if (!req.file) return data
-  if (!ALLOWED_EXT.test(req.file.name)) {
-    throw new APIError('Upload an image, an MP4/WebM video or a .vtt caption file.', 400)
+  if (!ALLOWED_EXT.test(req.file.name) || /svg|xml/i.test(String(data.mimeType))) {
+    throw new APIError(UNSUPPORTED, 400)
   }
   if (/\.vtt$/i.test(req.file.name)) data.mimeType = 'text/vtt'
   return data
@@ -32,7 +47,8 @@ export const Media: CollectionConfig = {
     delete: contentEditors,
   },
   hooks: {
-    beforeChange: [checkExtension],
+    beforeOperation: [checkFileName],
+    beforeChange: [checkDetectedType],
     // Pages that render media (alt text, replaced files) tag their fetches with 'media'.
     ...revalidateCollection({ tag: 'media' }),
   },

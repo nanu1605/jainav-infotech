@@ -74,7 +74,11 @@ const noFileReplacement: CollectionBeforeOperationHook = ({
   overrideAccess,
   req,
 }) => {
-  if (operation === 'update' && req.file && !overrideAccess) {
+  if (operation !== 'update' || overrideAccess) return args
+  // Payload keeps a submitted filesize/mimeType on update; file facts only come from the upload.
+  const data = (args as { data?: Record<string, unknown> }).data
+  if (data) for (const key of ['filesize', 'mimeType', 'width', 'height']) delete data[key]
+  if (req.file) {
     throw new APIError(
       'Installers can’t be replaced. Upload a new installer and attach it to a release.',
       400,
