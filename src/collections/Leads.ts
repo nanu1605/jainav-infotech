@@ -9,6 +9,11 @@ export const normalizeEmail: FieldHook = ({ value }) =>
 
 // Only server code (Local API, overrideAccess) ever reads or writes the token hash.
 const noFieldAccess: FieldAccess = () => false
+/**
+ * What the visitor submitted and agreed to is a record: the API ignores staff edits to it
+ * (admin readOnly only hides the inputs). Server code writes it with overrideAccess.
+ */
+const record = { update: noFieldAccess }
 
 /**
  * Form submissions (spec §9.1, §13). Personal data: staff-only reads, and never created through
@@ -65,24 +70,27 @@ export const Leads: CollectionConfig = {
           ],
           required: true,
           index: true,
+          access: record,
         },
-        { name: 'product', type: 'relationship', relationTo: 'products' },
-        { name: 'name', type: 'text' },
+        { name: 'product', type: 'relationship', relationTo: 'products', access: record },
+        { name: 'name', type: 'text', access: record },
         {
           name: 'email',
           type: 'email',
           required: true,
           index: true,
+          access: record,
           hooks: { beforeValidate: [normalizeEmail] },
         },
-        { name: 'phone', type: 'text' },
-        { name: 'company', type: 'text' },
-        { name: 'message', type: 'textarea' },
-        { name: 'details', type: 'json' },
-        { name: 'locale', type: 'select', options: [...routing.locales] },
+        { name: 'phone', type: 'text', access: record },
+        { name: 'company', type: 'text', access: record },
+        { name: 'message', type: 'textarea', access: record },
+        { name: 'details', type: 'json', access: record },
+        { name: 'locale', type: 'select', options: [...routing.locales], access: record },
         {
           name: 'source',
           type: 'group',
+          access: record,
           fields: [
             { name: 'page', type: 'text' },
             { name: 'referrer', type: 'text' },
@@ -103,6 +111,7 @@ export const Leads: CollectionConfig = {
         {
           name: 'consent',
           type: 'group',
+          access: record,
           fields: [
             { name: 'textVersion', type: 'text' },
             { name: 'givenAt', type: 'date' },
@@ -113,9 +122,10 @@ export const Leads: CollectionConfig = {
           name: 'marketingConsent',
           type: 'group',
           fields: [
-            { name: 'given', type: 'checkbox' },
-            { name: 'at', type: 'date' },
-            { name: 'textVersion', type: 'text' },
+            { name: 'given', type: 'checkbox', access: record },
+            { name: 'at', type: 'date', access: record },
+            { name: 'textVersion', type: 'text', access: record },
+            // Staff may record a withdrawal (spec §16: withdrawing is as easy as giving).
             { name: 'withdrawnAt', type: 'date' },
           ],
         },
@@ -126,7 +136,7 @@ export const Leads: CollectionConfig = {
           access: { read: noFieldAccess, create: noFieldAccess, update: noFieldAccess },
           admin: { hidden: true },
         },
-        { name: 'confirmedAt', type: 'date' },
+        { name: 'confirmedAt', type: 'date', access: record },
         { name: 'unsubscribedAt', type: 'date' },
       ],
     },

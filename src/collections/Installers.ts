@@ -4,6 +4,8 @@ import { createReadStream } from 'node:fs'
 import {
   APIError,
   type CollectionBeforeChangeHook,
+  type CollectionBeforeDeleteHook,
+  type CollectionBeforeOperationHook,
   type CollectionConfig,
   type FieldAccess,
 } from 'payload'
@@ -61,6 +63,38 @@ const processInstaller: CollectionBeforeChangeHook = async ({ data, req }) => {
   return data
 }
 
+/**
+ * Installer files are immutable: a published release must keep shipping the bytes the Owner
+ * approved, with a matching SHA-256 and update signature. A new build is a new installer.
+ * The storage plugin's own follow-up update runs with overrideAccess and no file, so it passes.
+ */
+const noFileReplacement: CollectionBeforeOperationHook = ({
+  args,
+  operation,
+  overrideAccess,
+  req,
+}) => {
+  if (operation === 'update' && req.file && !overrideAccess) {
+    throw new APIError(
+      'Installers can’t be replaced. Upload a new installer and attach it to a release.',
+      400,
+    )
+  }
+  return args
+}
+
+/** A release must never point at a deleted file while it is still listed. */
+const keepIfReleased: CollectionBeforeDeleteHook = async ({ id, req }) => {
+  const { totalDocs } = await req.payload.count({
+    collection: 'releases',
+    where: { installer: { equals: id } },
+    overrideAccess: true,
+    req,
+  })
+  if (totalDocs)
+    throw new APIError('Detach this installer from its releases before deleting it.', 409)
+}
+
 export const Installers: CollectionConfig = {
   slug: 'installers',
   admin: {
@@ -98,7 +132,9 @@ export const Installers: CollectionConfig = {
     bulkUpload: false,
   },
   hooks: {
+    beforeOperation: [noFileReplacement],
     beforeChange: [processInstaller],
+    beforeDelete: [keepIfReleased],
   },
   fields: [
     { name: 'product', type: 'relationship', relationTo: 'products', required: true },

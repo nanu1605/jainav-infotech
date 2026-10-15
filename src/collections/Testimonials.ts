@@ -9,7 +9,9 @@ import { revalidateCollection } from '@/hooks/revalidate'
  */
 const requireConsentToPublish: CollectionBeforeChangeHook = ({ data, originalDoc, req }) => {
   const status = data._status ?? originalDoc?._status
-  const consent = data.consentReceived ?? originalDoc?.consentReceived
+  // An explicit null must not fall back to the stored consent.
+  const consent =
+    data.consentReceived !== undefined ? data.consentReceived : originalDoc?.consentReceived
   if (status === 'published' && consent !== true) {
     throw new ValidationError(
       {

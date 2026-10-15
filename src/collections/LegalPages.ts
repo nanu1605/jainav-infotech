@@ -16,7 +16,8 @@ export const LegalPages: CollectionConfig = {
     description:
       'Editors save drafts; only the Owner can publish, and publishing counts as approval. Version history is kept.',
   },
-  versions: { drafts: true, maxPerDoc: 50 },
+  // Keep every version: published texts are what visitors and buyers agreed to (spec §8.13).
+  versions: { drafts: true, maxPerDoc: 0 },
   access: {
     read: publishedOrStaff,
     readVersions: staff,
@@ -44,7 +45,12 @@ export const LegalPages: CollectionConfig = {
         description: 'Shown on the page, e.g. 1.0. Bump it on every change.',
       },
     },
-    { name: 'effectiveDate', type: 'date', admin: { position: 'sidebar' } },
+    {
+      name: 'effectiveDate',
+      type: 'date',
+      required: true, // enforced on publish; draft saves skip validation
+      admin: { position: 'sidebar', date: { pickerAppearance: 'dayOnly' } },
+    },
     hiStatusField,
   ],
 }

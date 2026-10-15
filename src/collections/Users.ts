@@ -5,7 +5,11 @@ import { hasRole, isStaff, ownerOnly, ownerOnlyField, ROLES, staff } from '@/acc
 /** The very first admin account becomes the owner; later accounts default to editor. */
 const firstUserIsOwner: CollectionBeforeChangeHook = async ({ data, operation, req }) => {
   if (operation === 'create') {
-    const { totalDocs } = await req.payload.count({ collection: 'users', req })
+    const { totalDocs } = await req.payload.count({
+      collection: 'users',
+      overrideAccess: true,
+      req,
+    })
     if (totalDocs === 0) data.roles = ['owner']
   }
   return data
@@ -27,6 +31,8 @@ export const Users: CollectionConfig = {
     read: staff,
     create: ownerOnly,
     delete: ownerOnly,
+    // Otherwise any admin could clear the owner's login lockout (spec §16).
+    unlock: ownerOnly,
     update: ({ req: { user } }) =>
       hasRole(user, 'owner') ? true : user ? { id: { equals: user.id } } : false,
   },

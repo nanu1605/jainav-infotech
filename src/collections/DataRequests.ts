@@ -1,10 +1,13 @@
-import type { CollectionBeforeChangeHook, CollectionConfig } from 'payload'
+import type { CollectionBeforeChangeHook, CollectionConfig, FieldAccess } from 'payload'
 
 import { leadHandlers, nobody, ownerOnly } from '@/access/roles'
 
 import { normalizeEmail } from './Leads'
 
 const CLOSED = ['completed', 'rejected']
+
+/** The request as submitted is a record; the API ignores staff edits to it. */
+const record: { update: FieldAccess } = { update: () => false }
 
 /** Records who closed a request and when, unless staff filled it in already. */
 const stampHandled: CollectionBeforeChangeHook = ({ data, originalDoc, req }) => {
@@ -36,6 +39,7 @@ export const DataRequests: CollectionConfig = {
       name: 'email',
       type: 'email',
       required: true,
+      access: record,
       hooks: { beforeValidate: [normalizeEmail] },
       admin: { readOnly: true },
     },
@@ -44,9 +48,10 @@ export const DataRequests: CollectionConfig = {
       type: 'select',
       options: ['access', 'correction', 'erasure', 'withdraw-consent', 'grievance'],
       required: true,
+      access: record,
       admin: { readOnly: true },
     },
-    { name: 'details', type: 'textarea', admin: { readOnly: true } },
+    { name: 'details', type: 'textarea', access: record, admin: { readOnly: true } },
     {
       name: 'status',
       type: 'select',
