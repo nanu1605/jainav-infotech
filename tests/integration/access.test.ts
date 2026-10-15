@@ -190,7 +190,7 @@ describe('owner-only publishing', () => {
     await payload.update({
       collection: 'legal-pages',
       id: page.id,
-      data: { _status: 'published' },
+      data: { _status: 'published', effectiveDate: '2026-10-15T00:00:00.000Z' },
       ...as('owner'),
     })
     await expect(
