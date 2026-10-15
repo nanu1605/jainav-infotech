@@ -81,6 +81,17 @@
   --font-display: var(--font-jakarta), var(--font-mukta), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Continuous marquee (spec §14): transform only; the global reduced-motion rule stops it. */
+@theme {
+  --animate-marquee: marquee var(--marquee-duration, 40s) linear infinite;
+
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+}
+
 @layer base {
   html {
     background-color: var(--bg);
