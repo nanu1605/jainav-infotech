@@ -31,9 +31,9 @@ Tasks from spec §20. Each phase ends with all checks green, a phase report, and
 
 ### Phase 2 — Design system and motion
 
-- [ ] Components (§5.6) and motion primitives (word-based TextReveal using `Intl.Segmenter`).
-- [ ] Reduced-motion handling.
-- [ ] `/styleguide` (not in production).
+- [x] Components (§5.6) and motion primitives (word-based TextReveal; splits at whitespace, not `Intl.Segmenter`; see decisions).
+- [x] Reduced-motion handling.
+- [x] `/styleguide` (not in production).
 
 ## Milestone B — Company website live (Launch 1)
 
