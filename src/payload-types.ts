@@ -3010,6 +3010,9 @@ export interface SiteSetting {
     gstin?: string | null;
     incorporationDate?: string | null;
     registeredAddress?: string | null;
+    /**
+     * As shown on the site, e.g. +91 98765 43210.
+     */
     phone?: string | null;
     emails?: {
       hello?: string | null;
@@ -3018,6 +3021,9 @@ export interface SiteSetting {
       careers?: string | null;
       privacy?: string | null;
     };
+    /**
+     * Digits only with the country code, e.g. 919876543210.
+     */
     whatsapp?: string | null;
   };
   socials?:
