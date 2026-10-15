@@ -6,29 +6,24 @@ import { richText, text, textarea } from 'payload/shared'
  * the locale being saved, so a required localized field would block saving or publishing from
  * the Hindi admin until every row is translated, and non-draft tables get NOT NULL locale
  * columns. This plugin turns `required` on localized fields into "required in English": the
- * field is optional in the schema and its validator only insists on a value in the default locale.
+ * field is optional in the schema, and its validator applies `required` only when saving the
+ * default locale or creating a document (a new document has no English yet).
  */
 const DEFAULT_LOCALE = 'en'
 
 // Payload's own per-type validators, which a custom `validate` would otherwise replace.
 const builtIn = { text, textarea, richText } as unknown as Record<string, Validate | undefined>
 
-type Lexical = { root?: { children?: { children?: unknown[] }[] } }
-const isEmpty = (value: unknown) =>
-  value == null ||
-  value === '' ||
-  (typeof value === 'object' &&
-    'root' in value &&
-    !(value as Lexical).root?.children?.some((node) => (node.children?.length ?? 0) > 0))
-
+// Passing `required` through keeps Payload's own emptiness rules per type (e.g. rich text hasText).
 const requiredInDefaultLocale =
   (inner: Validate | undefined): Validate =>
   (value, options) => {
-    if (isEmpty(value)) {
-      const locale = options.req?.locale
-      return locale && locale !== DEFAULT_LOCALE ? true : options.req.t('validation:required')
-    }
-    return inner ? inner(value, options) : true
+    const locale = options.req?.locale
+    const required = !locale || locale === DEFAULT_LOCALE || options.operation === 'create'
+    if (inner) return inner(value, { ...options, required })
+    return !required || (value != null && value !== '')
+      ? true
+      : options.req.t('validation:required')
   }
 
 function relax(field: Field): Field {

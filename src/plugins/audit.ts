@@ -13,10 +13,11 @@ import { isDraftWrite, liveBefore } from './liveDoc'
 const SKIP = new Set(['audit-log', 'daily-stats'])
 
 /**
- * Their titles are personal data (emails). The log can't be edited or deleted, so it must not
- * hold them, or erasure requests could never be completed (spec §3, §16). The id is enough.
+ * Their titles are personal data (emails, a customer's name). The log can't be edited or deleted,
+ * so it must not hold them, or erasure requests could never be completed (spec §3, §16).
+ * The id is enough. Team names are public staff bios and stay.
  */
-const PERSONAL = new Set(['leads', 'data-requests', 'users'])
+const PERSONAL = new Set(['leads', 'data-requests', 'users', 'testimonials'])
 
 type Entry = {
   action: 'create' | 'update' | 'delete'

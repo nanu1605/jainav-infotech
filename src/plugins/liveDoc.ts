@@ -21,9 +21,20 @@ type LiveDoc = { _status?: 'draft' | 'published' | null; slug?: string | null } 
 const liveKey = (collection: string, id: number | string) => `liveDoc:${collection}:${id}`
 const draftKey = (collection: string) => `draftWrite:${collection}`
 
+type WriteArgs = { draft?: boolean; publishAllLocales?: boolean; data?: { _status?: unknown } }
+
+/**
+ * Mirrors Payload's own rule (collections/operations/utilities/update.js): a write only saves a
+ * draft when `draft` is set and it doesn't publish. Bulk "Publish many" sends draft=true with
+ * _status 'published' and does publish. Every write operation resets the flag.
+ */
 const recordDraftFlag: CollectionBeforeOperationHook = ({ args, collection, operation, req }) => {
-  if (operation === 'create' || operation === 'update') {
-    req.context[draftKey(collection.slug)] = (args as { draft?: boolean }).draft === true
+  const a = args as WriteArgs
+  if (operation === 'create' || operation === 'restoreVersion') {
+    req.context[draftKey(collection.slug)] = a.draft === true
+  } else if (operation === 'update') {
+    req.context[draftKey(collection.slug)] =
+      a.draft === true && a.data?._status !== 'published' && !a.publishAllLocales
   }
   return args
 }
