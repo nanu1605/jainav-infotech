@@ -56,6 +56,7 @@ export function TextReveal({ text, as: Tag = 'h2', className }: Props) {
               className="inline-block"
               variants={revealVariants}
               transition={revealTransition}
+              data-reveal
             >
               {piece}
             </m.span>

@@ -106,7 +106,7 @@ export const brandConfig = {
       surface: 'neutral.950',
       'surface-raised': 'neutral.900',
       overlay: { ref: 'neutral.1000', alpha: 0.7 },
-      hover: 'neutral.900',
+      hover: 'neutral.800',
       fg: 'neutral.50',
       'fg-muted': 'neutral.300',
       'fg-subtle': 'neutral.400',

@@ -77,6 +77,7 @@ export function Reveal({ as = 'div', delay = 0, className, children }: RevealPro
       animate={revealTarget(phase)}
       variants={revealVariants}
       transition={{ ...revealTransition, delay }}
+      data-reveal
       className={className}
     >
       {children}

@@ -34,7 +34,7 @@ export function Stagger({ as = 'div', className, children }: Props) {
 export function StaggerItem({ as = 'div', className, children }: Props) {
   const Comp = MOTION_TAGS[as]
   return (
-    <Comp variants={revealVariants} transition={revealTransition} className={className}>
+    <Comp variants={revealVariants} transition={revealTransition} data-reveal className={className}>
       {children}
     </Comp>
   )

@@ -36,7 +36,7 @@ export function ProductCard({ product, href, headingLevel: Heading = 'h3' }: Pro
       <Spotlight
         color="color-mix(in oklch, var(--product-accent, var(--brand-accent)) 22%, transparent)"
         style={accentVars(accentColor) as CSSProperties}
-        className="group flex h-full flex-col rounded-lg border border-border bg-surface p-6 shadow-sm transition-[translate] duration-[var(--duration-base)] ease-out hover:-translate-y-1 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring"
+        className="group flex h-full flex-col rounded-lg border border-border bg-surface p-6 shadow-sm transition-[translate] duration-[var(--duration-base)] ease-out hover:-translate-y-1 motion-reduce:hover:translate-y-0 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring"
       >
         <div
           aria-hidden
@@ -89,7 +89,7 @@ export function ProductCard({ product, href, headingLevel: Heading = 'h3' }: Pro
             {status === 'coming-soon' && t('waitlist')}
             <ArrowRight
               aria-hidden
-              className="size-4 text-fg-muted transition-[translate] duration-[var(--duration-base)] ease-out group-hover:translate-x-0.5"
+              className="size-4 text-fg-muted transition-[translate] duration-[var(--duration-base)] ease-out group-hover:translate-x-0.5 motion-reduce:group-hover:translate-x-0"
             />
           </span>
         </div>

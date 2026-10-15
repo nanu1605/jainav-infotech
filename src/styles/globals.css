@@ -1,7 +1,8 @@
 @import 'tailwindcss';
 @import './tokens.css';
 
-@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+/* Light islands inside a dark page (nested data-theme wrappers) stay light. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *):not(:where([data-theme=dark] [data-theme=light], [data-theme=dark] [data-theme=light] *)));
 
 /* shadcn/ui variables mapped onto Jainav tokens (spec §5.2). Our brand color is
    --brand-accent; shadcn's --accent is the hover/selected background. Declared on every
@@ -58,6 +59,8 @@
   --color-info-fg: var(--info-fg);
   --color-glow: var(--glow);
   --color-product-accent: var(--product-accent, var(--brand-accent));
+  /* The accent only where it reaches 3:1, else the text color (spec §5.3): for state indicators. */
+  --color-product-accent-text: var(--product-accent-text, var(--brand-accent));
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -111,11 +114,37 @@
     outline-offset: 2px;
   }
 
-  /* Devanagari: room for matras, no tracking, no case transforms (spec §5.4). */
+  /* Devanagari: room for matras, no tracking, no case transforms (spec §5.4). Utilities win over
+     this layer, so the theme variables they read are overridden too; display sizes need less. */
   :lang(hi) {
     line-height: 1.75;
     letter-spacing: normal;
     text-transform: none;
+    --text-xs--line-height: 1.75;
+    --text-sm--line-height: 1.75;
+    --text-base--line-height: 1.75;
+    --text-lg--line-height: 1.7;
+    --text-xl--line-height: 1.65;
+    --text-2xl--line-height: 1.55;
+    --text-3xl--line-height: 1.5;
+    --text-4xl--line-height: 1.45;
+    --text-5xl--line-height: 1.4;
+    --text-6xl--line-height: 1.35;
+    --leading-tight: 1.5;
+    --leading-snug: 1.6;
+    --tracking-tighter: 0em;
+    --tracking-tight: 0em;
+    --tracking-wide: 0em;
+    --tracking-wider: 0em;
+    --tracking-widest: 0em;
+  }
+
+  /* Printing never scrolls reveals into view: print them in their final state. */
+  @media print {
+    [data-reveal] {
+      opacity: 1 !important;
+      transform: none !important;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {

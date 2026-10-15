@@ -60,9 +60,11 @@ export function CountUp({ value, locale, format, durationMs = 1600, className }:
 
   return (
     <span ref={ref} className={cn('inline-grid tabular-nums', className)}>
-      <span className={cn('[grid-area:1/1]', counting && 'opacity-0')}>{nf.format(value)}</span>
+      <span className={cn('[grid-area:1/1]', counting && 'opacity-0 print:opacity-100')}>
+        {nf.format(value)}
+      </span>
       {counting && (
-        <span ref={overlay} aria-hidden className="[grid-area:1/1]">
+        <span ref={overlay} aria-hidden className="[grid-area:1/1] print:hidden">
           {nf.format(0)}
         </span>
       )}

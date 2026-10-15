@@ -38,7 +38,7 @@ export function ProductSubNav({ slug, name, active }: ProductSubNavProps) {
               <Link
                 href={tab === 'overview' ? `/products/${slug}` : `/products/${slug}/${tab}`}
                 aria-current={tab === active ? 'page' : undefined}
-                className="relative inline-flex h-10 items-center rounded-md px-3 text-sm font-medium whitespace-nowrap text-fg-muted transition-colors duration-(--duration-fast) after:absolute after:inset-x-3 after:-bottom-1 after:h-0.5 after:rounded-full after:bg-product-accent after:opacity-0 hover:bg-hover hover:text-fg aria-[current=page]:text-fg aria-[current=page]:after:opacity-100"
+                className="relative inline-flex h-10 items-center rounded-md px-3 text-sm font-medium whitespace-nowrap text-fg-muted transition-colors duration-(--duration-fast) after:absolute after:inset-x-3 after:-bottom-1 after:h-0.5 after:rounded-full after:bg-product-accent-text after:opacity-0 hover:bg-hover hover:text-fg aria-[current=page]:text-fg aria-[current=page]:after:opacity-100"
               >
                 {t(tab)}
               </Link>

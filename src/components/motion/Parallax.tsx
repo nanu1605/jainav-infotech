@@ -1,7 +1,6 @@
 'use client'
 
-import { useMotionValue, useMotionValueEvent, useReducedMotion, useScroll } from 'motion/react'
-import * as m from 'motion/react-m'
+import { useMotionValueEvent, useReducedMotion, useScroll } from 'motion/react'
 import { useRef, type ReactNode } from 'react'
 
 type Props = {
@@ -12,20 +11,21 @@ type Props = {
 }
 
 /**
- * Scroll-linked vertical drift (transform only). The offset starts at 0 and is applied only after
- * mount, so server and client render the same markup and reduced motion keeps it at 0.
+ * Scroll-linked vertical drift (transform only). Server and client render no transform; it is
+ * written straight to the element from the first measurement after mount (a Motion component
+ * would reset it when the lazy features load), and reduced motion keeps it off.
  */
 export function Parallax({ offset = 40, className, children }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const reduce = useReducedMotion()
-  const y = useMotionValue(0)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] })
   useMotionValueEvent(scrollYProgress, 'change', (progress) => {
-    y.set(reduce ? 0 : offset * (1 - 2 * progress))
+    if (ref.current)
+      ref.current.style.transform = reduce ? '' : `translateY(${offset * (1 - 2 * progress)}px)`
   })
   return (
-    <m.div ref={ref} style={{ y }} className={className}>
+    <div ref={ref} className={className}>
       {children}
-    </m.div>
+    </div>
   )
 }
