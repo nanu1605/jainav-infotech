@@ -5,6 +5,8 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
+// Media URLs point at the R2 CDN in staging and production (payload.config.ts generateFileURL).
+const cdn = process.env.NEXT_PUBLIC_CDN_URL?.replace(/\/$/, '')
 
 // Messages are compiled at build time, so the ICU parser stays out of the client bundle (§15).
 const withNextIntl = createNextIntlPlugin({
@@ -22,6 +24,7 @@ const nextConfig: NextConfig = {
   },
   images: {
     localPatterns: [{ pathname: '/api/media/file/**' }],
+    remotePatterns: cdn ? [new URL(`${cdn}/**`)] : [],
   },
   webpack: (webpackConfig) => {
     webpackConfig.resolve.extensionAlias = {
