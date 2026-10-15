@@ -7,6 +7,18 @@
  */
 
 /**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Stats".
+ */
+export type Stats =
+  | {
+      source: 'manual' | 'downloads';
+      value?: string | null;
+      label: string;
+      id?: string | null;
+    }[]
+  | null;
+/**
  * Supported timezones in IANA format.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -67,17 +79,61 @@ export interface Config {
   };
   blocks: {};
   collections: {
-    users: User;
+    pages: Page;
+    posts: Post;
+    services: Service;
+    faqs: Faq;
+    testimonials: Testimonial;
+    team: Team;
+    jobs: Job;
+    'legal-pages': LegalPage;
     media: Media;
+    products: Product;
+    plans: Plan;
+    releases: Release;
+    installers: Installer;
+    docs: Doc;
+    changelog: Changelog;
+    leads: Lead;
+    'data-requests': DataRequest;
+    'short-links': ShortLink;
+    users: User;
+    'audit-log': AuditLog;
+    'daily-stats': DailyStat;
+    redirects: Redirect;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
   };
-  collectionsJoins: {};
+  collectionsJoins: {
+    products: {
+      plans: 'plans';
+    };
+  };
   collectionsSelect: {
-    users: UsersSelect<false> | UsersSelect<true>;
+    pages: PagesSelect<false> | PagesSelect<true>;
+    posts: PostsSelect<false> | PostsSelect<true>;
+    services: ServicesSelect<false> | ServicesSelect<true>;
+    faqs: FaqsSelect<false> | FaqsSelect<true>;
+    testimonials: TestimonialsSelect<false> | TestimonialsSelect<true>;
+    team: TeamSelect<false> | TeamSelect<true>;
+    jobs: JobsSelect<false> | JobsSelect<true>;
+    'legal-pages': LegalPagesSelect<false> | LegalPagesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    products: ProductsSelect<false> | ProductsSelect<true>;
+    plans: PlansSelect<false> | PlansSelect<true>;
+    releases: ReleasesSelect<false> | ReleasesSelect<true>;
+    installers: InstallersSelect<false> | InstallersSelect<true>;
+    docs: DocsSelect<false> | DocsSelect<true>;
+    changelog: ChangelogSelect<false> | ChangelogSelect<true>;
+    leads: LeadsSelect<false> | LeadsSelect<true>;
+    'data-requests': DataRequestsSelect<false> | DataRequestsSelect<true>;
+    'short-links': ShortLinksSelect<false> | ShortLinksSelect<true>;
+    users: UsersSelect<false> | UsersSelect<true>;
+    'audit-log': AuditLogSelect<false> | AuditLogSelect<true>;
+    'daily-stats': DailyStatsSelect<false> | DailyStatsSelect<true>;
+    redirects: RedirectsSelect<false> | RedirectsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -86,10 +142,16 @@ export interface Config {
   db: {
     defaultIDType: number;
   };
-  fallbackLocale: null;
-  globals: {};
-  globalsSelect: {};
-  locale: null;
+  fallbackLocale: ('false' | 'none' | 'null') | false | null | ('en' | 'hi') | ('en' | 'hi')[];
+  globals: {
+    'site-settings': SiteSetting;
+    navigation: Navigation;
+  };
+  globalsSelect: {
+    'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
+    navigation: NavigationSelect<false> | NavigationSelect<true>;
+  };
+  locale: 'en' | 'hi';
   widgets: {
     collections: CollectionsWidget;
   };
@@ -118,11 +180,1371 @@ export interface UserAuthOperations {
   };
 }
 /**
+ * Block-built pages. The page with the slug "home" is the home page.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pages".
+ */
+export interface Page {
+  id: number;
+  title: string;
+  layout?:
+    | (
+        | PageHeroBlock
+        | PageProductShowcaseBlock
+        | PageServicesOverviewBlock
+        | PagePrinciplesBlock
+        | PageProofBlock
+        | PageProcessBlock
+        | PageLatestBlock
+        | PageCtaBlock
+        | PageRichTextBlock
+        | PageTimelineBlock
+        | PageTeamBlock
+        | PageCompanyFactsBlock
+        | PageFaqBlock
+      )[]
+    | null;
+  meta?: {
+    title?: string | null;
+    description?: string | null;
+    /**
+     * Maximum upload file size: 12MB. Recommended file size for images is <500KB.
+     */
+    image?: (number | null) | Media;
+  };
+  /**
+   * When enabled, the slug will auto-generate from the title field on save and autosave.
+   */
+  generateSlug?: boolean | null;
+  slug: string;
+  /**
+   * Ready: the Hindi page is indexed and paired with English via hreflang.
+   */
+  hiStatus: 'missing' | 'draft' | 'ready';
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageHeroBlock".
+ */
+export interface PageHeroBlock {
+  headline: string;
+  subheadline?: string | null;
+  primary?: {
+    label?: string | null;
+    href?: string | null;
+  };
+  secondary?: {
+    label?: string | null;
+    href?: string | null;
+  };
+  /**
+   * Routing chips, e.g. "My restaurant" → /products/menumesh.
+   */
+  chips?:
+    | {
+        label: string;
+        href: string;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'hero';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageProductShowcaseBlock".
+ */
+export interface PageProductShowcaseBlock {
+  heading?: string | null;
+  intro?: string | null;
+  mode: 'featured' | 'selected';
+  products?: (number | Product)[] | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'productShowcase';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "products".
+ */
+export interface Product {
+  id: number;
+  name: string;
+  tagline: string;
+  summary?: string | null;
+  type: 'saas' | 'desktop' | 'mobile' | 'web' | 'api';
+  category: 'restaurants' | 'pc-tools' | 'assistants' | 'other';
+  platforms?: ('windows' | 'macos' | 'linux' | 'web' | 'android' | 'ios')[] | null;
+  /**
+   * Coming soon replaces every button with "Join the waitlist".
+   */
+  status: 'live' | 'beta' | 'coming-soon' | 'retired';
+  hostingMode: 'external' | 'hosted';
+  /**
+   * The product's own website. Required for a Visit button.
+   */
+  externalUrl?: string | null;
+  launchDate?: string | null;
+  /**
+   * 6-digit hex. Used for the card glow.
+   */
+  accentColor: string;
+  logo?: (number | null) | Media;
+  icon?: (number | null) | Media;
+  heroMedia?: (number | null) | Media;
+  /**
+   * A short, muted video loop played on the product card.
+   */
+  cardPreview?: (number | null) | Media;
+  layout?:
+    | (
+        | ProductHeroBlock
+        | ProductProblemSolutionBlock
+        | ProductFeatureScrollerBlock
+        | ProductFeatureGridBlock
+        | ProductScreenshotsBlock
+        | ProductVideoBlock
+        | ProductHowItWorksBlock
+        | ProductUseCasesBlock
+        | ProductPricingBlock
+        | ProductPrivacyBlock
+        | ProductRequirementsBlock
+        | ProductDownloadBlock
+        | ProductChangelogPreviewBlock
+        | ProductFaqBlock
+        | ProductTestimonialsBlock
+        | ProductComparisonBlock
+        | ProductCtaBandBlock
+        | ProductRichTextBlock
+        | ProductStatStripBlock
+        | ProductEmbedBlock
+      )[]
+    | null;
+  primaryButton: {
+    type: 'visit' | 'download' | 'buy' | 'demo' | 'contact';
+    /**
+     * Leave empty for the default label.
+     */
+    labelOverride?: string | null;
+    plan?: (number | null) | Plan;
+    channel?: ('stable' | 'beta') | null;
+    /**
+     * Optional. Overrides the scheduler link in Site settings.
+     */
+    url?: string | null;
+  };
+  secondaryButton?: {
+    type?: ('visit' | 'download' | 'buy' | 'demo' | 'contact') | null;
+    /**
+     * Leave empty for the default label.
+     */
+    labelOverride?: string | null;
+    plan?: (number | null) | Plan;
+    channel?: ('stable' | 'beta') | null;
+    /**
+     * Optional. Overrides the scheduler link in Site settings.
+     */
+    url?: string | null;
+  };
+  /**
+   * Shown in a row under the hero.
+   */
+  secondaryLinks?:
+    | {
+        kind: 'docs' | 'microsoft-store' | 'play-store' | 'app-store' | 'github' | 'status' | 'other';
+        label?: string | null;
+        url: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Plans of this product. They are edited in Products → Plans.
+   */
+  plans?: {
+    docs?: (number | Plan)[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
+  meta?: {
+    title?: string | null;
+    description?: string | null;
+    /**
+     * Maximum upload file size: 12MB. Recommended file size for images is <500KB.
+     */
+    image?: (number | null) | Media;
+  };
+  /**
+   * When enabled, the slug will auto-generate from the title field on save and autosave.
+   */
+  generateSlug?: boolean | null;
+  slug: string;
+  /**
+   * Ready: the Hindi page is indexed and paired with English via hreflang.
+   */
+  hiStatus: 'missing' | 'draft' | 'ready';
+  /**
+   * Feature on the home page.
+   */
+  featured?: boolean | null;
+  sortOrder?: number | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "media".
+ */
+export interface Media {
+  id: number;
+  alt: string;
+  caption?: string | null;
+  prefix?: string | null;
+  _objectKey?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+  sizes?: {
+    thumbnail?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    square?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    small?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    medium?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    large?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    xlarge?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    og?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductHeroBlock".
+ */
+export interface ProductHeroBlock {
+  eyebrow?: string | null;
+  heading?: string | null;
+  subheading?: string | null;
+  media?: (number | null) | Media;
+  /**
+   * Signature animation in place of the media.
+   */
+  animation: 'none' | 'menumesh' | 'vyro' | 'baby';
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'productHero';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductProblemSolutionBlock".
+ */
+export interface ProductProblemSolutionBlock {
+  heading?: string | null;
+  problem?: string | null;
+  solution?: string | null;
+  points?:
+    | {
+        text: string;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'problemSolution';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductFeatureScrollerBlock".
+ */
+export interface ProductFeatureScrollerBlock {
+  heading?: string | null;
+  /**
+   * The media changes as each feature scrolls into view.
+   */
+  items?:
+    | {
+        title: string;
+        text?: string | null;
+        media?: (number | null) | Media;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'featureScroller';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductFeatureGridBlock".
+ */
+export interface ProductFeatureGridBlock {
+  heading?: string | null;
+  intro?: string | null;
+  items?:
+    | {
+        /**
+         * Lucide icon name, e.g. shield-check.
+         */
+        icon?: string | null;
+        title: string;
+        text?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'featureGrid';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductScreenshotsBlock".
+ */
+export interface ProductScreenshotsBlock {
+  heading?: string | null;
+  images?:
+    | {
+        image: number | Media;
+        caption?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'screenshots';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductVideoBlock".
+ */
+export interface ProductVideoBlock {
+  heading?: string | null;
+  video: number | Media;
+  poster?: (number | null) | Media;
+  /**
+   * WebVTT (.vtt) subtitles.
+   */
+  captions?: (number | null) | Media;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'video';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductHowItWorksBlock".
+ */
+export interface ProductHowItWorksBlock {
+  heading?: string | null;
+  steps?:
+    | {
+        title: string;
+        text?: string | null;
+        media?: (number | null) | Media;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'howItWorks';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductUseCasesBlock".
+ */
+export interface ProductUseCasesBlock {
+  heading?: string | null;
+  items?:
+    | {
+        /**
+         * Lucide icon name, e.g. shield-check.
+         */
+        icon?: string | null;
+        title: string;
+        text?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'useCases';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductPricingBlock".
+ */
+export interface ProductPricingBlock {
+  heading?: string | null;
+  source: 'plans' | 'manual';
+  tiers?:
+    | {
+        name: string;
+        /**
+         * Display only.
+         */
+        price?: string | null;
+        features?:
+          | {
+              text: string;
+              id?: string | null;
+            }[]
+          | null;
+        highlight?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  fullPricingUrl?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'pricing';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductPrivacyBlock".
+ */
+export interface ProductPrivacyBlock {
+  heading?: string | null;
+  local?:
+    | {
+        text: string;
+        id?: string | null;
+      }[]
+    | null;
+  cloud?:
+    | {
+        text: string;
+        id?: string | null;
+      }[]
+    | null;
+  note?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'privacy';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductRequirementsBlock".
+ */
+export interface ProductRequirementsBlock {
+  heading?: string | null;
+  rows?:
+    | {
+        label: string;
+        minimum?: string | null;
+        recommended?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'requirements';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductDownloadBlock".
+ */
+export interface ProductDownloadBlock {
+  heading?: string | null;
+  /**
+   * Shows the latest published release on this channel (version, size, SHA-256).
+   */
+  channel: 'stable' | 'beta';
+  note?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'download';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductChangelogPreviewBlock".
+ */
+export interface ProductChangelogPreviewBlock {
+  heading?: string | null;
+  /**
+   * This product's newest changelog entries and releases.
+   */
+  limit: number;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'changelogPreview';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductFaqBlock".
+ */
+export interface ProductFaqBlock {
+  heading?: string | null;
+  /**
+   * Leave empty to show this product's FAQs.
+   */
+  faqs?: (number | Faq)[] | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'faq';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "faqs".
+ */
+export interface Faq {
+  id: number;
+  question: string;
+  answer: string;
+  /**
+   * Leave empty for a company-wide question.
+   */
+  product?: (number | null) | Product;
+  category:
+    'general' | 'pricing' | 'licensing' | 'devices' | 'refunds' | 'updates' | 'services' | 'careers' | 'privacy';
+  sortOrder?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductTestimonialsBlock".
+ */
+export interface ProductTestimonialsBlock {
+  heading?: string | null;
+  /**
+   * Leave empty to show this product's published testimonials.
+   */
+  items?: (number | Testimonial)[] | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'testimonials';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "testimonials".
+ */
+export interface Testimonial {
+  id: number;
+  quote: string;
+  name: string;
+  role?: string | null;
+  company?: string | null;
+  product?: (number | null) | Product;
+  avatar?: (number | null) | Media;
+  /**
+   * The person agreed to publish this quote with their name. Required to publish.
+   */
+  consentReceived?: boolean | null;
+  /**
+   * How and when consent was given. Never shown publicly.
+   */
+  consentNote?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductComparisonBlock".
+ */
+export interface ProductComparisonBlock {
+  heading?: string | null;
+  columns?:
+    | {
+        label: string;
+        highlight?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  rows?:
+    | {
+        feature: string;
+        /**
+         * One cell per column, in column order.
+         */
+        cells?:
+          | {
+              value?: string | null;
+              id?: string | null;
+            }[]
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'comparison';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductCtaBandBlock".
+ */
+export interface ProductCtaBandBlock {
+  heading?: string | null;
+  text?: string | null;
+  useProductButtons?: boolean | null;
+  primary?: {
+    label?: string | null;
+    href?: string | null;
+  };
+  secondary?: {
+    label?: string | null;
+    href?: string | null;
+  };
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'ctaBand';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductRichTextBlock".
+ */
+export interface ProductRichTextBlock {
+  content: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  };
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'richText';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductStatStripBlock".
+ */
+export interface ProductStatStripBlock {
+  stats?: Stats;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'statStrip';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductEmbedBlock".
+ */
+export interface ProductEmbedBlock {
+  /**
+   * Describes the embed for screen readers (iframe title).
+   */
+  title: string;
+  /**
+   * Allowed: www.youtube-nocookie.com, www.youtube.com, player.vimeo.com, www.loom.com, cal.com, calendly.com
+   */
+  url: string;
+  aspectRatio: '16:9' | '4:3' | '1:1';
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'embed';
+}
+/**
+ * Prices are whole numbers in the smallest unit: paise for INR, cents for USD.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "plans".
+ */
+export interface Plan {
+  id: number;
+  product: number | Product;
+  /**
+   * Unique per product, e.g. free or pro.
+   */
+  code: string;
+  name: string;
+  description?: string | null;
+  billing: 'one_time' | 'yearly' | 'monthly';
+  /**
+   * GST-inclusive. ₹999 = 99900 paise.
+   */
+  priceINR?: number | null;
+  /**
+   * Optional. $9.99 = 999 cents.
+   */
+  priceUSD?: number | null;
+  features?:
+    | {
+        text: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Devices per license.
+   */
+  maxActivations?: number | null;
+  /**
+   * Leave empty for lifetime updates.
+   */
+  updatesForMonths?: number | null;
+  /**
+   * Emphasise on the pricing table.
+   */
+  highlight?: boolean | null;
+  /**
+   * Inactive plans are hidden and cannot be bought.
+   */
+  active?: boolean | null;
+  sortOrder?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageServicesOverviewBlock".
+ */
+export interface PageServicesOverviewBlock {
+  heading?: string | null;
+  intro?: string | null;
+  /**
+   * Leave empty to show all services.
+   */
+  services?: (number | Service)[] | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'servicesOverview';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "services".
+ */
+export interface Service {
+  id: number;
+  title: string;
+  summary: string;
+  /**
+   * Lucide icon name in kebab-case, e.g. cloud-cog (lucide.dev/icons).
+   */
+  icon?: string | null;
+  capabilities?:
+    | {
+        text: string;
+        id?: string | null;
+      }[]
+    | null;
+  deliverables?:
+    | {
+        text: string;
+        id?: string | null;
+      }[]
+    | null;
+  relatedProducts?: (number | Product)[] | null;
+  layout?:
+    | (
+        | PageHeroBlock
+        | PageProductShowcaseBlock
+        | PageServicesOverviewBlock
+        | PagePrinciplesBlock
+        | PageProofBlock
+        | PageProcessBlock
+        | PageLatestBlock
+        | PageCtaBlock
+        | PageRichTextBlock
+        | PageTimelineBlock
+        | PageTeamBlock
+        | PageCompanyFactsBlock
+        | PageFaqBlock
+      )[]
+    | null;
+  meta?: {
+    title?: string | null;
+    description?: string | null;
+    /**
+     * Maximum upload file size: 12MB. Recommended file size for images is <500KB.
+     */
+    image?: (number | null) | Media;
+  };
+  /**
+   * When enabled, the slug will auto-generate from the title field on save and autosave.
+   */
+  generateSlug?: boolean | null;
+  slug: string;
+  sortOrder?: number | null;
+  /**
+   * Ready: the Hindi page is indexed and paired with English via hreflang.
+   */
+  hiStatus: 'missing' | 'draft' | 'ready';
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PagePrinciplesBlock".
+ */
+export interface PagePrinciplesBlock {
+  heading?: string | null;
+  items?:
+    | {
+        /**
+         * Lucide icon name, e.g. shield-check.
+         */
+        icon?: string | null;
+        title: string;
+        text?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'principles';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageProofBlock".
+ */
+export interface PageProofBlock {
+  heading?: string | null;
+  stats?: Stats;
+  /**
+   * Only published (consented) testimonials show. The block hides itself when empty.
+   */
+  testimonials?: (number | Testimonial)[] | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'proof';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageProcessBlock".
+ */
+export interface PageProcessBlock {
+  heading?: string | null;
+  steps?:
+    | {
+        title: string;
+        text?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'process';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageLatestBlock".
+ */
+export interface PageLatestBlock {
+  heading?: string | null;
+  postsCount: number;
+  changelogCount: number;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'latest';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageCtaBlock".
+ */
+export interface PageCtaBlock {
+  heading: string;
+  text?: string | null;
+  primary?: {
+    label?: string | null;
+    href?: string | null;
+  };
+  secondary?: {
+    label?: string | null;
+    href?: string | null;
+  };
+  showNewsletter?: boolean | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'cta';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageRichTextBlock".
+ */
+export interface PageRichTextBlock {
+  content: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  };
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'richText';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageTimelineBlock".
+ */
+export interface PageTimelineBlock {
+  heading?: string | null;
+  items?:
+    | {
+        date?: string | null;
+        title: string;
+        text?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'timeline';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageTeamBlock".
+ */
+export interface PageTeamBlock {
+  heading?: string | null;
+  /**
+   * Leave empty to show the whole team.
+   */
+  members?: (number | Team)[] | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'team';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "team".
+ */
+export interface Team {
+  id: number;
+  name: string;
+  role?: string | null;
+  bio?: string | null;
+  photo?: (number | null) | Media;
+  links?:
+    | {
+        label?: string | null;
+        url: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Shown in the founder section on About.
+   */
+  founder?: boolean | null;
+  sortOrder?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageCompanyFactsBlock".
+ */
+export interface PageCompanyFactsBlock {
+  /**
+   * Legal name, CIN, incorporation date and office come from Site settings.
+   */
+  heading?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'companyFacts';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageFaqBlock".
+ */
+export interface PageFaqBlock {
+  heading?: string | null;
+  faqs?: (number | Faq)[] | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'faq';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts".
+ */
+export interface Post {
+  id: number;
+  title: string;
+  excerpt?: string | null;
+  cover?: (number | null) | Media;
+  body: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  };
+  tags?: string[] | null;
+  author?: (number | null) | Team;
+  meta?: {
+    title?: string | null;
+    description?: string | null;
+    /**
+     * Maximum upload file size: 12MB. Recommended file size for images is <500KB.
+     */
+    image?: (number | null) | Media;
+  };
+  /**
+   * When enabled, the slug will auto-generate from the title field on save and autosave.
+   */
+  generateSlug?: boolean | null;
+  slug: string;
+  /**
+   * Set automatically on first publish if left empty.
+   */
+  publishedAt?: string | null;
+  /**
+   * Ready: the Hindi page is indexed and paired with English via hreflang.
+   */
+  hiStatus: 'missing' | 'draft' | 'ready';
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "jobs".
+ */
+export interface Job {
+  id: number;
+  title: string;
+  type: 'full-time' | 'part-time' | 'internship' | 'contract';
+  workMode: 'onsite' | 'remote' | 'hybrid';
+  location?: string | null;
+  description?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  /**
+   * When enabled, the slug will auto-generate from the title field on save and autosave.
+   */
+  generateSlug?: boolean | null;
+  slug: string;
+  postedAt?: string | null;
+  /**
+   * Ready: the Hindi page is indexed and paired with English via hreflang.
+   */
+  hiStatus: 'missing' | 'draft' | 'ready';
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * Editors save drafts; only the Owner can publish, and publishing counts as approval. Version history is kept.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "legal-pages".
+ */
+export interface LegalPage {
+  id: number;
+  title: string;
+  body?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  /**
+   * When enabled, the slug will auto-generate from the title field on save and autosave.
+   */
+  generateSlug?: boolean | null;
+  slug: string;
+  /**
+   * Shown on the page, e.g. 1.0. Bump it on every change.
+   */
+  version: string;
+  effectiveDate?: string | null;
+  /**
+   * Ready: the Hindi page is indexed and paired with English via hreflang.
+   */
+  hiStatus: 'missing' | 'draft' | 'ready';
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * Editors save drafts; only the Owner publishes. Publishing pushes this update to every installed copy through the update feed. Unpublish to pull a bad release.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "releases".
+ */
+export interface Release {
+  id: number;
+  product: number | Product;
+  version: string;
+  channel: 'stable' | 'beta';
+  platform: string;
+  releasedAt: string;
+  /**
+   * e.g. Windows 10 (1809)
+   */
+  minOs?: string | null;
+  /**
+   * Upload it in Products → Installers first (built with createUpdaterArtifacts).
+   */
+  installer: number | Installer;
+  /**
+   * Paste the full contents of the installer's .sig file.
+   */
+  updaterSignature: string;
+  /**
+   * Plain text. Shown on the download page and in the update feed.
+   */
+  notes?: string | null;
+  /**
+   * Copied from the installer.
+   */
+  sha256?: string | null;
+  /**
+   * Copied from the installer.
+   */
+  sizeBytes?: number | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * Windows installers (.exe / .msi). The SHA-256 is computed on upload; attach the file to a release to ship it.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "installers".
+ */
+export interface Installer {
+  id: number;
+  product: number | Product;
+  version: string;
+  sha256?: string | null;
+  prefix?: string | null;
+  _objectKey?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "docs".
+ */
+export interface Doc {
+  id: number;
+  title: string;
+  body?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  product: number | Product;
+  /**
+   * When enabled, the slug will auto-generate from the title field on save and autosave.
+   */
+  generateSlug?: boolean | null;
+  slug: string;
+  /**
+   * Nest this page under another doc of the same product.
+   */
+  parent?: (number | null) | Doc;
+  sortOrder?: number | null;
+  /**
+   * Ready: the Hindi page is indexed and paired with English via hreflang.
+   */
+  hiStatus: 'missing' | 'draft' | 'ready';
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "changelog".
+ */
+export interface Changelog {
+  id: number;
+  title: string;
+  body?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  product: number | Product;
+  type: 'new' | 'improved' | 'fixed';
+  date: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "leads".
+ */
+export interface Lead {
+  id: number;
+  status: 'new' | 'contacted' | 'qualified' | 'won' | 'lost' | 'spam';
+  assignedTo?: (number | null) | User;
+  notes?: string | null;
+  type: 'contact' | 'project' | 'waitlist' | 'newsletter' | 'demo' | 'careers' | 'partnership';
+  product?: (number | null) | Product;
+  name?: string | null;
+  email: string;
+  phone?: string | null;
+  company?: string | null;
+  message?: string | null;
+  details?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  locale?: ('en' | 'hi') | null;
+  source?: {
+    page?: string | null;
+    referrer?: string | null;
+    utm?: {
+      source?: string | null;
+      medium?: string | null;
+      campaign?: string | null;
+      term?: string | null;
+      content?: string | null;
+    };
+  };
+  consent?: {
+    textVersion?: string | null;
+    givenAt?: string | null;
+    ipHash?: string | null;
+  };
+  marketingConsent?: {
+    given?: boolean | null;
+    at?: string | null;
+    textVersion?: string | null;
+    withdrawnAt?: string | null;
+  };
+  confirmTokenHash?: string | null;
+  confirmedAt?: string | null;
+  unsubscribedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users".
  */
 export interface User {
   id: number;
+  name?: string | null;
+  roles: ('owner' | 'editor' | 'support')[];
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -145,22 +1567,101 @@ export interface User {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "media".
+ * via the `definition` "data-requests".
  */
-export interface Media {
+export interface DataRequest {
   id: number;
-  alt: string;
+  email: string;
+  type: 'access' | 'correction' | 'erasure' | 'withdraw-consent' | 'grievance';
+  details?: string | null;
+  status: 'new' | 'in-progress' | 'completed' | 'rejected';
+  handledBy?: (number | null) | User;
+  handledAt?: string | null;
   updatedAt: string;
   createdAt: string;
-  url?: string | null;
-  thumbnailURL?: string | null;
-  filename?: string | null;
-  mimeType?: string | null;
-  filesize?: number | null;
-  width?: number | null;
-  height?: number | null;
-  focalX?: number | null;
-  focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "short-links".
+ */
+export interface ShortLink {
+  id: number;
+  slug: string;
+  destination: string;
+  /**
+   * Added to the destination unless it already sets that parameter.
+   */
+  utm?: {
+    source?: string | null;
+    medium?: string | null;
+    /**
+     * Leave empty to use the slug.
+     */
+    campaign?: string | null;
+  };
+  active?: boolean | null;
+  notes?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "audit-log".
+ */
+export interface AuditLog {
+  id: number;
+  actor?: (number | null) | User;
+  action: 'create' | 'update' | 'delete';
+  entity: string;
+  docId?: string | null;
+  summary?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "daily-stats".
+ */
+export interface DailyStat {
+  id: number;
+  date: string;
+  kind: 'go-click' | 'download';
+  key: string;
+  count: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "redirects".
+ */
+export interface Redirect {
+  id: number;
+  from: string;
+  to?: {
+    type?: ('reference' | 'custom') | null;
+    reference?:
+      | ({
+          relationTo: 'pages';
+          value: number | Page;
+        } | null)
+      | ({
+          relationTo: 'products';
+          value: number | Product;
+        } | null)
+      | ({
+          relationTo: 'services';
+          value: number | Service;
+        } | null)
+      | ({
+          relationTo: 'posts';
+          value: number | Post;
+        } | null);
+    url?: string | null;
+  };
+  type: '301' | '302' | '307' | '308';
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -187,12 +1688,92 @@ export interface PayloadLockedDocument {
   id: number;
   document?:
     | ({
-        relationTo: 'users';
-        value: number | User;
+        relationTo: 'pages';
+        value: number | Page;
+      } | null)
+    | ({
+        relationTo: 'posts';
+        value: number | Post;
+      } | null)
+    | ({
+        relationTo: 'services';
+        value: number | Service;
+      } | null)
+    | ({
+        relationTo: 'faqs';
+        value: number | Faq;
+      } | null)
+    | ({
+        relationTo: 'testimonials';
+        value: number | Testimonial;
+      } | null)
+    | ({
+        relationTo: 'team';
+        value: number | Team;
+      } | null)
+    | ({
+        relationTo: 'jobs';
+        value: number | Job;
+      } | null)
+    | ({
+        relationTo: 'legal-pages';
+        value: number | LegalPage;
       } | null)
     | ({
         relationTo: 'media';
         value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'products';
+        value: number | Product;
+      } | null)
+    | ({
+        relationTo: 'plans';
+        value: number | Plan;
+      } | null)
+    | ({
+        relationTo: 'releases';
+        value: number | Release;
+      } | null)
+    | ({
+        relationTo: 'installers';
+        value: number | Installer;
+      } | null)
+    | ({
+        relationTo: 'docs';
+        value: number | Doc;
+      } | null)
+    | ({
+        relationTo: 'changelog';
+        value: number | Changelog;
+      } | null)
+    | ({
+        relationTo: 'leads';
+        value: number | Lead;
+      } | null)
+    | ({
+        relationTo: 'data-requests';
+        value: number | DataRequest;
+      } | null)
+    | ({
+        relationTo: 'short-links';
+        value: number | ShortLink;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: number | User;
+      } | null)
+    | ({
+        relationTo: 'audit-log';
+        value: number | AuditLog;
+      } | null)
+    | ({
+        relationTo: 'daily-stats';
+        value: number | DailyStat;
+      } | null)
+    | ({
+        relationTo: 'redirects';
+        value: number | Redirect;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -238,9 +1819,1083 @@ export interface PayloadMigration {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pages_select".
+ */
+export interface PagesSelect<T extends boolean = true> {
+  title?: T;
+  layout?:
+    | T
+    | {
+        hero?: T | PageHeroBlockSelect<T>;
+        productShowcase?: T | PageProductShowcaseBlockSelect<T>;
+        servicesOverview?: T | PageServicesOverviewBlockSelect<T>;
+        principles?: T | PagePrinciplesBlockSelect<T>;
+        proof?: T | PageProofBlockSelect<T>;
+        process?: T | PageProcessBlockSelect<T>;
+        latest?: T | PageLatestBlockSelect<T>;
+        cta?: T | PageCtaBlockSelect<T>;
+        richText?: T | PageRichTextBlockSelect<T>;
+        timeline?: T | PageTimelineBlockSelect<T>;
+        team?: T | PageTeamBlockSelect<T>;
+        companyFacts?: T | PageCompanyFactsBlockSelect<T>;
+        faq?: T | PageFaqBlockSelect<T>;
+      };
+  meta?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        image?: T;
+      };
+  generateSlug?: T;
+  slug?: T;
+  hiStatus?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageHeroBlock_select".
+ */
+export interface PageHeroBlockSelect<T extends boolean = true> {
+  headline?: T;
+  subheadline?: T;
+  primary?:
+    | T
+    | {
+        label?: T;
+        href?: T;
+      };
+  secondary?:
+    | T
+    | {
+        label?: T;
+        href?: T;
+      };
+  chips?:
+    | T
+    | {
+        label?: T;
+        href?: T;
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageProductShowcaseBlock_select".
+ */
+export interface PageProductShowcaseBlockSelect<T extends boolean = true> {
+  heading?: T;
+  intro?: T;
+  mode?: T;
+  products?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageServicesOverviewBlock_select".
+ */
+export interface PageServicesOverviewBlockSelect<T extends boolean = true> {
+  heading?: T;
+  intro?: T;
+  services?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PagePrinciplesBlock_select".
+ */
+export interface PagePrinciplesBlockSelect<T extends boolean = true> {
+  heading?: T;
+  items?:
+    | T
+    | {
+        icon?: T;
+        title?: T;
+        text?: T;
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageProofBlock_select".
+ */
+export interface PageProofBlockSelect<T extends boolean = true> {
+  heading?: T;
+  stats?: T | StatsSelect<T>;
+  testimonials?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Stats_select".
+ */
+export interface StatsSelect<T extends boolean = true> {
+  source?: T;
+  value?: T;
+  label?: T;
+  id?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageProcessBlock_select".
+ */
+export interface PageProcessBlockSelect<T extends boolean = true> {
+  heading?: T;
+  steps?:
+    | T
+    | {
+        title?: T;
+        text?: T;
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageLatestBlock_select".
+ */
+export interface PageLatestBlockSelect<T extends boolean = true> {
+  heading?: T;
+  postsCount?: T;
+  changelogCount?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageCtaBlock_select".
+ */
+export interface PageCtaBlockSelect<T extends boolean = true> {
+  heading?: T;
+  text?: T;
+  primary?:
+    | T
+    | {
+        label?: T;
+        href?: T;
+      };
+  secondary?:
+    | T
+    | {
+        label?: T;
+        href?: T;
+      };
+  showNewsletter?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageRichTextBlock_select".
+ */
+export interface PageRichTextBlockSelect<T extends boolean = true> {
+  content?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageTimelineBlock_select".
+ */
+export interface PageTimelineBlockSelect<T extends boolean = true> {
+  heading?: T;
+  items?:
+    | T
+    | {
+        date?: T;
+        title?: T;
+        text?: T;
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageTeamBlock_select".
+ */
+export interface PageTeamBlockSelect<T extends boolean = true> {
+  heading?: T;
+  members?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageCompanyFactsBlock_select".
+ */
+export interface PageCompanyFactsBlockSelect<T extends boolean = true> {
+  heading?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PageFaqBlock_select".
+ */
+export interface PageFaqBlockSelect<T extends boolean = true> {
+  heading?: T;
+  faqs?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts_select".
+ */
+export interface PostsSelect<T extends boolean = true> {
+  title?: T;
+  excerpt?: T;
+  cover?: T;
+  body?: T;
+  tags?: T;
+  author?: T;
+  meta?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        image?: T;
+      };
+  generateSlug?: T;
+  slug?: T;
+  publishedAt?: T;
+  hiStatus?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "services_select".
+ */
+export interface ServicesSelect<T extends boolean = true> {
+  title?: T;
+  summary?: T;
+  icon?: T;
+  capabilities?:
+    | T
+    | {
+        text?: T;
+        id?: T;
+      };
+  deliverables?:
+    | T
+    | {
+        text?: T;
+        id?: T;
+      };
+  relatedProducts?: T;
+  layout?:
+    | T
+    | {
+        hero?: T | PageHeroBlockSelect<T>;
+        productShowcase?: T | PageProductShowcaseBlockSelect<T>;
+        servicesOverview?: T | PageServicesOverviewBlockSelect<T>;
+        principles?: T | PagePrinciplesBlockSelect<T>;
+        proof?: T | PageProofBlockSelect<T>;
+        process?: T | PageProcessBlockSelect<T>;
+        latest?: T | PageLatestBlockSelect<T>;
+        cta?: T | PageCtaBlockSelect<T>;
+        richText?: T | PageRichTextBlockSelect<T>;
+        timeline?: T | PageTimelineBlockSelect<T>;
+        team?: T | PageTeamBlockSelect<T>;
+        companyFacts?: T | PageCompanyFactsBlockSelect<T>;
+        faq?: T | PageFaqBlockSelect<T>;
+      };
+  meta?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        image?: T;
+      };
+  generateSlug?: T;
+  slug?: T;
+  sortOrder?: T;
+  hiStatus?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "faqs_select".
+ */
+export interface FaqsSelect<T extends boolean = true> {
+  question?: T;
+  answer?: T;
+  product?: T;
+  category?: T;
+  sortOrder?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "testimonials_select".
+ */
+export interface TestimonialsSelect<T extends boolean = true> {
+  quote?: T;
+  name?: T;
+  role?: T;
+  company?: T;
+  product?: T;
+  avatar?: T;
+  consentReceived?: T;
+  consentNote?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "team_select".
+ */
+export interface TeamSelect<T extends boolean = true> {
+  name?: T;
+  role?: T;
+  bio?: T;
+  photo?: T;
+  links?:
+    | T
+    | {
+        label?: T;
+        url?: T;
+        id?: T;
+      };
+  founder?: T;
+  sortOrder?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "jobs_select".
+ */
+export interface JobsSelect<T extends boolean = true> {
+  title?: T;
+  type?: T;
+  workMode?: T;
+  location?: T;
+  description?: T;
+  generateSlug?: T;
+  slug?: T;
+  postedAt?: T;
+  hiStatus?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "legal-pages_select".
+ */
+export interface LegalPagesSelect<T extends boolean = true> {
+  title?: T;
+  body?: T;
+  generateSlug?: T;
+  slug?: T;
+  version?: T;
+  effectiveDate?: T;
+  hiStatus?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "media_select".
+ */
+export interface MediaSelect<T extends boolean = true> {
+  alt?: T;
+  caption?: T;
+  prefix?: T;
+  _objectKey?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
+  sizes?:
+    | T
+    | {
+        thumbnail?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        square?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        small?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        medium?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        large?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        xlarge?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        og?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+      };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "products_select".
+ */
+export interface ProductsSelect<T extends boolean = true> {
+  name?: T;
+  tagline?: T;
+  summary?: T;
+  type?: T;
+  category?: T;
+  platforms?: T;
+  status?: T;
+  hostingMode?: T;
+  externalUrl?: T;
+  launchDate?: T;
+  accentColor?: T;
+  logo?: T;
+  icon?: T;
+  heroMedia?: T;
+  cardPreview?: T;
+  layout?:
+    | T
+    | {
+        productHero?: T | ProductHeroBlockSelect<T>;
+        problemSolution?: T | ProductProblemSolutionBlockSelect<T>;
+        featureScroller?: T | ProductFeatureScrollerBlockSelect<T>;
+        featureGrid?: T | ProductFeatureGridBlockSelect<T>;
+        screenshots?: T | ProductScreenshotsBlockSelect<T>;
+        video?: T | ProductVideoBlockSelect<T>;
+        howItWorks?: T | ProductHowItWorksBlockSelect<T>;
+        useCases?: T | ProductUseCasesBlockSelect<T>;
+        pricing?: T | ProductPricingBlockSelect<T>;
+        privacy?: T | ProductPrivacyBlockSelect<T>;
+        requirements?: T | ProductRequirementsBlockSelect<T>;
+        download?: T | ProductDownloadBlockSelect<T>;
+        changelogPreview?: T | ProductChangelogPreviewBlockSelect<T>;
+        faq?: T | ProductFaqBlockSelect<T>;
+        testimonials?: T | ProductTestimonialsBlockSelect<T>;
+        comparison?: T | ProductComparisonBlockSelect<T>;
+        ctaBand?: T | ProductCtaBandBlockSelect<T>;
+        richText?: T | ProductRichTextBlockSelect<T>;
+        statStrip?: T | ProductStatStripBlockSelect<T>;
+        embed?: T | ProductEmbedBlockSelect<T>;
+      };
+  primaryButton?:
+    | T
+    | {
+        type?: T;
+        labelOverride?: T;
+        plan?: T;
+        channel?: T;
+        url?: T;
+      };
+  secondaryButton?:
+    | T
+    | {
+        type?: T;
+        labelOverride?: T;
+        plan?: T;
+        channel?: T;
+        url?: T;
+      };
+  secondaryLinks?:
+    | T
+    | {
+        kind?: T;
+        label?: T;
+        url?: T;
+        id?: T;
+      };
+  plans?: T;
+  meta?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        image?: T;
+      };
+  generateSlug?: T;
+  slug?: T;
+  hiStatus?: T;
+  featured?: T;
+  sortOrder?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductHeroBlock_select".
+ */
+export interface ProductHeroBlockSelect<T extends boolean = true> {
+  eyebrow?: T;
+  heading?: T;
+  subheading?: T;
+  media?: T;
+  animation?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductProblemSolutionBlock_select".
+ */
+export interface ProductProblemSolutionBlockSelect<T extends boolean = true> {
+  heading?: T;
+  problem?: T;
+  solution?: T;
+  points?:
+    | T
+    | {
+        text?: T;
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductFeatureScrollerBlock_select".
+ */
+export interface ProductFeatureScrollerBlockSelect<T extends boolean = true> {
+  heading?: T;
+  items?:
+    | T
+    | {
+        title?: T;
+        text?: T;
+        media?: T;
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductFeatureGridBlock_select".
+ */
+export interface ProductFeatureGridBlockSelect<T extends boolean = true> {
+  heading?: T;
+  intro?: T;
+  items?:
+    | T
+    | {
+        icon?: T;
+        title?: T;
+        text?: T;
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductScreenshotsBlock_select".
+ */
+export interface ProductScreenshotsBlockSelect<T extends boolean = true> {
+  heading?: T;
+  images?:
+    | T
+    | {
+        image?: T;
+        caption?: T;
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductVideoBlock_select".
+ */
+export interface ProductVideoBlockSelect<T extends boolean = true> {
+  heading?: T;
+  video?: T;
+  poster?: T;
+  captions?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductHowItWorksBlock_select".
+ */
+export interface ProductHowItWorksBlockSelect<T extends boolean = true> {
+  heading?: T;
+  steps?:
+    | T
+    | {
+        title?: T;
+        text?: T;
+        media?: T;
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductUseCasesBlock_select".
+ */
+export interface ProductUseCasesBlockSelect<T extends boolean = true> {
+  heading?: T;
+  items?:
+    | T
+    | {
+        icon?: T;
+        title?: T;
+        text?: T;
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductPricingBlock_select".
+ */
+export interface ProductPricingBlockSelect<T extends boolean = true> {
+  heading?: T;
+  source?: T;
+  tiers?:
+    | T
+    | {
+        name?: T;
+        price?: T;
+        features?:
+          | T
+          | {
+              text?: T;
+              id?: T;
+            };
+        highlight?: T;
+        id?: T;
+      };
+  fullPricingUrl?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductPrivacyBlock_select".
+ */
+export interface ProductPrivacyBlockSelect<T extends boolean = true> {
+  heading?: T;
+  local?:
+    | T
+    | {
+        text?: T;
+        id?: T;
+      };
+  cloud?:
+    | T
+    | {
+        text?: T;
+        id?: T;
+      };
+  note?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductRequirementsBlock_select".
+ */
+export interface ProductRequirementsBlockSelect<T extends boolean = true> {
+  heading?: T;
+  rows?:
+    | T
+    | {
+        label?: T;
+        minimum?: T;
+        recommended?: T;
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductDownloadBlock_select".
+ */
+export interface ProductDownloadBlockSelect<T extends boolean = true> {
+  heading?: T;
+  channel?: T;
+  note?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductChangelogPreviewBlock_select".
+ */
+export interface ProductChangelogPreviewBlockSelect<T extends boolean = true> {
+  heading?: T;
+  limit?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductFaqBlock_select".
+ */
+export interface ProductFaqBlockSelect<T extends boolean = true> {
+  heading?: T;
+  faqs?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductTestimonialsBlock_select".
+ */
+export interface ProductTestimonialsBlockSelect<T extends boolean = true> {
+  heading?: T;
+  items?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductComparisonBlock_select".
+ */
+export interface ProductComparisonBlockSelect<T extends boolean = true> {
+  heading?: T;
+  columns?:
+    | T
+    | {
+        label?: T;
+        highlight?: T;
+        id?: T;
+      };
+  rows?:
+    | T
+    | {
+        feature?: T;
+        cells?:
+          | T
+          | {
+              value?: T;
+              id?: T;
+            };
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductCtaBandBlock_select".
+ */
+export interface ProductCtaBandBlockSelect<T extends boolean = true> {
+  heading?: T;
+  text?: T;
+  useProductButtons?: T;
+  primary?:
+    | T
+    | {
+        label?: T;
+        href?: T;
+      };
+  secondary?:
+    | T
+    | {
+        label?: T;
+        href?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductRichTextBlock_select".
+ */
+export interface ProductRichTextBlockSelect<T extends boolean = true> {
+  content?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductStatStripBlock_select".
+ */
+export interface ProductStatStripBlockSelect<T extends boolean = true> {
+  stats?: T | StatsSelect<T>;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ProductEmbedBlock_select".
+ */
+export interface ProductEmbedBlockSelect<T extends boolean = true> {
+  title?: T;
+  url?: T;
+  aspectRatio?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "plans_select".
+ */
+export interface PlansSelect<T extends boolean = true> {
+  product?: T;
+  code?: T;
+  name?: T;
+  description?: T;
+  billing?: T;
+  priceINR?: T;
+  priceUSD?: T;
+  features?:
+    | T
+    | {
+        text?: T;
+        id?: T;
+      };
+  maxActivations?: T;
+  updatesForMonths?: T;
+  highlight?: T;
+  active?: T;
+  sortOrder?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "releases_select".
+ */
+export interface ReleasesSelect<T extends boolean = true> {
+  product?: T;
+  version?: T;
+  channel?: T;
+  platform?: T;
+  releasedAt?: T;
+  minOs?: T;
+  installer?: T;
+  updaterSignature?: T;
+  notes?: T;
+  sha256?: T;
+  sizeBytes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "installers_select".
+ */
+export interface InstallersSelect<T extends boolean = true> {
+  product?: T;
+  version?: T;
+  sha256?: T;
+  prefix?: T;
+  _objectKey?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "docs_select".
+ */
+export interface DocsSelect<T extends boolean = true> {
+  title?: T;
+  body?: T;
+  product?: T;
+  generateSlug?: T;
+  slug?: T;
+  parent?: T;
+  sortOrder?: T;
+  hiStatus?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "changelog_select".
+ */
+export interface ChangelogSelect<T extends boolean = true> {
+  title?: T;
+  body?: T;
+  product?: T;
+  type?: T;
+  date?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "leads_select".
+ */
+export interface LeadsSelect<T extends boolean = true> {
+  status?: T;
+  assignedTo?: T;
+  notes?: T;
+  type?: T;
+  product?: T;
+  name?: T;
+  email?: T;
+  phone?: T;
+  company?: T;
+  message?: T;
+  details?: T;
+  locale?: T;
+  source?:
+    | T
+    | {
+        page?: T;
+        referrer?: T;
+        utm?:
+          | T
+          | {
+              source?: T;
+              medium?: T;
+              campaign?: T;
+              term?: T;
+              content?: T;
+            };
+      };
+  consent?:
+    | T
+    | {
+        textVersion?: T;
+        givenAt?: T;
+        ipHash?: T;
+      };
+  marketingConsent?:
+    | T
+    | {
+        given?: T;
+        at?: T;
+        textVersion?: T;
+        withdrawnAt?: T;
+      };
+  confirmTokenHash?: T;
+  confirmedAt?: T;
+  unsubscribedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-requests_select".
+ */
+export interface DataRequestsSelect<T extends boolean = true> {
+  email?: T;
+  type?: T;
+  details?: T;
+  status?: T;
+  handledBy?: T;
+  handledAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "short-links_select".
+ */
+export interface ShortLinksSelect<T extends boolean = true> {
+  slug?: T;
+  destination?: T;
+  utm?:
+    | T
+    | {
+        source?: T;
+        medium?: T;
+        campaign?: T;
+      };
+  active?: T;
+  notes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
+  name?: T;
+  roles?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -261,21 +2916,45 @@ export interface UsersSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "media_select".
+ * via the `definition` "audit-log_select".
  */
-export interface MediaSelect<T extends boolean = true> {
-  alt?: T;
+export interface AuditLogSelect<T extends boolean = true> {
+  actor?: T;
+  action?: T;
+  entity?: T;
+  docId?: T;
+  summary?: T;
   updatedAt?: T;
   createdAt?: T;
-  url?: T;
-  thumbnailURL?: T;
-  filename?: T;
-  mimeType?: T;
-  filesize?: T;
-  width?: T;
-  height?: T;
-  focalX?: T;
-  focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "daily-stats_select".
+ */
+export interface DailyStatsSelect<T extends boolean = true> {
+  date?: T;
+  kind?: T;
+  key?: T;
+  count?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "redirects_select".
+ */
+export interface RedirectsSelect<T extends boolean = true> {
+  from?: T;
+  to?:
+    | T
+    | {
+        type?: T;
+        reference?: T;
+        url?: T;
+      };
+  type?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -316,6 +2995,170 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-settings".
+ */
+export interface SiteSetting {
+  id: number;
+  company?: {
+    legalName?: string | null;
+    cin?: string | null;
+    gstin?: string | null;
+    incorporationDate?: string | null;
+    registeredAddress?: string | null;
+    phone?: string | null;
+    emails?: {
+      hello?: string | null;
+      sales?: string | null;
+      support?: string | null;
+      careers?: string | null;
+      privacy?: string | null;
+    };
+    whatsapp?: string | null;
+  };
+  socials?:
+    | {
+        platform: 'linkedin' | 'x' | 'instagram' | 'youtube' | 'github' | 'facebook';
+        url: string;
+        id?: string | null;
+      }[]
+    | null;
+  announcement?: {
+    text?: string | null;
+    link?: string | null;
+    active?: boolean | null;
+  };
+  /**
+   * Shows Buy buttons and customer accounts. Leave off until the store launches.
+   */
+  storeEnabled?: boolean | null;
+  maintenanceMode?: boolean | null;
+  /**
+   * Cal.com or Calendly link opened by "Book a call".
+   */
+  schedulerUrl?: string | null;
+  defaultSeo?: {
+    title?: string | null;
+    description?: string | null;
+    image?: (number | null) | Media;
+  };
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "navigation".
+ */
+export interface Navigation {
+  id: number;
+  header?:
+    | {
+        label: string;
+        href: string;
+        megaMenu?: ('none' | 'products') | null;
+        id?: string | null;
+      }[]
+    | null;
+  footer?:
+    | {
+        title: string;
+        links?:
+          | {
+              label: string;
+              href: string;
+              id?: string | null;
+            }[]
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-settings_select".
+ */
+export interface SiteSettingsSelect<T extends boolean = true> {
+  company?:
+    | T
+    | {
+        legalName?: T;
+        cin?: T;
+        gstin?: T;
+        incorporationDate?: T;
+        registeredAddress?: T;
+        phone?: T;
+        emails?:
+          | T
+          | {
+              hello?: T;
+              sales?: T;
+              support?: T;
+              careers?: T;
+              privacy?: T;
+            };
+        whatsapp?: T;
+      };
+  socials?:
+    | T
+    | {
+        platform?: T;
+        url?: T;
+        id?: T;
+      };
+  announcement?:
+    | T
+    | {
+        text?: T;
+        link?: T;
+        active?: T;
+      };
+  storeEnabled?: T;
+  maintenanceMode?: T;
+  schedulerUrl?: T;
+  defaultSeo?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        image?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "navigation_select".
+ */
+export interface NavigationSelect<T extends boolean = true> {
+  header?:
+    | T
+    | {
+        label?: T;
+        href?: T;
+        megaMenu?: T;
+        id?: T;
+      };
+  footer?:
+    | T
+    | {
+        title?: T;
+        links?:
+          | T
+          | {
+              label?: T;
+              href?: T;
+              id?: T;
+            };
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
