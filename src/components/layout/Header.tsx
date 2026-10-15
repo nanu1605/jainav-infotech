@@ -14,7 +14,7 @@ import type { Navigation } from '@/payload-types'
 import { Container } from './Container'
 import { LanguageSwitch } from './LanguageSwitch'
 import { Logo } from './Logo'
-import { isCurrent, MegaMenu, type MenuProduct } from './MegaMenu'
+import { currentAttr, isCurrent, MegaMenu, type MenuProduct } from './MegaMenu'
 import { MobileMenu } from './MobileMenu'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -43,8 +43,9 @@ const navItem = cn(
 )
 
 /**
- * Site header (spec §8.1). Sticky at a fixed 4rem: on scroll only opacity and transform change
- * (background, blur and shadow fade in, the row settles up), so nothing below ever shifts.
+ * Site header (spec §8.1). Sticky in a fixed 4rem box. It compacts on scroll with opacity and
+ * transform only: the background fades in at 3.5rem, the row moves up and the logo shrinks, so
+ * nothing below ever shifts (§14: CLS).
  * Pages give their `<main>` `id="main"` (skip link target) and `scroll-mt-16`.
  * Breakpoints are container queries, so the header also lays out correctly inside narrow frames.
  */
@@ -71,10 +72,13 @@ export function Header({ nav, products, showAccount = false }: HeaderProps) {
       </a>
       <div
         aria-hidden
-        className="absolute inset-0 border-b border-border bg-bg/80 opacity-0 shadow-sm backdrop-blur-md transition-opacity duration-(--duration-base) ease-out group-data-[scrolled]/header:opacity-100"
+        className="absolute inset-0 origin-top border-b border-border bg-bg/80 opacity-0 shadow-sm backdrop-blur-md transition-[opacity,scale] duration-(--duration-base) ease-out group-data-[scrolled]/header:scale-y-[0.875] group-data-[scrolled]/header:opacity-100"
       />
-      <Container className="relative flex h-full translate-y-1 items-center gap-2 transition-transform duration-(--duration-base) ease-out group-data-[scrolled]/header:translate-y-0">
-        <Link href="/" className="-ml-1 mr-4 shrink-0 rounded-md p-1">
+      <Container className="relative flex h-full translate-y-1 items-center gap-2 transition-transform duration-(--duration-base) ease-out group-data-[scrolled]/header:-translate-y-1">
+        <Link
+          href="/"
+          className="-ml-1 mr-4 shrink-0 origin-left rounded-md p-1 transition-[scale] duration-(--duration-base) ease-out group-data-[scrolled]/header:scale-90"
+        >
           <Logo />
         </Link>
 
@@ -86,6 +90,7 @@ export function Header({ nav, products, showAccount = false }: HeaderProps) {
                   <>
                     <NavigationMenu.Trigger
                       data-active={isCurrent(pathname, item.href) ? '' : undefined}
+                      aria-current={isCurrent(pathname, item.href) ? 'true' : undefined}
                       className={cn(navItem, 'group/trigger')}
                     >
                       {item.label}
@@ -97,7 +102,12 @@ export function Header({ nav, products, showAccount = false }: HeaderProps) {
                     <MegaMenu products={products} href={item.href} />
                   </>
                 ) : (
-                  <NavigationMenu.Link asChild active={isCurrent(pathname, item.href)}>
+                  <NavigationMenu.Link
+                    asChild
+                    active={isCurrent(pathname, item.href)}
+                    // Radix would say "page" on every page below the link too.
+                    aria-current={currentAttr(pathname, item.href)}
+                  >
                     <Link href={item.href} className={navItem}>
                       {item.label}
                     </Link>

@@ -12,7 +12,7 @@ import { Link, usePathname } from '@/i18n/navigation'
 import type { HeaderProps, NavLink } from './Header'
 import { LanguageSwitch } from './LanguageSwitch'
 import { Logo } from './Logo'
-import { isCurrent, ProductEntry } from './MegaMenu'
+import { currentAttr, ProductEntry } from './MegaMenu'
 import { ThemeToggle } from './ThemeToggle'
 
 type MobileMenuProps = Omit<HeaderProps, 'nav'> & { nav: NavLink[]; className?: string }
@@ -64,8 +64,8 @@ export function MobileMenu({ nav, products, showAccount = false, className }: Mo
                 <li key={`${item.href}-${item.label}`}>
                   <Link
                     href={item.href}
-                    aria-current={isCurrent(pathname, item.href) ? 'page' : undefined}
-                    className="flex min-h-12 items-center rounded-md px-2 font-display text-2xl font-semibold transition-colors duration-(--duration-fast) hover:bg-hover aria-[current=page]:text-primary"
+                    aria-current={currentAttr(pathname, item.href)}
+                    className="flex min-h-12 items-center rounded-md px-2 font-display text-2xl font-semibold transition-colors duration-(--duration-fast) hover:bg-hover aria-[current]:text-primary"
                   >
                     {item.label}
                   </Link>
@@ -75,9 +75,7 @@ export function MobileMenu({ nav, products, showAccount = false, className }: Mo
                         <li key={product.slug}>
                           <ProductEntry
                             product={product}
-                            aria-current={
-                              isCurrent(pathname, `/products/${product.slug}`) ? 'page' : undefined
-                            }
+                            aria-current={currentAttr(pathname, `/products/${product.slug}`)}
                           />
                         </li>
                       ))}

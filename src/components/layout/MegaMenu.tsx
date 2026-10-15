@@ -19,6 +19,10 @@ export type MenuProduct = Pick<Product, 'name' | 'slug' | 'tagline' | 'status'> 
 export const isCurrent = (pathname: string, href: string) =>
   href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)
 
+/** aria-current: "page" only on the page itself, "true" on the section it sits in. */
+export const currentAttr = (pathname: string, href: string) =>
+  pathname === href ? 'page' : isCurrent(pathname, href) ? 'true' : undefined
+
 type ProductEntryProps = { product: MenuProduct } & Omit<
   ComponentProps<typeof Link>,
   'href' | 'children'
@@ -32,7 +36,7 @@ export function ProductEntry({ product, className, ...props }: ProductEntryProps
     <Link
       href={`/products/${slug}`}
       className={cn(
-        'flex items-start gap-3 rounded-lg p-3 transition-colors duration-(--duration-fast) hover:bg-hover aria-[current=page]:bg-hover',
+        'flex items-start gap-3 rounded-lg p-3 transition-colors duration-(--duration-fast) hover:bg-hover aria-[current]:bg-hover',
         className,
       )}
       {...props}
@@ -78,6 +82,7 @@ export function MegaMenu({ products, href }: { products: MenuProduct[]; href: st
               <NavigationMenu.Link
                 asChild
                 active={isCurrent(pathname, `/products/${product.slug}`)}
+                aria-current={currentAttr(pathname, `/products/${product.slug}`)}
               >
                 <ProductEntry product={product} />
               </NavigationMenu.Link>

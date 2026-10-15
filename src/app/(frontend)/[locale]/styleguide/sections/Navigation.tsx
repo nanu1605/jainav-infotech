@@ -119,7 +119,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
     demos: {
       header: [
         'Header · desktop',
-        'Shown at 1152px; scroll sideways. Hover or press Enter on Products for the mega-menu. Once the page scrolls, a background, blur and shadow fade in; the height never changes.',
+        'Shown at 1152px; scroll sideways. Hover or press Enter on Products for the mega-menu. Once the page scrolls it compacts: a background, blur and shadow fade in and the row moves up, but the layout below never shifts.',
       ],
       mobile: [
         'Header · mobile',
@@ -233,7 +233,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
     demos: {
       header: [
         'हेडर · डेस्कटॉप',
-        '1152px पर दिखाया गया है; बगल में स्क्रॉल करें। मेगा-मेन्यू के लिए "प्रोडक्ट" पर माउस ले जाएँ या Enter दबाएँ। पेज स्क्रॉल होते ही बैकग्राउंड, ब्लर और शैडो उभरते हैं; ऊँचाई कभी नहीं बदलती।',
+        '1152px पर दिखाया गया है; बगल में स्क्रॉल करें। मेगा-मेन्यू के लिए "प्रोडक्ट" पर माउस ले जाएँ या Enter दबाएँ। पेज स्क्रॉल होते ही हेडर सिमट जाता है: बैकग्राउंड, ब्लर और शैडो उभरते हैं और पंक्ति ऊपर खिसकती है, पर नीचे का लेआउट कभी नहीं हिलता।',
       ],
       mobile: [
         'हेडर · मोबाइल',
