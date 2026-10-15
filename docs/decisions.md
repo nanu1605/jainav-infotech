@@ -55,3 +55,12 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
 - **`daily-stats.date` is text `YYYY-MM-DD`** (IST business date) so the Phase 3 `INSERT … ON CONFLICT (date, kind, key)` upsert stays simple.
 - **Tests use a separate `jainav_test` database** brought up to date with `payload migrate` in a Vitest global setup (dev schema push disabled via `PAYLOAD_MIGRATING`). `pnpm check:migrations` (also in CI) compares the config's schema with the newest migration snapshot, so a forgotten migration fails the build (spec §18.3).
 - **Migrations were squashed** into one initial migration during Phase 1; nothing had been deployed. From the first deploy on, migrations are only ever added.
+
+## Phase 2
+
+- **New dependencies are pinned to releases at least two weeks old** (supply-chain cool-off): motion 13.4.6 (motion 14 was a week-old major), radix-ui 1.6.7, zod 4.6.5, react-hook-form 7.89.0, @marsidev/react-turnstile 1.6.1, @axe-core/playwright 4.13.0. pnpm 12's own `minimumReleaseAge` check also rejects same-day releases; never bypass it with exclusions.
+- **Motion** loads lazily (`LazyMotion` + `domAnimation`, `m.*` components) and honours reduced motion globally (`MotionConfig reducedMotion="user"`); continuous effects also check `useReducedMotion()`.
+- **No page transitions:** View Transitions are not in stable React 19.2 / Next 16.3, so per spec §5.6 they are skipped.
+- **Theme tokens apply to nested `data-theme` wrappers** (light block on `:root, [data-theme='light']`, shadcn aliases re-declared on `[data-theme]`), so the styleguide shows light and dark side by side.
+- **`/styleguide`** is on in development and 404s in production unless `ENABLE_STYLEGUIDE=1` (staging). It's `noindex`.
+- **Playwright on this machine** uses the installed Chrome (`PLAYWRIGHT_CHANNEL=chrome` in `.env`): Playwright's own Chromium download hangs while extracting here.
