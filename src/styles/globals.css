@@ -237,11 +237,60 @@
     --tracking-widest: 0em;
   }
 
+  /* Scroll reveals (spec §14; components/motion): fade and a 16px rise over --duration-slow,
+     items of a [data-stagger] group 75ms apart. useReveal only ever hides content that starts
+     below the fold; hiding is instant, only the reveal transitions. */
+  [data-reveal='hidden'],
+  [data-stagger='hidden'] [data-reveal] {
+    opacity: 0;
+    translate: 0 16px;
+  }
+  [data-reveal='shown'],
+  [data-stagger='shown'] [data-reveal] {
+    transition:
+      opacity var(--duration-slow) var(--ease-out),
+      translate var(--duration-slow) var(--ease-out);
+    transition-delay: calc(var(--i, 0) * 75ms);
+  }
+  [data-stagger] > :nth-child(2) {
+    --i: 1;
+  }
+  [data-stagger] > :nth-child(3) {
+    --i: 2;
+  }
+  [data-stagger] > :nth-child(4) {
+    --i: 3;
+  }
+  [data-stagger] > :nth-child(5) {
+    --i: 4;
+  }
+  [data-stagger] > :nth-child(6) {
+    --i: 5;
+  }
+  [data-stagger] > :nth-child(7) {
+    --i: 6;
+  }
+  [data-stagger] > :nth-child(8) {
+    --i: 7;
+  }
+  [data-stagger] > :nth-child(9) {
+    --i: 8;
+  }
+  [data-stagger] > :nth-child(10) {
+    --i: 9;
+  }
+  [data-stagger] > :nth-child(11) {
+    --i: 10;
+  }
+  [data-stagger] > :nth-child(12) {
+    --i: 11;
+  }
+
   /* Printing never scrolls reveals into view: print them in their final state. */
   @media print {
     [data-reveal] {
       opacity: 1 !important;
-      transform: none !important;
+      translate: none !important;
     }
   }
 

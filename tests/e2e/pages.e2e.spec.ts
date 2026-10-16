@@ -56,7 +56,9 @@ test('vanity /vyro redirects permanently and keeps the language', async ({ reque
   ]) {
     const res = await request.get(from, { maxRedirects: 0 })
     expect(res.status()).toBe(308)
-    expect(new URL(res.headers().location!, 'http://localhost:3000').pathname).toBe(to)
+    // A production cache miss repeats the (identical) Location header: compare the first value.
+    const location = res.headers().location!.split(',')[0]!.trim()
+    expect(new URL(location, 'http://localhost:3000').pathname).toBe(to)
   }
 })
 

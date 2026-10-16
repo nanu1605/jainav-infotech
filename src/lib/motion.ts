@@ -26,8 +26,5 @@ export const DURATION = {
   slow: seconds(brandConfig.motion['duration-slow']),
 } as const
 
-/** Scroll reveal: fade + 12–24 px rise, 400–700 ms, 60–90 ms stagger (spec §14). */
-export const REVEAL = { rise: 16, duration: 0.5, stagger: 0.075 } as const
-
 /** Pointer effects only where a precise pointer can hover (never on touch). */
 export const FINE_POINTER = '(hover: hover) and (pointer: fine)'

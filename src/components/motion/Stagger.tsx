@@ -1,41 +1,31 @@
 'use client'
 
-import { stagger, type Variants } from 'motion/react'
 import { useRef, type ReactNode } from 'react'
 
-import { REVEAL } from '@/lib/motion'
+import { useReveal, type RevealTag } from './Reveal'
 
-import { MOTION_TAGS, revealTarget, revealTransition, revealVariants, useReveal } from './Reveal'
+type Props = { as?: RevealTag; className?: string; children: ReactNode }
 
-const parentVariants: Variants = {
-  shown: { transition: { delayChildren: stagger(REVEAL.stagger) } },
-}
-
-type Props = { as?: keyof typeof MOTION_TAGS; className?: string; children: ReactNode }
-
-/** Reveals its `StaggerItem` children one after another when the group scrolls into view. */
+/**
+ * Reveals its `StaggerItem` children one after another when the group scrolls into view. The
+ * per-item delay comes from the item's position (globals.css, `[data-stagger]`).
+ */
 export function Stagger({ as = 'div', className, children }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const phase = useReveal(ref)
-  const Comp = MOTION_TAGS[as]
+  // `as` changes the element only; typing the ref for every tag isn't worth a union here.
+  const Tag = as as 'div'
   return (
-    <Comp
-      ref={ref}
-      initial={false}
-      animate={revealTarget(phase)}
-      variants={parentVariants}
-      className={className}
-    >
+    <Tag ref={ref} data-stagger={phase} className={className}>
       {children}
-    </Comp>
+    </Tag>
   )
 }
 
-export function StaggerItem({ as = 'div', className, children }: Props) {
-  const Comp = MOTION_TAGS[as]
+export function StaggerItem({ as: Tag = 'div', className, children }: Props) {
   return (
-    <Comp variants={revealVariants} transition={revealTransition} data-reveal className={className}>
+    <Tag data-reveal="" className={className}>
       {children}
-    </Comp>
+    </Tag>
   )
 }

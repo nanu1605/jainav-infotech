@@ -8,7 +8,8 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
-    baseURL: 'http://localhost:3000',
+    // E2E_BASE_URL runs the suite against another server, e.g. a local production build.
+    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3000',
     trace: 'on-first-retry',
   },
   // PLAYWRIGHT_CHANNEL=chrome uses an installed Chrome instead of the downloaded Chromium.
@@ -19,10 +20,12 @@ export default defineConfig({
     },
   ],
   globalSetup: './tests/e2e/globalSetup.ts',
-  webServer: {
-    command: 'pnpm dev',
-    reuseExistingServer: true,
-    url: 'http://localhost:3000',
-    timeout: 180_000,
-  },
+  webServer: process.env.E2E_BASE_URL
+    ? undefined
+    : {
+        command: 'pnpm dev',
+        reuseExistingServer: true,
+        url: 'http://localhost:3000',
+        timeout: 180_000,
+      },
 })

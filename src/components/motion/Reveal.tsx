@@ -1,12 +1,10 @@
 'use client'
 
-import { useReducedMotion, type Transition, type Variants } from 'motion/react'
-import * as m from 'motion/react-m'
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 
-import { EASE_OUT, REVEAL } from '@/lib/motion'
-
 export type RevealPhase = 'static' | 'hidden' | 'shown'
+
+const prefersReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /**
  * Entrance state for scroll reveals (spec §14). Content renders visible on the server, so it is
@@ -16,11 +14,10 @@ export type RevealPhase = 'static' | 'hidden' | 'shown'
  * With reduced motion everything stays `static`: entrances are non-essential (spec §20).
  */
 export function useReveal(ref: RefObject<Element | null>): RevealPhase {
-  const reduce = useReducedMotion()
   const [phase, setPhase] = useState<RevealPhase>('static')
   useEffect(() => {
     const el = ref.current
-    if (reduce || !el || el.getBoundingClientRect().top < window.innerHeight) return
+    if (!el || prefersReducedMotion() || el.getBoundingClientRect().top < window.innerHeight) return
     const io = new IntersectionObserver(
       ([entry]) => {
         const visible = !!entry?.isIntersecting
@@ -31,56 +28,37 @@ export function useReveal(ref: RefObject<Element | null>): RevealPhase {
     )
     io.observe(el)
     return () => io.disconnect()
-  }, [ref, reduce])
-  return reduce ? 'static' : phase
+  }, [ref])
+  return phase
 }
 
-/** Variant label for `animate`: `static` renders the final state without animating. */
-export const revealTarget = (phase: RevealPhase) => (phase === 'hidden' ? 'hidden' : 'shown')
-
-/** Fade + rise. Hiding is instant (it only happens off screen); the reveal uses the tokens. */
-export const revealVariants: Variants = {
-  hidden: { opacity: 0, y: REVEAL.rise, transition: { duration: 0 } },
-  shown: { opacity: 1, y: 0 },
-}
-
-// No `delay` key: a stagger parent supplies each child's delay, and an own delay would override it.
-export const revealTransition: Transition = { duration: REVEAL.duration, ease: EASE_OUT }
-
-// `as` changes the element only; Motion's per-tag component types differ just in their ref type.
-export const MOTION_TAGS = {
-  div: m.div,
-  section: m.section,
-  article: m.article,
-  ul: m.ul,
-  ol: m.ol,
-  li: m.li,
-} as unknown as Record<'div' | 'section' | 'article' | 'ul' | 'ol' | 'li', typeof m.div>
+export type RevealTag = 'div' | 'section' | 'article' | 'ul' | 'ol' | 'li'
 
 type RevealProps = {
-  as?: keyof typeof MOTION_TAGS
+  as?: RevealTag
   /** Seconds before this element starts revealing, for hand-sequenced groups. */
   delay?: number
   className?: string
   children: ReactNode
 }
 
-/** Fades and rises its content in the first time it scrolls into view. */
+/**
+ * Fades and rises its content in the first time it scrolls into view. The animation is CSS
+ * (globals.css, `[data-reveal]`) on the motion tokens: no animation library on the page (§15).
+ */
 export function Reveal({ as = 'div', delay = 0, className, children }: RevealProps) {
   const ref = useRef<HTMLDivElement>(null)
   const phase = useReveal(ref)
-  const Comp = MOTION_TAGS[as]
+  // `as` changes the element only; typing the ref for every tag isn't worth a union here.
+  const Tag = as as 'div'
   return (
-    <Comp
+    <Tag
       ref={ref}
-      initial={false}
-      animate={revealTarget(phase)}
-      variants={revealVariants}
-      transition={{ ...revealTransition, delay }}
-      data-reveal
+      data-reveal={phase}
+      style={delay ? { transitionDelay: `${delay}s` } : undefined}
       className={className}
     >
       {children}
-    </Comp>
+    </Tag>
   )
 }

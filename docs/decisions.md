@@ -96,3 +96,14 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
 - **`/go/` rate limiting** moves to Phase 4 with the other rate limits (`rate-limiter-flexible`).
 - **CI runs on `ubuntu-24.04`**: `ubuntu-latest` switches to Ubuntu 26 on 2026-10-19.
 - **`server-only`** is resolved by Next.js itself (not a dependency); Vitest aliases it to Next's empty server build.
+- **JS budget (spec §15): about 183–185 KB gzipped initial JS** on the measured pages (home, products, a product page, the blog), down from about 215 KB. Three changes got it there:
+  - Scroll reveals (`Reveal`, `Stagger`, `TextReveal`) are CSS transitions on the motion tokens. They are driven by the same IntersectionObserver phase as before (`[data-reveal]` / `[data-stagger]` in globals.css).
+  - `Tilt` and `MagneticButton` use a CSS transition instead of Motion springs.
+  - Motion's `LazyMotion` provider moved out of the layout into the components that animate with Motion (today only `MultiStepForm`). Pages without such a component load no animation library. Phase 5 signature animations wrap themselves the same way.
+  - The mobile menu dialog (Radix focus trap and scroll lock) loads on first use.
+  - Remaining fixed cost: Next.js and React about 125 KB, the header's Radix NavigationMenu about 16 KB, next/image about 11 KB, tailwind-merge about 8.5 KB. A lighter desktop nav would bring it to about 175 KB (Phase 5 performance tuning).
+  - Measured as the scripts the HTML references; the polyfill script is `noModule`, so modern browsers don't load it.
+- **Maintenance mode answers 200**, not 503: a statically rendered layout can't set the status. The Phase 6 deploy (Caddy or the proxy) should serve a 503 with `Retry-After` while it is on.
+- **Next.js quirk:** a render-time redirect (`/vyro`) repeats its identical `Location` header on the first, uncached response. Browsers accept identical duplicates, and cached responses have one header.
+- **Long dev sessions can fail renders** with "context from NextIntlClientProvider was not found" after many hot reloads. A fresh `pnpm dev` (or removing `.next/dev`) clears it, and production builds are unaffected (the full e2e suite passed against `next start`).
+- **Review follow-ups not done in Phase 3:** video caption language is fixed to English (no per-file language field yet); English-fallback `lang` marking is per page or block, so a few Hindi UI labels inside fallback blocks may inherit `lang="en"`.
