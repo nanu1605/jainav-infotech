@@ -5,6 +5,21 @@
 {
 	# No automatic certificates: the Origin CA certificate is mounted at /certs.
 	auto_https disable_redirects
+	# Upstream errors (e.g. the app restarting) log the whole request: same filter as the
+	# access log below.
+	log default {
+		exclude http.log.error
+	}
+	log errors {
+		include http.log.error
+		format filter {
+			wrap json
+			request>headers delete
+			request>uri query {
+				delete token
+			}
+		}
+	}
 }
 
 (origin) {
@@ -13,9 +28,17 @@
 	request_body {
 		max_size 110MB
 	}
+	# Access log without personal data or secrets: no request headers (visitor IPs, Access
+	# identities) and no token query parameter (newsletter confirm and unsubscribe links).
 	log {
 		output stdout
-		format json
+		format filter {
+			wrap json
+			request>headers delete
+			request>uri query {
+				delete token
+			}
+		}
 	}
 }
 
