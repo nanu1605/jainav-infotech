@@ -70,9 +70,10 @@ export async function storeInvoicePdf(id: number) {
 /**
  * The sendOrderEmail job (spec §11.7): the order confirmation with the invoice attached, in the
  * order's language. Claimed in SQL first, so parallel runs never send it twice; a failed send
- * releases the claim for the retry. The claim is a 30-minute lease: if the process died after
- * claiming (the job is then released, see src/jobs), the re-run takes it again unless the email
- * is recorded as sent.
+ * releases the claim for the retry. The claim is a 20-minute lease, shorter than the 30 minutes
+ * after which src/jobs releases a job a dead process left running, so that re-run can take it.
+ * A claim still held without the email recorded as sent fails the run: Payload retries, then
+ * alerts, instead of the job ending silently without an email.
  */
 export async function sendOrderEmail(orderId: number) {
   const payload = await getClient()
@@ -81,11 +82,17 @@ export async function sendOrderEmail(orderId: number) {
     UPDATE orders SET emailed_at = now()
     WHERE id = ${orderId}
       AND (emailed_at IS NULL
-        OR (emailed_at < now() - interval '30 minutes'
+        OR (emailed_at < now() - interval '20 minutes'
           AND NOT (COALESCE(events, '[]'::jsonb) @> ${sent}::jsonb)))
     RETURNING id
   `)
-  if (!rows.length) return
+  if (!rows.length) {
+    const { rows: done } = await drizzle(payload).execute(sql`
+      SELECT 1 FROM orders WHERE id = ${orderId} AND COALESCE(events, '[]'::jsonb) @> ${sent}::jsonb
+    `)
+    if (done.length) return
+    throw new Error('Order email is claimed by another run')
+  }
   try {
     const order = await payload.findByID({
       collection: 'orders',

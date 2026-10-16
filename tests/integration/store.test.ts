@@ -871,7 +871,7 @@ describe('housekeeping', () => {
     await fulfilOrder(payload, order.id, paid.response.razorpay_payment_id, 'verify')
     await db().execute(sql`DELETE FROM payload_jobs WHERE input->>'id' = ${String(order.id)}`)
     await db().execute(
-      sql`UPDATE orders SET emailed_at = now() - interval '31 minutes' WHERE id = ${order.id}`,
+      sql`UPDATE orders SET emailed_at = now() - interval '21 minutes' WHERE id = ${order.id}`,
     )
     const { sendOrderEmail } = await import('@/lib/invoices/deliver')
     await sendOrderEmail(order.id)
@@ -880,7 +880,7 @@ describe('housekeeping', () => {
     ).toHaveLength(1)
     // Recorded as sent: a later run doesn't send it twice.
     await db().execute(
-      sql`UPDATE orders SET emailed_at = now() - interval '31 minutes' WHERE id = ${order.id}`,
+      sql`UPDATE orders SET emailed_at = now() - interval '21 minutes' WHERE id = ${order.id}`,
     )
     await sendOrderEmail(order.id)
     expect(
