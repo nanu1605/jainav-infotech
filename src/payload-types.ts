@@ -491,6 +491,17 @@ export interface ProductHeroBlock {
    * Signature animation in place of the media.
    */
   animation: 'none' | 'menumesh' | 'vyro' | 'baby';
+  /**
+   * Short audio clips of the assistant speaking, played on click.
+   */
+  samples?:
+    | {
+        label?: string | null;
+        audio: number | Media;
+        transcript?: string | null;
+        id?: string | null;
+      }[]
+    | null;
   id?: string | null;
   blockName?: string | null;
   blockType: 'productHero';
@@ -2438,6 +2449,14 @@ export interface ProductHeroBlockSelect<T extends boolean = true> {
   subheading?: T;
   media?: T;
   animation?: T;
+  samples?:
+    | T
+    | {
+        label?: T;
+        audio?: T;
+        transcript?: T;
+        id?: T;
+      };
   id?: T;
   blockName?: T;
 }

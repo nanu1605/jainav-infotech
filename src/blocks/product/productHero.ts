@@ -22,5 +22,21 @@ export const ProductHero: Block = {
       ],
       admin: { description: 'Signature animation in place of the media.' },
     },
+    {
+      // "Hear Baby speak" (spec §14): played on click only.
+      name: 'samples',
+      label: 'Voice samples',
+      type: 'array',
+      maxRows: 4,
+      admin: {
+        condition: (_, siblingData) => siblingData?.animation === 'baby',
+        description: 'Short audio clips of the assistant speaking, played on click.',
+      },
+      fields: [
+        { name: 'label', type: 'text', localized: true, required: true },
+        { name: 'audio', type: 'upload', relationTo: 'media', required: true },
+        { name: 'transcript', type: 'textarea', localized: true },
+      ],
+    },
   ],
 }

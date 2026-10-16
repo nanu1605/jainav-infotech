@@ -13,9 +13,10 @@ import { revalidateCollection } from '@/hooks/revalidate'
 // carry scripts, and media is served from the site origin in development.
 const revalidateMedia = revalidateCollection({ tag: 'media' })
 
-const ALLOWED_EXT = /\.(avif|gif|jpe?g|png|webp|mp4|webm|vtt)$/i
+const ALLOWED_EXT = /\.(avif|gif|jpe?g|png|webp|mp4|webm|vtt|mp3|m4a|ogg|oga)$/i
 
-const UNSUPPORTED = 'Upload an image, an MP4/WebM video or a .vtt caption file.'
+const UNSUPPORTED =
+  'Upload an image, an MP4/WebM video, an MP3/M4A/Ogg audio clip or a .vtt caption file.'
 
 // Runs before Payload writes anything: on update it stores the new file before beforeChange.
 const checkFileName: CollectionBeforeOperationHook = ({ args, operation, req }) => {
@@ -67,7 +68,18 @@ export const Media: CollectionConfig = {
     adminThumbnail: 'thumbnail',
     focalPoint: true,
     // text/plain: Payload can't sniff .vtt and falls back to text/plain for the content check.
-    mimeTypes: ['image/*', 'video/mp4', 'video/webm', 'text/vtt', 'text/plain'],
+    // Audio: voice samples in product heroes (spec §14, "Hear Baby speak").
+    mimeTypes: [
+      'image/*',
+      'video/mp4',
+      'video/webm',
+      'audio/mpeg',
+      'audio/mp4',
+      'audio/ogg',
+      'audio/webm',
+      'text/vtt',
+      'text/plain',
+    ],
     // Width-only sizes keep the aspect ratio; square and og crop around the focal point.
     imageSizes: [
       { name: 'thumbnail', width: 300 },

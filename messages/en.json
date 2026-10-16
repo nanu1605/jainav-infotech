@@ -236,6 +236,93 @@
       "docsNav": "Docs",
       "docsIntro": "Guides and answers for {name}. Pick a topic.",
       "noDocs": "Docs are on their way."
+    },
+    "demo": {
+      "menumesh": {
+        "label": "Illustration of MenuMesh: a guest scans the QR code on table 4, browses the menu on their phone, adds Masala Dosa and Cold Coffee to the cart, and the order appears on the kitchen screen. Dishes and prices are examples.",
+        "steps": {
+          "scan": "Scan the table's QR code",
+          "browse": "Browse the menu",
+          "cart": "Add to cart",
+          "kitchen": "The order reaches the kitchen"
+        },
+        "restaurant": "Spice Route",
+        "table": "Table 4",
+        "categories": {
+          "starters": "Starters",
+          "mains": "Mains",
+          "drinks": "Drinks"
+        },
+        "dishes": {
+          "paneerTikka": {
+            "name": "Paneer Tikka",
+            "description": "Cottage cheese and peppers from the tandoor"
+          },
+          "chicken65": {
+            "name": "Chicken 65",
+            "description": "Spicy fried chicken with curry leaves"
+          },
+          "masalaDosa": {
+            "name": "Masala Dosa",
+            "description": "Crisp dosa with a spiced potato filling"
+          },
+          "coldCoffee": {
+            "name": "Cold Coffee",
+            "description": "Chilled coffee with a scoop of ice cream"
+          }
+        },
+        "add": "Add",
+        "items": "2 items",
+        "placeOrder": "Place order",
+        "sent": "Sent to kitchen",
+        "scanToOrder": "Scan to order",
+        "kitchen": "Kitchen",
+        "new": "New",
+        "round": "Round 1",
+        "now": "Just now",
+        "ticketLine": "{count} × {dish}",
+        "start": "Start"
+      },
+      "vyro": {
+        "label": "VYRO dashboard illustration: CPU and GPU speedometers and a CPU temperature graph, playing illustrative values",
+        "illustrative": "Illustrative values",
+        "cpu": "CPU",
+        "gpu": "GPU",
+        "temperature": "CPU temperature",
+        "percent": "%",
+        "mhz": "MHz",
+        "celsius": "°C",
+        "pause": "Pause animation",
+        "play": "Play animation"
+      },
+      "baby": {
+        "label": "Animated demo of Baby’s voice orb in a scripted conversation. Asked in English, Baby opens Spotify; asked in Hindi, it finds a résumé file; asked in Hinglish, it starts a research task in the background.",
+        "you": "You",
+        "baby": "Baby",
+        "listening": "Listening…",
+        "thinking": "Thinking…",
+        "speaking": "Speaking",
+        "hear": "Hear Baby speak",
+        "languages": {
+          "english": "English",
+          "hindi": "Hindi",
+          "hinglish": "Hinglish"
+        },
+        "script": {
+          "english": {
+            "you": "Open Spotify for me.",
+            "baby": "Sure, Spotify is open."
+          },
+          "hindi": {
+            "you": "मेरी रेज़्यूमे वाली फ़ाइल ढूँढ दो।",
+            "baby": "मिल गई। Downloads फ़ोल्डर में Resume.pdf है।"
+          },
+          "hinglish": {
+            "you": "Background mein top 3 EVs under 15 lakh research karo.",
+            "baby": "Theek hai, shuru kar diya. Ho jaate hi bata dunga."
+          }
+        }
+      }
     }
   },
   "styleguide": {
