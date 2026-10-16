@@ -9,7 +9,11 @@ import { cache } from 'react'
 import type { Locale } from '@/i18n/routing'
 import type { User } from '@/payload-types'
 
-export const getClient = () => getPayload({ config })
+/**
+ * The Payload client. `cron` starts the jobs queue's autoRun in the server process (spec §2);
+ * Payload skips it during builds, and tests run their jobs themselves.
+ */
+export const getClient = () => getPayload({ config, cron: process.env.NODE_ENV !== 'test' })
 
 export type Viewer = { draft: boolean; user: User | null; locale: Locale }
 

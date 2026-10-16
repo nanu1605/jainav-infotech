@@ -54,7 +54,7 @@ export const jobs: JobsConfig = {
       (await import('@/lib/commerce/webhooks')).processWebhookEvent(id),
     ),
     idTask('renderInvoicePdf', async (id) =>
-      (await import('@/lib/invoices/deliver')).renderInvoicePdf(id),
+      (await import('@/lib/invoices/deliver')).storeInvoicePdf(id),
     ),
     idTask('sendOrderEmail', async (id) =>
       (await import('@/lib/invoices/deliver')).sendOrderEmail(id),
@@ -70,11 +70,12 @@ export const jobs: JobsConfig = {
       },
     },
     {
-      slug: 'cleanupSignIns',
+      // Expired sign-ins, and webhook payloads (they hold payer details) after 90 days (spec §16).
+      slug: 'cleanup',
       schedule: [{ cron: '30 3 * * *', queue: 'default' }],
       retries: 0,
       handler: async () => {
-        await (await import('@/lib/account/session')).deleteExpired()
+        await (await import('@/lib/commerce/webhooks')).cleanup()
         return { output: {} }
       },
     },
