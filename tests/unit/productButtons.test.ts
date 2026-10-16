@@ -92,3 +92,15 @@ describe('resolveProductButton (spec §8.5)', () => {
     })
   })
 })
+
+describe('withUtm (spec §8.6)', () => {
+  it('adds missing UTM defaults and keeps ones the destination sets', async () => {
+    const { withUtm } = await import('@/lib/links')
+    expect(withUtm('https://menumesh.example/', 'menumesh', null)).toBe(
+      'https://menumesh.example/?utm_source=jainav&utm_medium=site&utm_campaign=menumesh',
+    )
+    expect(
+      withUtm('https://x.example/?utm_source=mail&a=1', 'x', { medium: 'footer', campaign: '' }),
+    ).toBe('https://x.example/?utm_source=mail&a=1&utm_medium=footer&utm_campaign=x')
+  })
+})

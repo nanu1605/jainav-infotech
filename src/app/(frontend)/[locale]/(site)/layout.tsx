@@ -5,11 +5,13 @@ import { AnnouncementBar } from '@/components/layout/AnnouncementBar'
 import { Footer } from '@/components/layout/Footer'
 import { Header } from '@/components/layout/Header'
 import { LanguageSuggestion } from '@/components/layout/LanguageSuggestion'
+import { LivePreviewRefresh } from '@/components/layout/LivePreviewRefresh'
 import { Maintenance } from '@/components/layout/Maintenance'
 import { PreviewBar } from '@/components/layout/PreviewBar'
 import type { Locale } from '@/i18n/routing'
 import { isPreview } from '@/lib/cms'
 import { getNavigation, getProducts, getSettings } from '@/lib/queries'
+import { SITE_URL } from '@/lib/seo'
 
 type Props = { children: ReactNode; params: Promise<{ locale: string }> }
 
@@ -29,7 +31,12 @@ export default async function SiteLayout({ children, params }: Props) {
 
   return (
     <>
-      {preview && <PreviewBar />}
+      {preview && (
+        <>
+          <PreviewBar />
+          <LivePreviewRefresh serverURL={SITE_URL} />
+        </>
+      )}
       {showAnnouncement && (
         <AnnouncementBar
           id={`${announcement.text}|${announcement.link ?? ''}`}
