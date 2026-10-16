@@ -1105,6 +1105,13 @@ export const legalPages: DraftSeedDoc<'legal-pages'>[] = [
 /** Rich text has no per-row ids, so Hindi bodies are written as whole values. */
 export const legalBodyHi = legalPlaceholder.hi
 
+/**
+ * Commerce settings (spec §9.2): the schema defaults, plus the seeded legal drafts' version as
+ * the Terms and EULA a buyer accepts. GST stays off and the SAC code empty until the CA confirms
+ * them ({{SAC_CODE}}, {{CONFIRM_WITH_CA}}).
+ */
+export const commerceSettings = { currentTermsVersion: '0.1', currentEulaVersion: '0.1' }
+
 // ─── Globals ─────────────────────────────────────────────────────────────────
 
 export const siteSettings = {

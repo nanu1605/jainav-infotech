@@ -27,6 +27,7 @@
     "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap",
     "seed": "cross-env NODE_OPTIONS=--no-deprecation payload run scripts/seed/run.ts",
     "seed:publish": "cross-env NODE_OPTIONS=--no-deprecation payload run scripts/seed/publish.ts",
+    "seed:store": "cross-env NODE_OPTIONS=--no-deprecation payload run scripts/seed/store.ts",
     "import:release": "cross-env NODE_OPTIONS=--no-deprecation payload run scripts/import-release.ts",
     "prepare": "husky",
     "lhci": "lhci autorun"
