@@ -44,6 +44,13 @@ const nextConfig: NextConfig = {
           { key: 'Content-Security-Policy', value: contentSecurityPolicy(env, { admin: true }) },
         ],
       },
+      // Checkout opens Razorpay's script and frames; every other page keeps them out.
+      ...['/checkout/:path*', '/hi/checkout/:path*'].map((source) => ({
+        source,
+        headers: [
+          { key: 'Content-Security-Policy', value: contentSecurityPolicy(env, { checkout: true }) },
+        ],
+      })),
     ]
   },
   images: {

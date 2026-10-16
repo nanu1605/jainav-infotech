@@ -53,6 +53,17 @@ describe('content security policy', () => {
     expect(site['worker-src']).not.toContain('data:')
   })
 
+  it('allows Razorpay Checkout on checkout pages only', () => {
+    const site = directives(contentSecurityPolicy({}))
+    const checkout = directives(contentSecurityPolicy({}, { checkout: true }))
+    expect(checkout['script-src']).toContain('https://checkout.razorpay.com')
+    expect(checkout['frame-src']).toContain('https://api.razorpay.com')
+    expect(checkout['connect-src']).toContain('https://api.razorpay.com')
+    for (const d of ['script-src', 'frame-src', 'connect-src', 'img-src']) {
+      expect(site[d]!.join(' ')).not.toContain('razorpay')
+    }
+  })
+
   it('ignores values that are not URLs', () => {
     const csp = contentSecurityPolicy({ cdnUrl: 'not a url', umamiUrl: '', sentryDsn: undefined })
     expect(csp).not.toMatch(/not a url|undefined/)
