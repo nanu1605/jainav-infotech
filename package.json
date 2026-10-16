@@ -27,6 +27,7 @@
     "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap",
     "seed": "cross-env NODE_OPTIONS=--no-deprecation payload run scripts/seed/run.ts",
     "seed:publish": "cross-env NODE_OPTIONS=--no-deprecation payload run scripts/seed/publish.ts",
+    "import:release": "cross-env NODE_OPTIONS=--no-deprecation payload run scripts/import-release.ts",
     "prepare": "husky",
     "lhci": "lhci autorun"
   },
@@ -60,7 +61,7 @@
     "react-dom": "19.2.6",
     "react-hook-form": "7.89.0",
     "semver": "^7.8.5",
-    "sharp": "0.35.4",
+    "sharp": "0.35.5",
     "tailwind-merge": "3.7.0",
     "zod": "4.6.5"
   },
