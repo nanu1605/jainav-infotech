@@ -60,6 +60,18 @@ jobs:
             NEXT_PUBLIC_UMAMI_WEBSITE_ID=${{ vars.NEXT_PUBLIC_UMAMI_WEBSITE_ID }}
             NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
 
+      # Full source and dependencies for one-off commands on the server (seed, migrate, release
+      # import); see docs/runbooks/server.md.
+      - name: Build and push the tools image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: tools
+          push: true
+          tags: ghcr.io/${{ github.repository }}:tools-${{ github.sha }}
+          cache-from: type=gha,scope=${{ env.SERVICE }}
+
       - name: Deploy on the VPS
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
