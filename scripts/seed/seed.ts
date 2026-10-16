@@ -141,6 +141,29 @@ export async function seed(payload: Payload): Promise<SeedSummary> {
     })
   }
 
+  // Vanity path (spec §7): /vyro → 308 → /products/vyro, served by the catch-all page.
+  const vanity = await payload.find({
+    collection: 'redirects',
+    where: { from: { equals: '/vyro' } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+  if (!vanity.docs.length) {
+    await payload.create({
+      collection: 'redirects',
+      data: {
+        from: '/vyro',
+        to: { type: 'reference', reference: { relationTo: 'products', value: productIds.vyro! } },
+        type: '308',
+      },
+      depth: 0,
+      context,
+      overrideAccess: true,
+    })
+    summary.created.push('redirects:/vyro')
+  } else summary.skipped.push('redirects:/vyro')
+
   for (const { related, ...doc } of content.services) {
     await ensure(payload, summary, {
       collection: 'services',
