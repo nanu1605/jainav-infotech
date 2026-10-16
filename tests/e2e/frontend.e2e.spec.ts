@@ -13,7 +13,7 @@ test('Hindi home renders under /hi with lang="hi"', async ({ page }) => {
 
 test('language switch keeps the page and remembers the choice', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('link', { name: 'हिंदी' }).click()
+  await page.getByRole('link', { name: 'हिंदी', exact: true }).first().click()
   await expect(page).toHaveURL(/\/hi$/)
   expect(await page.evaluate(() => localStorage.getItem('jv-lang-pref'))).toBe('hi')
 })

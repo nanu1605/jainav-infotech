@@ -18,6 +18,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], channel: process.env.PLAYWRIGHT_CHANNEL || undefined },
     },
   ],
+  globalSetup: './tests/e2e/globalSetup.ts',
   webServer: {
     command: 'pnpm dev',
     reuseExistingServer: true,

@@ -113,7 +113,7 @@ export async function planTiers(loaded: LoadedProduct, locale: Locale): Promise<
       key: plan.code,
       name: plan.name ?? plan.code,
       description: plan.description,
-      price: free ? t('free') : formatINR(locale, plan.priceINR ?? 0),
+      price: formatINR(locale, plan.priceINR ?? 0),
       period: free ? undefined : period(plan),
       features: (plan.features ?? []).flatMap((f) => (f.text ? [f.text] : [])),
       highlight: plan.highlight,
