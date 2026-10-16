@@ -40,7 +40,7 @@ export function LeadForm<TIn extends FieldValues, TOut>({
   children,
 }: {
   form: UseFormReturn<TIn, unknown, TOut>
-  onValid: (values: TOut) => Promise<void>
+  onValid: (values: TOut) => Promise<unknown>
   className?: string
   children: ReactNode
 }) {

@@ -1,14 +1,29 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { lazy, Suspense, type ComponentType } from 'react'
+
+import { Callout } from '@/components/ui/Callout'
+
+/** In place of a form whose code didn't download (offline, or a tab older than a deploy). */
+export function LoadFailed() {
+  const t = useTranslations('forms')
+  return <Callout tone="warning">{t('loadFailed')}</Callout>
+}
 
 /**
  * The lead forms with their code split off (spec §15 budget: react-hook-form, Zod and Turnstile
  * are ~40 KB). The server still renders the full form into the HTML; in the browser that
- * markup stays as it is, readable and typeable, until the chunk arrives and hydrates it.
+ * markup stays as it is, readable and typeable, until the chunk arrives and hydrates it. A
+ * failed download shows a notice there instead of reaching the page's error boundary.
  */
-function deferred<P extends object>(load: () => Promise<ComponentType<P>>) {
-  const Lazy = lazy(async () => ({ default: await load() }))
+export function deferred<P extends object>(load: () => Promise<ComponentType<P>>) {
+  const Lazy = lazy(() =>
+    load().then(
+      (Component) => ({ default: Component }),
+      () => ({ default: LoadFailed as ComponentType<P> }),
+    ),
+  )
   return function Deferred(props: P) {
     return (
       <Suspense>

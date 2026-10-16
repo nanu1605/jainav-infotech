@@ -7,6 +7,7 @@ import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 import { getPayload, type Payload, type SendEmailOptions } from 'payload'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { inboxKey, ipKey } from '@/lib/rateLimit'
 import config from '@/payload.config'
 
 const pending: Promise<unknown>[] = []
@@ -130,7 +131,8 @@ beforeAll(async () => {
   productId = product.id
 })
 
-beforeEach(() => {
+beforeEach(async () => {
+  await settled()
   sent.length = 0
   telegrams.length = 0
 })
@@ -214,7 +216,36 @@ describe('contact form', () => {
     expect(failed.status).toBe(400)
     expect(await failed.json()).toEqual({ error: 'verification' })
     expect((await post('nope', {})).status).toBe(404)
+    // z.email allows a label ending in "-"; Payload's email field doesn't, so neither do we.
+    expect((await post('contact', contact(`${run}@gmail-.com`))).status).toBe(400)
     expect(await leadsFor(email)).toHaveLength(0)
+  })
+
+  it('strips NUL characters, which Postgres refuses, instead of failing the save', async () => {
+    const email = address('nul')
+    const res = await post('contact', contact(email, { message: 'hello\u0000 world' }))
+    expect(res.status).toBe(200)
+    expect((await leadsFor(email))[0]?.message).toBe('hello world')
+  })
+
+  it('caps the body as it is read, with or without a Content-Length', async () => {
+    const chunk = new Uint8Array(64 * 1024)
+    let left = 100 // 6.4 MB, more than a CV plus fields
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (left-- > 0) controller.enqueue(chunk)
+        else controller.close()
+      },
+    })
+    const req = new Request('http://localhost:3000/api/v1/forms/contact', {
+      method: 'POST',
+      body,
+      // @ts-expect-error -- Node needs this for a streamed body; the DOM types don't know it.
+      duplex: 'half',
+      headers: { 'content-type': 'multipart/form-data; boundary=x', 'cf-connecting-ip': nextIp() },
+    })
+    expect(req.headers.get('content-length')).toBeNull()
+    expect((await submit(req, { params: Promise.resolve({ form: 'contact' }) })).status).toBe(413)
   })
 
   it('answers a filled honeypot like a success but keeps and sends nothing', async () => {
@@ -246,6 +277,26 @@ describe('rate limits', () => {
     for (let i = 0; i < 5; i++) expect((await post('contact', contact(email))).status).toBe(200)
     expect((await post('contact', contact(email))).status).toBe(429)
   })
+
+  it('counts one inbox across +tags and one IPv6 client across its /64', async () => {
+    expect(inboxKey('V.I.C+x@googlemail.com')).toBe('vic@gmail.com')
+    expect(inboxKey('a.b+news@outlook.com')).toBe('a.b@outlook.com')
+    expect(ipKey('2405:201:abcd:12::1')).toBe('2405:201:abcd:12::/64')
+    expect(ipKey('2405:0201:abcd:0012:aaaa:bbbb:cccc:dddd')).toBe('2405:201:abcd:12::/64')
+    expect(ipKey('203.0.113.9')).toBe('203.0.113.9')
+    expect(ipKey('::ffff:203.0.113.9')).toBe('::ffff:203.0.113.9')
+
+    const tagged = (i: number) => `tags.${run}+${i}@example.test`
+    for (let i = 0; i < 5; i++) expect((await post('contact', contact(tagged(i)))).status).toBe(200)
+    expect((await post('contact', contact(tagged(5)))).status).toBe(429)
+
+    const prefix = `2001:db8:${(Date.now() % 0xffff).toString(16)}:7`
+    const v6 = (i: number) => `${prefix}::${i + 1}`
+    for (let i = 0; i < 10; i++) {
+      expect((await post('contact', contact(address(`v6-${i}`)), { ip: v6(i) })).status).toBe(200)
+    }
+    expect((await post('contact', contact(address('v6-last')), { ip: v6(10) })).status).toBe(429)
+  })
 })
 
 describe('waitlist', () => {
@@ -262,6 +313,24 @@ describe('waitlist', () => {
     const leads = await leadsFor(email)
     expect(leads).toHaveLength(1)
     expect(leads[0]).toMatchObject({ type: 'waitlist', product: productId })
+    expect(sent).toHaveLength(0)
+  })
+
+  it('promises the launch email only with the box ticked, and keeps a later tick', async () => {
+    const email = address('waitlist-later')
+    const join = { product: `${run}-app`, email, marketing: false }
+    expect((await post('waitlist', join)).status).toBe(200)
+    await settled()
+    expect(String(sent.find((m) => m.to === email)?.text)).toContain('only email')
+    expect((await leadsFor(email))[0]?.marketingConsent?.given).toBe(false)
+
+    sent.length = 0
+    expect((await post('waitlist', { ...join, marketing: true })).status).toBe(200)
+    await settled()
+    const leads = await leadsFor(email)
+    expect(leads).toHaveLength(1)
+    expect(leads[0]?.marketingConsent).toMatchObject({ given: true, withdrawnAt: null })
+    expect(leads[0]?.marketingConsent?.textVersion).toBeTruthy()
     expect(sent).toHaveLength(0)
   })
 })
@@ -334,7 +403,26 @@ describe('newsletter double opt-in and unsubscribe', () => {
     const forged = await unsubscribeRoute.GET(
       new Request(`http://localhost:3000/api/v1/forms/unsubscribe?token=${id}.forged`),
     )
-    expect(new URL(forged.headers.get('location')!).pathname).toBe('/newsletter/invalid')
+    expect(new URL(forged.headers.get('location')!).pathname).toBe('/newsletter/unsubscribeFailed')
+  })
+
+  it('starts a new opt-in when a confirmed subscriber had withdrawn consent', async () => {
+    const email = address('withdrawn')
+    await payload.create({
+      collection: 'leads',
+      data: {
+        type: 'newsletter',
+        status: 'new',
+        email,
+        confirmedAt: '2026-10-01T10:00:00.000Z',
+        marketingConsent: { given: true, withdrawnAt: '2026-10-10T10:00:00.000Z' },
+      },
+      overrideAccess: true,
+    })
+    expect((await post('newsletter', { email })).status).toBe(200)
+    await settled()
+    expect(await leadsFor(email)).toHaveLength(2)
+    expect(tokenFrom(sent.find((m) => m.to === email))).toBeTruthy()
   })
 
   it('rejects confirmation links older than seven days', async () => {
@@ -384,9 +472,10 @@ describe('careers', () => {
   it('rejects a missing, oversized or non-PDF CV', async () => {
     const email = address('badcv')
     expect((await post('careers', application(email))).status).toBe(400)
-    expect(
-      (await post('careers', application(email), { cv: Buffer.from('MZ not a pdf') })).status,
-    ).toBe(400)
+    // Named PDF, typed PDF, not a PDF: the answer says which field to fix.
+    const renamed = await post('careers', application(email), { cv: Buffer.from('MZ not a pdf') })
+    expect(renamed.status).toBe(400)
+    expect(await renamed.json()).toEqual({ error: 'invalid', field: 'cv' })
     const huge = Buffer.concat([Buffer.from('%PDF-'), Buffer.alloc(5 * 1024 * 1024)])
     expect((await post('careers', application(email), { cv: huge })).status).toBe(400)
     expect(await leadsFor(email)).toHaveLength(0)

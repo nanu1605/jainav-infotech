@@ -66,7 +66,7 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
   DROP TABLE "leads_rels" CASCADE;
   DROP TABLE "private_files" CASCADE;
   DROP TABLE "private_files_rels" CASCADE;
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_private_files_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_private_files_fk";
   
   DROP INDEX "payload_locked_documents_rels_private_files_id_idx";
   ALTER TABLE "payload_locked_documents_rels" DROP COLUMN "private_files_id";

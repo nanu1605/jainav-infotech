@@ -22,6 +22,14 @@ export const PrivateFiles: CollectionConfig = {
   },
   upload: {
     mimeTypes: ['application/pdf'],
+    // Runs before the storage handler. No shared cache may keep a file or its signed redirect:
+    // Cloudflare caches .pdf paths by default, and would serve them without the access check.
+    handlers: [
+      (req) => {
+        req.responseHeaders ??= new Headers()
+        req.responseHeaders.set('Cache-Control', 'private, no-store')
+      },
+    ],
   },
   fields: [
     {

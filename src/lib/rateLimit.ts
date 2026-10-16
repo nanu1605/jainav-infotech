@@ -1,19 +1,43 @@
 import 'server-only'
 
 import { createHash, createHmac } from 'node:crypto'
+import { isIPv6 } from 'node:net'
 
 import type { PostgresAdapter } from '@payloadcms/db-postgres'
 import { RateLimiterPostgres, RateLimiterRes } from 'rate-limiter-flexible'
 
 import { getClient } from './cms'
 
-/** Attempts allowed per `duration` seconds (spec §16). */
+/** One client: an IPv6 subscriber usually holds a whole /64, so count the prefix. */
+export function ipKey(ip: string) {
+  if (!isIPv6(ip) || ip.includes('.')) return ip // IPv4 (also IPv4-mapped): the address
+  const [head, tail] = ip.split('::')
+  const h = head ? head.split(':') : []
+  const t = tail ? tail.split(':') : []
+  const groups = tail === undefined ? h : [...h, ...Array(8 - h.length - t.length).fill('0'), ...t]
+  return `${groups
+    .slice(0, 4)
+    .map((g) => parseInt(g, 16).toString(16))
+    .join(':')}::/64`
+}
+
+/** One inbox: +tags reach the same one, and Gmail also ignores dots. */
+export function inboxKey(email: string) {
+  const at = email.lastIndexOf('@')
+  let local = email.slice(0, at).split('+')[0]
+  let domain = email.slice(at + 1).toLowerCase()
+  if (domain === 'googlemail.com') domain = 'gmail.com'
+  if (domain === 'gmail.com') local = local.replaceAll('.', '')
+  return `${local.toLowerCase()}@${domain}`
+}
+
+/** Attempts allowed per `duration` seconds (spec §16), counted per `key` of what is passed. */
 const RULES = {
   /** Every form submission from one IP, all forms together. */
-  formIp: { points: 10, duration: 10 * 60 },
-  /** Submissions naming one email address: also caps auto-replies sent to someone else. */
-  formEmail: { points: 5, duration: 60 * 60 },
-  goClick: { points: 60, duration: 60 },
+  formIp: { points: 10, duration: 10 * 60, key: ipKey },
+  /** Submissions naming one inbox: also caps auto-replies sent to someone else. */
+  formEmail: { points: 5, duration: 60 * 60, key: inboxKey },
+  goClick: { points: 60, duration: 60, key: ipKey },
 } as const
 export type Rule = keyof typeof RULES
 
@@ -26,11 +50,14 @@ export const clientIp = (headers: Headers) =>
   headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
   'unknown'
 
-/** Keyed hash for storing an IP with a consent record without storing the IP (spec §13). */
-export const hashIp = (ip: string) =>
+// Keyed: a plain hash of an IPv4 address or a known email is reversed by trying them all.
+const hmac = (value: string) =>
   createHmac('sha256', process.env.PAYLOAD_SECRET ?? '')
-    .update(`ip:${ip}`)
+    .update(value)
     .digest('hex')
+
+/** Keyed hash for storing an IP with a consent record without storing the IP (spec §13). */
+export const hashIp = (ip: string) => hmac(`ip:${ip}`)
 
 export const sha256 = (value: string) => createHash('sha256').update(value).digest('hex')
 
@@ -52,7 +79,8 @@ async function createLimiters() {
       tableName: 'hits',
       tableCreated: true,
       keyPrefix: rule,
-      ...RULES[rule],
+      points: RULES[rule].points,
+      duration: RULES[rule].duration,
     })
   return Object.fromEntries(
     (Object.keys(RULES) as Rule[]).map((rule) => [rule, limiter(rule)]),
@@ -62,16 +90,16 @@ async function createLimiters() {
 let limiters: Promise<Record<Rule, RateLimiterPostgres>> | undefined
 
 /**
- * Counts one attempt for `key` (hashed: keys are IPs and email addresses). Returns 0 when it is
- * within the limit, else the seconds until the next attempt is allowed.
+ * Counts one attempt for `value` (an IP or an email address, stored only as a keyed hash).
+ * Returns 0 when it is within the limit, else the seconds until the next attempt is allowed.
  */
-export async function limit(rule: Rule, key: string): Promise<number> {
+export async function limit(rule: Rule, value: string): Promise<number> {
   limiters ??= createLimiters().catch((error) => {
     limiters = undefined
     throw error
   })
   try {
-    await (await limiters)[rule].consume(sha256(key))
+    await (await limiters)[rule].consume(hmac(`rl:${RULES[rule].key(value)}`))
     return 0
   } catch (error) {
     if (error instanceof RateLimiterRes) return Math.max(1, Math.ceil(error.msBeforeNext / 1000))

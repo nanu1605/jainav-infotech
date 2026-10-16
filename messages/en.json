@@ -219,7 +219,7 @@
     },
     "waitlist": {
       "title": "Be first to try {name}",
-      "text": "Leave your email and we'll tell you when {name} is ready."
+      "text": "Join the waitlist, and tick the box if you would like an email when {name} is ready."
     },
     "productPages": {
       "pricingTitle": "{name} pricing",
@@ -460,7 +460,9 @@
     "waitlist": {
       "submit": "Join the waitlist",
       "successTitle": "You're on the list",
-      "successText": "We'll email you when {name} is ready."
+      "successText": "We'll email you when {name} is ready.",
+      "marketing": "Email me when {name} is ready (optional).",
+      "successTextNoEmail": "Thanks for your interest in {name}. You left the box unticked, so we won't email you about its launch."
     },
     "newsletter": {
       "title": "Newsletter",
@@ -482,7 +484,11 @@
         "title": "You're unsubscribed",
         "text": "We won't send you marketing emails any more. Replies to your own messages still reach you."
       },
-      "home": "Go to the home page"
+      "home": "Go to the home page",
+      "unsubscribeFailed": {
+        "title": "We couldn't unsubscribe you with this link",
+        "text": "The link may be damaged or out of date. Reply to any of our emails, or <privacy>send a privacy request</privacy>, and we'll stop marketing emails to your address."
+      }
     },
     "careers": {
       "applyTitle": "Apply for this role",
@@ -517,7 +523,8 @@
     "whatsapp": {
       "label": "Chat with us on WhatsApp",
       "prefill": "Hello Jainav Infotech, I have a question about this page: {url}"
-    }
+    },
+    "loadFailed": "This form didn't load. Reload the page to try again."
   },
   "email": {
     "brand": "Jainav Infotech",
@@ -536,7 +543,8 @@
       },
       "waitlist": {
         "subject": "You're on the {product} waitlist",
-        "body": "Thanks for your interest in {product}. We'll email you as soon as it's ready."
+        "body": "Thanks for your interest in {product}. We'll email you as soon as it's ready.",
+        "bodyNoEmail": "Thanks for your interest in {product}. You're on its waitlist. You didn't ask for a launch email, so this is the only email we'll send you about it."
       },
       "careers": {
         "subject": "We've received your application",

@@ -30,12 +30,21 @@ export const DATA_REQUEST_TYPES = [
 ] as const
 export const CV_MAX_BYTES = 5 * 1024 * 1024
 
+// Postgres text columns refuse NUL, so a pasted one would fail the save.
+const noNul = z.overwrite((s: string) => s.replaceAll('\u0000', ''))
+/** Payload's email field rule (stricter than z.email: domain labels end in a letter or digit). */
+const PAYLOAD_EMAIL =
+  /^(?!.*\.\.)[\w!#$%&'*+/=?^`{|}~-](?:[\w!#$%&'*+/=?^`{|}~.-]*[\w!#$%&'*+/=?^`{|}~-])?@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}$/i
+
 // Error messages are keys into `forms.errors`; the form translates them.
 const text = (max: number, ...checks: z.core.$ZodCheck<string>[]) =>
-  z.string().check(z.trim(), z.maxLength(max, 'tooLong'), ...checks)
+  z.string().check(noNul, z.trim(), z.maxLength(max, 'tooLong'), ...checks)
 const required = (max: number, ...checks: z.core.$ZodCheck<string>[]) =>
   text(max, z.minLength(1, 'required'), ...checks)
-const email = z.pipe(z.string().check(z.trim(), z.maxLength(254, 'tooLong')), z.email('email'))
+const email = z.pipe(
+  z.string().check(z.trim(), z.maxLength(254, 'tooLong')),
+  z.email('email').check(z.regex(PAYLOAD_EMAIL, 'email')),
+)
 const phone = z.string().check(z.trim(), z.regex(/^$|^\+?[\d\s()-]{7,20}$/, 'phone'))
 const slug = z.string().check(z.trim(), z.regex(/^$|^[a-z0-9-]{1,100}$/, 'choose'))
 const chosen = z.string().check(z.trim(), z.regex(/^[a-z0-9-]{1,100}$/, 'choose'))
@@ -98,7 +107,7 @@ export const formSchemas = {
 export type FormName = keyof typeof formSchemas
 export const isFormName = (name: string): name is FormName => Object.hasOwn(formSchemas, name)
 
-const meta = (max: number) => z.catch(z.string().check(z.maxLength(max)), '')
+const meta = (max: number) => z.catch(z.string().check(noNul, z.maxLength(max)), '')
 
 /** Sent with every form next to its fields: where it was filled in and the spam checks. */
 export const metaSchema = z.object({

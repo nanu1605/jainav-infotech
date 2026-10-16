@@ -31,12 +31,27 @@ const SEARCHABLE = ['email', 'name', 'company']
 
 /**
  * A deleted lead takes its CV with it (spec §16). Before the delete, like Payload's own file
- * cleanup: deleting the lead row also drops the files' owner links.
+ * cleanup: deleting the lead row also drops the links. Files it lists or that name it as owner
+ * (the owner link is written separately and may be missing).
  */
 const deleteOwnFiles: CollectionBeforeDeleteHook = async ({ id, req }) => {
+  const lead = await req.payload.findByID({
+    collection: 'leads',
+    id,
+    select: { attachments: true },
+    depth: 0,
+    overrideAccess: true,
+    req,
+  })
+  const attached = (lead.attachments ?? []).map((file) =>
+    typeof file === 'object' ? file.id : file,
+  )
+  const owned: Where = {
+    and: [{ 'owner.relationTo': { equals: 'leads' } }, { 'owner.value': { equals: id } }],
+  }
   const { errors } = await req.payload.delete({
     collection: 'private-files',
-    where: { 'owner.relationTo': { equals: 'leads' }, 'owner.value': { equals: id } },
+    where: attached.length ? { or: [owned, { id: { in: attached } }] } : owned,
     depth: 0,
     overrideAccess: true,
     req,

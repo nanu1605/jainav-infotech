@@ -158,15 +158,24 @@ describe('private files', () => {
       data: { type: 'careers', status: 'new', email: `cv-${run}@jainav.test` },
     })
     leads.push(lead)
-    const upload = (owner: Lead, name: string) =>
+    const upload = (owner: Lead | null, name: string) =>
       payload.create({
         collection: 'private-files',
-        data: { purpose: 'cv', owner: { relationTo: 'leads', value: owner.id } },
+        data: {
+          purpose: 'cv',
+          ...(owner && { owner: { relationTo: 'leads' as const, value: owner.id } }),
+        },
         file: { name, data: pdf, mimetype: 'application/pdf', size: pdf.length },
       })
     const file = await upload(lead, `${run}-cv.pdf`)
+    // Listed on the lead, but its owner link was never written.
+    const unowned = await upload(null, `${run}-unowned.pdf`)
     const othersFile = await upload(leads[1]!, `${run}-other.pdf`)
-    await payload.update({ collection: 'leads', id: lead.id, data: { attachments: [file.id] } })
+    await payload.update({
+      collection: 'leads',
+      id: lead.id,
+      data: { attachments: [file.id, unowned.id] },
+    })
     const onDisk = path.resolve('private-files', file.filename!)
     expect(existsSync(onDisk)).toBe(true)
 
@@ -178,11 +187,21 @@ describe('private files', () => {
     })
     expect(staffView.url?.endsWith(`/api/private-files/file/${file.filename}`)).toBe(true)
     expect((await rest(REST_GET, `/private-files/file/${file.filename}`)).status).toBe(403)
+    // Signed in: the file, and never kept by a shared cache (Cloudflare caches .pdf by default).
+    const { token } = await payload.login({
+      collection: 'users',
+      data: { email: owner.email, password: `pw-${run}` },
+    })
+    const download = await rest(REST_GET, `/private-files/file/${file.filename}`, {
+      headers: { Authorization: `JWT ${token}` },
+    })
+    expect(download.status).toBe(200)
+    expect(download.headers.get('cache-control')).toBe('private, no-store')
 
     await payload.delete({ collection: 'leads', id: lead.id, ...asOwner() })
     const { totalDocs } = await payload.count({
       collection: 'private-files',
-      where: { id: { equals: file.id } },
+      where: { id: { in: [file.id, unowned.id] } },
     })
     expect(totalDocs).toBe(0)
     expect(existsSync(onDisk)).toBe(false)

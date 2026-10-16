@@ -55,7 +55,7 @@ type Outcome = {
   collection: 'leads' | 'data-requests'
   id: number
   staff?: { inbox: Inbox; title: string; telegram: string; fields: [string, string][] }
-  autoReply?: { kind: AutoReplyKind; product?: string | null }
+  autoReply?: { kind: AutoReplyKind; product?: string | null; notify?: boolean }
   /** Newsletter: the raw confirmation token (only its hash is stored). */
   confirm?: string
 }
@@ -66,6 +66,12 @@ const json = (status: number, body: object, headers: Record<string, string> = {}
   Response.json(body, { status, headers: { 'Cache-Control': 'no-store', ...headers } })
 
 const optional = (value: string) => value || undefined
+
+/** What may be logged about a failure: a database error's message lists every bound value. */
+const errorCode = (error: unknown) => {
+  const code = (error as { cause?: { code?: unknown } } | null)?.cause?.code
+  return typeof code === 'string' ? code : error instanceof Error ? error.name : 'unknown'
+}
 
 const marketingConsent = (given: boolean, now: string) =>
   given ? { given: true, at: now, textVersion: MARKETING_VERSION } : { given: false }
@@ -195,16 +201,36 @@ const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome 
   async waitlist(v, ctx) {
     const product = await findProduct(ctx.payload, v.product)
     if (!product) throw new InvalidForm()
-    // Already waiting: say yes again without a second lead or a second email.
-    const waiting = await exists(ctx.payload, {
-      and: [
-        { type: { equals: 'waitlist' } },
-        { product: { equals: product.id } },
-        { email: { equals: v.email } },
-        { unsubscribedAt: { exists: false } },
-      ],
-    })
-    if (waiting) return null
+    // Already waiting: say yes again without a second lead or a second email, but keep a newly
+    // ticked box (the launch email needs it).
+    const waiting: Where[] = [
+      { type: { equals: 'waitlist' } },
+      { product: { equals: product.id } },
+      { email: { equals: v.email } },
+      { unsubscribedAt: { exists: false } },
+    ]
+    if (await exists(ctx.payload, { and: waiting })) {
+      if (v.marketing) {
+        await ctx.payload.update({
+          collection: 'leads',
+          where: {
+            and: [
+              ...waiting,
+              {
+                or: [
+                  { 'marketingConsent.given': { not_equals: true } },
+                  { 'marketingConsent.withdrawnAt': { exists: true } },
+                ],
+              },
+            ],
+          },
+          data: { marketingConsent: { ...marketingConsent(true, ctx.now), withdrawnAt: null } },
+          overrideAccess: true,
+          depth: 0,
+        })
+      }
+      return null
+    }
     const id = await createLead(ctx, {
       type: 'waitlist',
       product: product.id,
@@ -226,7 +252,7 @@ const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome 
           ['Page', ctx.meta.page],
         ]),
       },
-      autoReply: { kind: 'waitlist', product: product.name },
+      autoReply: { kind: 'waitlist', product: product.name, notify: v.marketing },
     }
   },
 
@@ -238,6 +264,7 @@ const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome 
         { email: { equals: v.email } },
         { confirmedAt: { exists: true } },
         { unsubscribedAt: { exists: false } },
+        { 'marketingConsent.withdrawnAt': { exists: false } },
       ],
     })
     if (subscribed) return null
@@ -286,13 +313,17 @@ const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome 
       })
       throw error
     }
-    await ctx.payload.update({
-      collection: 'private-files',
-      id: file.id,
-      data: { owner: { relationTo: 'leads', value: id } },
-      overrideAccess: true,
-      depth: 0,
-    })
+    // A convenience link for the admin (deleting the lead finds the CV through `attachments`):
+    // the application is saved, so a failure here must not fail it.
+    await ctx.payload
+      .update({
+        collection: 'private-files',
+        id: file.id,
+        data: { owner: { relationTo: 'leads', value: id } },
+        overrideAccess: true,
+        depth: 0,
+      })
+      .catch((error) => console.error('forms/careers: CV owner not set:', errorCode(error)))
     return {
       collection: 'leads',
       id,
@@ -371,15 +402,33 @@ const parseJson = (value: FormDataEntryValue | null | undefined): unknown => {
  * response so a slow mail or Telegram API never delays it or loses the lead.
  */
 export async function handleForm(form: FormName, req: Request): Promise<Response> {
-  // CV plus fields; anything bigger is not one of our forms.
-  if (Number(req.headers.get('content-length')) > CV_MAX_BYTES + 512 * 1024) {
-    return json(413, { error: 'invalid' })
-  }
-  const body = await req.formData().catch(() => null)
+  // CV plus fields; anything bigger is not one of our forms. Counted as it is read too: a
+  // chunked request has no Content-Length to check.
+  const max = CV_MAX_BYTES + 512 * 1024
+  if (Number(req.headers.get('content-length')) > max) return json(413, { error: 'invalid' })
+  let read = 0
+  const capped = req.body?.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        read += chunk.byteLength
+        if (read > max) controller.error(new Error('Body too large'))
+        else controller.enqueue(chunk)
+      },
+    }),
+  )
+  const body = await new Response(capped ?? null, {
+    headers: { 'content-type': req.headers.get('content-type') ?? '' },
+  })
+    .formData()
+    .catch(() => null)
+  if (read > max) return json(413, { error: 'invalid' })
+
   const parsed = formSchemas[form].safeParse(parseJson(body?.get('data')))
   const meta = metaSchema.safeParse(parseJson(body?.get('meta'))).data ?? metaSchema.parse({})
   const cv = form === 'careers' ? await readPdf(body?.get('cv') ?? null) : null
-  if (!parsed.success || (form === 'careers' && !cv)) return json(400, { error: 'invalid' })
+  if (!parsed.success) return json(400, { error: 'invalid' })
+  // The browser only checked the file's name; say which field to fix.
+  if (form === 'careers' && !cv) return json(400, { error: 'invalid', field: 'cv' })
   const values = { ...parsed.data, email: parsed.data.email.toLowerCase() }
 
   const ip = clientIp(req.headers)
@@ -402,7 +451,7 @@ export async function handleForm(form: FormName, req: Request): Promise<Response
     )
   } catch (error) {
     if (error instanceof InvalidForm) return json(400, { error: 'invalid' })
-    console.error(`forms/${form}: save failed:`, error instanceof Error ? error.message : error)
+    console.error(`forms/${form}: save failed:`, errorCode(error))
     return json(500, { error: 'server' })
   }
   if (outcome) {
@@ -456,7 +505,7 @@ async function notify(payload: Payload, outcome: Outcome, email: string, locale:
 
 const statusPage = (
   locale: string | null | undefined,
-  status: 'confirmed' | 'invalid' | 'unsubscribed',
+  status: 'confirmed' | 'invalid' | 'unsubscribed' | 'unsubscribeFailed',
 ) => {
   const known = routing.locales.find((l) => l === locale) ?? routing.defaultLocale
   return Response.redirect(new URL(localizedPath(known, `/newsletter/${status}`), SITE_URL), 303)
@@ -506,14 +555,23 @@ export async function unsubscribe(req: Request): Promise<Response> {
         .catch(() => null)
     : null
   if (!lead) {
-    return req.method === 'POST' ? json(400, { error: 'invalid' }) : statusPage(null, 'invalid')
+    return req.method === 'POST'
+      ? json(400, { error: 'invalid' })
+      : statusPage(null, 'unsubscribeFailed')
   }
-  await payload.update({
-    collection: 'leads',
-    where: { and: [{ email: { equals: lead.email } }, { unsubscribedAt: { exists: false } }] },
-    data: { unsubscribedAt: new Date().toISOString() },
-    overrideAccess: true,
-    depth: 0,
-  })
+  try {
+    await payload.update({
+      collection: 'leads',
+      where: { and: [{ email: { equals: lead.email } }, { unsubscribedAt: { exists: false } }] },
+      data: { unsubscribedAt: new Date().toISOString() },
+      overrideAccess: true,
+      depth: 0,
+    })
+  } catch (error) {
+    console.error('forms/unsubscribe: failed:', errorCode(error))
+    return req.method === 'POST'
+      ? json(500, { error: 'server' })
+      : statusPage(lead.locale, 'unsubscribeFailed')
+  }
   return req.method === 'POST' ? json(200, { ok: true }) : statusPage(lead.locale, 'unsubscribed')
 }

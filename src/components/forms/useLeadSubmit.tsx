@@ -21,6 +21,7 @@ export function useLeadSubmit(form: FormName) {
   const [problem, setProblem] = useState<FormProblem | null>(null)
   const [sent, setSent] = useState(false)
 
+  /** Resolves to the server's answer (none while verification is pending). */
   const submit = async (values: Record<string, unknown>, cv?: File) => {
     setProblem(null)
     if (!token) return setProblem('verificationPending')
@@ -30,10 +31,15 @@ export function useLeadSubmit(form: FormName) {
       website: honeypot.current?.value ?? '',
       cv,
     })
-    if (result.ok) return setSent(true)
+    if (result.ok) {
+      setSent(true)
+      return result
+    }
     setToken(null)
     setAttempt((n) => n + 1)
-    setProblem(result.error)
+    // A refused field is marked on the field itself.
+    if (!result.field) setProblem(result.error)
+    return result
   }
 
   const onToken = (value: string | null) => {

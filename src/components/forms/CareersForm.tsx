@@ -43,7 +43,16 @@ export function CareersForm({ job }: { job?: { slug: string } }) {
     return <SuccessPanel title={t('careers.successTitle')} text={t('careers.successText')} />
   }
   return (
-    <LeadForm form={form} onValid={({ cv, ...values }) => lead.submit(values, cv)}>
+    <LeadForm
+      form={form}
+      onValid={async ({ cv, ...values }) => {
+        const result = await lead.submit(values, cv)
+        // The browser judged the file by its name; the server read it and found no PDF.
+        if (result?.ok === false && result.field === 'cv') {
+          form.setError('cv', { type: 'server', message: 'pdf' }, { shouldFocus: true })
+        }
+      }}
+    >
       <div className="grid gap-5 sm:grid-cols-2">
         <FormField label={t('fields.name')} error={errorText(errors.name)} required>
           <Input autoComplete="name" {...register('name')} />

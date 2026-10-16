@@ -10,7 +10,7 @@ import { pageMetadata } from '@/lib/seo'
 
 type Props = { params: Promise<{ locale: string; status: string }> }
 
-const STATUSES = ['confirmed', 'invalid', 'unsubscribed'] as const
+const STATUSES = ['confirmed', 'invalid', 'unsubscribed', 'unsubscribeFailed'] as const
 type Status = (typeof STATUSES)[number]
 const isStatus = (s: string): s is Status => (STATUSES as readonly string[]).includes(s)
 
@@ -41,7 +41,15 @@ export default async function NewsletterStatusPage({ params }: Props) {
         <h1 className="font-display text-4xl font-bold text-balance text-fg sm:text-5xl">
           {t(`${status}.title`)}
         </h1>
-        <p className="mt-4 text-lg text-fg-muted">{t(`${status}.text`)}</p>
+        <p className="mt-4 text-lg text-fg-muted">
+          {t.rich(`${status}.text`, {
+            privacy: (chunks) => (
+              <Link href="/legal/privacy-requests" className="text-fg underline underline-offset-4">
+                {chunks}
+              </Link>
+            ),
+          })}
+        </p>
         <Button asChild size="lg" className="mt-8">
           <Link href="/">{t('home')}</Link>
         </Button>

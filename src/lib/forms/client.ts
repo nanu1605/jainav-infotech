@@ -1,7 +1,8 @@
 import type { FormMeta, FormName } from './schemas'
 
 export type SubmitError = 'invalid' | 'verification' | 'rateLimited' | 'server'
-export type SubmitResult = { ok: true } | { ok: false; error: SubmitError }
+/** `field`: the one field the server refused (the CV, whose bytes only it can check). */
+export type SubmitResult = { ok: true } | { ok: false; error: SubmitError; field?: string }
 
 const UTM = ['source', 'medium', 'campaign', 'term', 'content'] as const
 
@@ -33,8 +34,8 @@ export async function submitForm(
   try {
     const res = await fetch(`/api/v1/forms/${form}`, { method: 'POST', body })
     if (res.ok) return { ok: true }
-    const data = (await res.json().catch(() => ({}))) as { error?: SubmitError }
-    return { ok: false, error: data.error ?? 'server' }
+    const data = (await res.json().catch(() => ({}))) as { error?: SubmitError; field?: string }
+    return { ok: false, error: data.error ?? 'server', field: data.field }
   } catch {
     return { ok: false, error: 'server' }
   }

@@ -7,10 +7,14 @@ import { Button } from '@/components/ui/Button'
 
 import { FormField } from './FormField'
 import { Input } from './Input'
+import { LoadFailed } from './lazy'
 import { ConsentNotice } from './LeadForm'
 
 const NewsletterFields = lazy(() =>
-  import('./NewsletterFields').then((m) => ({ default: m.NewsletterFields })),
+  import('./NewsletterFields').then(
+    (m) => ({ default: m.NewsletterFields }),
+    () => ({ default: LoadFailed }),
+  ),
 )
 
 /**
@@ -37,17 +41,20 @@ export function NewsletterForm({ level = 2 }: { level?: 2 | 3 }) {
   }, [])
 
   const Heading = `h${level}` as const
+  // Inert: it is swapped for the real form, which would lose anything typed into it.
   const placeholder = (
-    <div className="grid gap-5">
-      <FormField label={t('fields.email')} required>
-        <Input type="email" autoComplete="email" />
-      </FormField>
-      <div className="min-h-[65px]" />
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-        <ConsentNotice kind="newsletter" className="min-w-0 flex-1 basis-64" />
-        <Button>{t('newsletter.submit')}</Button>
+    <fieldset disabled className="contents">
+      <div className="grid gap-5">
+        <FormField label={t('fields.email')} required>
+          <Input type="email" autoComplete="email" />
+        </FormField>
+        <div className="min-h-[65px]" />
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+          <ConsentNotice kind="newsletter" className="min-w-0 flex-1 basis-64" />
+          <Button>{t('newsletter.submit')}</Button>
+        </div>
       </div>
-    </div>
+    </fieldset>
   )
 
   return (

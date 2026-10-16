@@ -121,20 +121,26 @@ async function renderEmail(subject: string, email: ReactElement): Promise<Render
 /**
  * Auto-reply to a form (spec §13). It never repeats what the visitor typed, so the forms can't be
  * used to send someone else's words to a third party's inbox. `product` is our own product name.
+ * `notify`: a waitlist sign-up ticked the box for the launch email (without it, none is promised).
  */
 export function autoReplyEmail({
   locale,
   kind,
   product,
+  notify = true,
 }: {
   locale: Locale
   kind: AutoReplyKind
   product?: string | null
+  notify?: boolean
 }): Promise<RenderedEmail> {
   const t = translator(locale)
   const values = { product: product || t('brand') }
   const subject = t(`autoReply.${kind}.subject`, values)
-  const body = t(`autoReply.${kind}.body`, values)
+  const body =
+    kind === 'waitlist' && !notify
+      ? t('autoReply.waitlist.bodyNoEmail', values)
+      : t(`autoReply.${kind}.body`, values)
   return renderEmail(
     subject,
     <Layout

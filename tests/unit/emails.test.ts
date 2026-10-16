@@ -29,6 +29,19 @@ describe('autoReplyEmail', () => {
     expect(email.subject).toBe('आप MenuMesh की वेटलिस्ट में हैं')
     expect(email.text).toContain('MenuMesh में रुचि के लिए धन्यवाद')
   })
+
+  it('promises no launch email when the waitlist box was left unticked', async () => {
+    const notify = await autoReplyEmail({ locale: 'en', kind: 'waitlist', product: 'Baby' })
+    const none = await autoReplyEmail({
+      locale: 'en',
+      kind: 'waitlist',
+      product: 'Baby',
+      notify: false,
+    })
+    expect(notify.text).toContain("as soon as it's ready")
+    expect(none.text).not.toContain("as soon as it's ready")
+    expect(none.text).toContain('only email')
+  })
 })
 
 describe('newsletterConfirmEmail', () => {

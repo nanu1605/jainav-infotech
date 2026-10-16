@@ -25,10 +25,16 @@ export function WaitlistForm({ product }: { product: { slug: string; name: strin
   const { errors, isSubmitting } = form.formState
 
   if (lead.sent) {
+    // Only a ticked box is consent to the launch email (spec §13), so only then is it promised.
     return (
       <SuccessPanel
         title={t('waitlist.successTitle')}
-        text={t('waitlist.successText', { name: product.name })}
+        text={t(
+          form.getValues('marketing') ? 'waitlist.successText' : 'waitlist.successTextNoEmail',
+          {
+            name: product.name,
+          },
+        )}
       />
     )
   }
@@ -37,7 +43,10 @@ export function WaitlistForm({ product }: { product: { slug: string; name: strin
       <FormField label={t('fields.email')} error={errorText(errors.email)} required>
         <Input type="email" autoComplete="email" {...form.register('email')} />
       </FormField>
-      <Checkbox label={t('consent.marketing')} {...form.register('marketing')} />
+      <Checkbox
+        label={t('waitlist.marketing', { name: product.name })}
+        {...form.register('marketing')}
+      />
       {lead.spamChecks}
       <FormActions problem={lead.problem} pending={isSubmitting} label={t('waitlist.submit')} />
     </LeadForm>

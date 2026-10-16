@@ -35,7 +35,7 @@ export type MultiStepFormProps<TIn extends FieldValues, TOut> = {
   schema: $ZodType<TOut, TIn>
   defaultValues: DefaultValues<TIn>
   steps: FormStep<TIn>[]
-  onSubmit: (values: TOut) => void | Promise<void>
+  onSubmit: (values: TOut) => unknown
   submitLabel?: string
   className?: string
 }
