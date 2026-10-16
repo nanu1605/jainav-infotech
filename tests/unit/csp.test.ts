@@ -17,7 +17,11 @@ describe('content security policy', () => {
     expect(d['object-src']).toEqual(["'none'"])
     expect(d['base-uri']).toEqual(["'self'"])
     expect(d['frame-ancestors']).toEqual(["'self'"])
-    expect(d['connect-src']).toEqual(["'self'"])
+    expect(d['connect-src']).toEqual([
+      "'self'",
+      'https://api.razorpay.com',
+      'https://lumberjack.razorpay.com',
+    ])
     expect(d['script-src']).toContain('https://challenges.cloudflare.com')
     expect(d['frame-src']).toEqual(
       expect.arrayContaining(['https://www.youtube-nocookie.com', 'https://www.google.com']),
@@ -39,6 +43,8 @@ describe('content security policy', () => {
       "'self'",
       'https://analytics.example.in',
       'https://o42.ingest.sentry.io',
+      'https://api.razorpay.com',
+      'https://lumberjack.razorpay.com',
     ])
   })
 
@@ -53,15 +59,13 @@ describe('content security policy', () => {
     expect(site['worker-src']).not.toContain('data:')
   })
 
-  it('allows Razorpay Checkout on checkout pages only', () => {
-    const site = directives(contentSecurityPolicy({}))
-    const checkout = directives(contentSecurityPolicy({}, { checkout: true }))
-    expect(checkout['script-src']).toContain('https://checkout.razorpay.com')
-    expect(checkout['frame-src']).toContain('https://api.razorpay.com')
-    expect(checkout['connect-src']).toContain('https://api.razorpay.com')
-    for (const d of ['script-src', 'frame-src', 'connect-src', 'img-src']) {
-      expect(site[d]!.join(' ')).not.toContain('razorpay')
-    }
+  it('allows Razorpay Checkout everywhere (checkout is reached by client navigation)', () => {
+    const d = directives(contentSecurityPolicy({}))
+    expect(d['script-src']).toContain('https://checkout.razorpay.com')
+    expect(d['frame-src']).toEqual(
+      expect.arrayContaining(['https://api.razorpay.com', 'https://checkout.razorpay.com']),
+    )
+    expect(d['connect-src']).toContain('https://api.razorpay.com')
   })
 
   it('ignores values that are not URLs', () => {

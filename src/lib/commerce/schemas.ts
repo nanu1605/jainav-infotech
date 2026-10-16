@@ -36,7 +36,10 @@ const latin = (max: number, min = 0) =>
 const phone = z.string().check(z.trim(), z.regex(/^$|^\+?[\d\s()-]{7,20}$/, 'phone'))
 const state = z.string().check(z.refine(isStateCode, 'choose'))
 const gstin = z.pipe(
-  z.string().check(z.trim(), z.toUpperCase()),
+  z.string().check(
+    z.overwrite((v) => v.replace(/s+/g, '')),
+    z.toUpperCase(),
+  ),
   z.string().check(z.refine((v) => v === '' || gstinState(v) !== null, 'gstin')),
 )
 const couponCode = z.string().check(z.trim(), z.toUpperCase(), z.maxLength(32, 'tooLong'))

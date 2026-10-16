@@ -19,18 +19,20 @@ export const getSettings = (locale: Locale) =>
   )
 
 /**
- * Whether prices include GST lines ("incl. GST", spec §11.1). Commerce settings are staff-only
- * through the API; this one non-personal flag is read for the public pricing table.
+ * How plan prices relate to GST, for the note under a price (spec §11.1): null while GST is off,
+ * else whether prices include it. Commerce settings are staff-only through the API; these two
+ * non-personal flags are read for the public pricing table.
  */
-export const getGstEnabled = () =>
-  read('en', ['commerce-settings'], ['gst-enabled'], async (payload) => {
+export const getGstPricing = () =>
+  read('en', ['commerce-settings'], ['gst-pricing'], async (payload) => {
     const settings = await payload.findGlobal({
       slug: 'commerce-settings',
-      select: { gstEnabled: true },
+      select: { gstEnabled: true, pricesIncludeGst: true },
       depth: 0,
       overrideAccess: true,
     })
-    return settings.gstEnabled === true
+    if (!settings.gstEnabled) return null
+    return settings.pricesIncludeGst === false ? 'plus' : 'included'
   })
 
 export const getNavigation = (locale: Locale) =>

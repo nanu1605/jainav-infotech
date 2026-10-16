@@ -174,7 +174,8 @@
       "buy": "{plan} ख़रीदें",
       "soon": "जल्द उपलब्ध",
       "fullPricing": "पूरी क़ीमतें देखें",
-      "inclGst": "GST सहित"
+      "inclGst": "GST सहित",
+      "plusGst": "GST अलग से"
     },
     "release": {
       "version": "वर्ज़न {version}",

@@ -168,10 +168,16 @@ export async function createHandler(req: Request) {
   }
   const { product: productSlug, plan: planCode, coupon: code, billing, locale } = parsed.data
   const cfg = razorpayConfig()
-  const settings = await getCommerceSettings(payload)
-  if (!cfg || !settings.currentTermsVersion || !settings.currentEulaVersion) {
+  const [settings, site] = await Promise.all([
+    getCommerceSettings(payload),
+    payload.findGlobal({ slug: 'site-settings', depth: 0, overrideAccess: true }),
+  ])
+  // A tax invoice must name the seller's GSTIN (spec §11.4), and site settings could lose it
+  // after GST was turned on.
+  const gstReady = !settings.gstEnabled || Boolean(site.company?.gstin)
+  if (!cfg || !settings.currentTermsVersion || !settings.currentEulaVersion || !gstReady) {
     console.error(
-      'checkout: unavailable: set the Razorpay keys and the current Terms and EULA versions.',
+      'checkout: unavailable: set the Razorpay keys, the current Terms and EULA versions and, with GST on, the company GSTIN.',
     )
     return json(409, { error: 'unavailable' })
   }
@@ -259,20 +265,22 @@ export async function createHandler(req: Request) {
   await (payload.db as unknown as PostgresAdapter).drizzle.execute(
     sql`UPDATE orders SET razorpay_order_id = ${razorpayOrderId}, updated_at = now() WHERE id = ${order.id}`,
   )
-  // Next time the form starts with these details.
-  await payload.update({
-    collection: 'customers',
-    id: customer.id,
-    data: {
-      name: billing.name,
-      phone: billing.phone || null,
-      state,
-      businessName: billing.businessName || null,
-      gstin: billing.gstin || null,
-    },
-    overrideAccess: true,
-    depth: 0,
-  })
+  // Next time the form starts with these details. Best effort: the order is already open.
+  await payload
+    .update({
+      collection: 'customers',
+      id: customer.id,
+      data: {
+        name: billing.name,
+        phone: billing.phone || null,
+        state,
+        businessName: billing.businessName || null,
+        gstin: billing.gstin || null,
+      },
+      overrideAccess: true,
+      depth: 0,
+    })
+    .catch((error) => console.error('checkout: profile not saved:', errorCode(error)))
 
   const razorpay: CheckoutOptions = {
     script: cfg.script,

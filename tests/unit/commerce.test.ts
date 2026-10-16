@@ -167,6 +167,21 @@ describe('coupons (spec §11.5)', () => {
     expect(couponProblem(coupon({ active: false }), target)).toBe('invalid')
     expect(couponProblem(coupon({ validFrom: '2026-11-01T00:00:00Z' }), target)).toBe('invalid')
     expect(couponProblem(coupon({ validTo: '2026-10-01T00:00:00Z' }), target)).toBe('expired')
+    // Days in India time: the picker stores a day at 12:00 UTC; it lasts until midnight IST.
+    const lastDay = coupon({ validTo: '2026-10-16T12:00:00Z' })
+    expect(
+      couponProblem(lastDay, { ...target, now: new Date('2026-10-16T23:59:00+05:30') }),
+    ).toBeNull()
+    expect(couponProblem(lastDay, { ...target, now: new Date('2026-10-17T00:01:00+05:30') })).toBe(
+      'expired',
+    )
+    const firstDay = coupon({ validFrom: '2026-10-16T12:00:00Z' })
+    expect(
+      couponProblem(firstDay, { ...target, now: new Date('2026-10-16T00:01:00+05:30') }),
+    ).toBeNull()
+    expect(couponProblem(firstDay, { ...target, now: new Date('2026-10-15T23:59:00+05:30') })).toBe(
+      'invalid',
+    )
     expect(couponProblem(coupon({ products: [{ id: 9 }] }), target)).toBe('not_applicable')
     expect(couponProblem(coupon({ products: [1], plans: [3] }), target)).toBe('not_applicable')
     expect(couponProblem(coupon({ products: [1], plans: [{ id: 2 }] }), target)).toBeNull()

@@ -216,6 +216,8 @@ export function CheckoutForm({
   }
 
   const verify = async (response: RazorpaySuccess, order: string) => {
+    // A retry inside Razorpay's window can succeed after payment.failed re-enabled the form.
+    setPaying(true)
     setProblem(null)
     const res = await post<{ ok: true }>('/api/v1/checkout/verify', response)
     if (!res.ok && res.error === 'mismatch') return fail(res)

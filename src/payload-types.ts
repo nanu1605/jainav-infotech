@@ -1717,7 +1717,13 @@ export interface Coupon {
    * Empty: every plan.
    */
   plans?: (number | Plan)[] | null;
+  /**
+   * First day it works (India time).
+   */
   validFrom?: string | null;
+  /**
+   * Last day it works (India time).
+   */
   validTo?: string | null;
   /**
    * Empty: unlimited.

@@ -8,7 +8,7 @@ import type { Locale } from '@/i18n/routing'
 import type { Plan } from '@/payload-types'
 import { cn } from '@/lib/cn'
 import { formatINR } from '@/lib/format'
-import { getGstEnabled } from '@/lib/queries'
+import { getGstPricing } from '@/lib/queries'
 import type { LoadedProduct } from '@/lib/product'
 
 type Tier = {
@@ -17,7 +17,7 @@ type Tier = {
   description?: string | null
   price: string
   period?: string
-  /** "incl. GST" under a paid price while GST is charged (spec §11.1). */
+  /** "incl. GST" (or "+ GST") under a paid price while GST is charged (spec §11.1). */
   taxNote?: string
   features: string[]
   highlight?: boolean | null
@@ -107,7 +107,7 @@ export async function PricingTable({ tiers, level = 3 }: { tiers: Tier[]; level?
 
 /** Tiers from a hosted product's plans. */
 export async function planTiers(loaded: LoadedProduct, locale: Locale): Promise<Tier[]> {
-  const [t, gst] = await Promise.all([getTranslations('ui.pricing'), getGstEnabled()])
+  const [t, gst] = await Promise.all([getTranslations('ui.pricing'), getGstPricing()])
   const { product, plans, latest, settings, buttons } = loaded
   // The same build the product's own Download button offers (its channel), else any build.
   const download =
@@ -128,7 +128,7 @@ export async function planTiers(loaded: LoadedProduct, locale: Locale): Promise<
       description: plan.description,
       price: formatINR(locale, plan.priceINR ?? 0),
       period: free ? undefined : period(plan),
-      taxNote: !free && gst ? t('inclGst') : undefined,
+      taxNote: free || !gst ? undefined : gst === 'included' ? t('inclGst') : t('plusGst'),
       features: (plan.features ?? []).flatMap((f) => (f.text ? [f.text] : [])),
       highlight: plan.highlight,
       action: free

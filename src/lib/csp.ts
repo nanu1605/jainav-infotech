@@ -6,8 +6,10 @@ const GOOGLE_MAPS = 'https://www.google.com' // MapEmbed's iframe
 const GRAVATAR = 'https://www.gravatar.com' // admin user avatars
 // Payload's JSON and code fields load the Monaco editor from jsdelivr (@monaco-editor/loader).
 const MONACO = 'https://cdn.jsdelivr.net'
-// Razorpay Checkout (checkout pages only). Razorpay publishes no CSP list: these are the origins
-// its checkout.js loads from, frames and calls. Check the console on staging with test keys.
+// Razorpay Checkout. On every page (spec §16): a CSP belongs to the document, and checkout is
+// usually reached by client-side navigation from the pricing page or sign-in. Razorpay publishes
+// no CSP list: these are the origins its checkout.js loads from, frames and calls. Check the
+// console on staging with test keys.
 const RAZORPAY = {
   script: ['https://checkout.razorpay.com'],
   frame: ['https://api.razorpay.com', 'https://checkout.razorpay.com'],
@@ -28,27 +30,26 @@ export type CspEnv = { cdnUrl?: string; umamiUrl?: string; sentryDsn?: string }
 
 /**
  * Static CSP for every route (spec §16): pages are static, so no nonces; 'unsafe-inline' covers
- * Next's inline scripts. The admin adds Payload's Monaco editor; checkout adds Razorpay.
+ * Next's inline scripts. The admin adds Payload's Monaco editor.
  */
 export function contentSecurityPolicy(
   { cdnUrl, umamiUrl, sentryDsn }: CspEnv,
-  { admin = false, checkout = false }: { admin?: boolean; checkout?: boolean } = {},
+  { admin = false }: { admin?: boolean } = {},
 ): string {
   const monaco = admin ? MONACO : undefined
-  const rzp = (list: string[]) => (checkout ? list : [])
   const cdn = origin(cdnUrl)
   const umami = origin(umamiUrl)
   const sentry = origin(sentryDsn)
   const sources = (...values: (string | undefined)[]) => values.filter(Boolean).join(' ')
   return [
     "default-src 'self'",
-    `script-src ${sources("'self'", "'unsafe-inline'", TURNSTILE, umami, monaco, ...rzp(RAZORPAY.script))}`,
+    `script-src ${sources("'self'", "'unsafe-inline'", TURNSTILE, umami, monaco, ...RAZORPAY.script)}`,
     `style-src ${sources("'self'", "'unsafe-inline'", monaco)}`,
-    `img-src ${sources("'self'", 'data:', 'blob:', cdn, GRAVATAR, ...rzp(RAZORPAY.img))}`,
+    `img-src ${sources("'self'", 'data:', 'blob:', cdn, GRAVATAR, ...RAZORPAY.img)}`,
     `media-src ${sources("'self'", 'blob:', cdn)}`,
     `font-src ${sources("'self'", 'data:', monaco)}`,
-    `connect-src ${sources("'self'", umami, sentry, ...rzp(RAZORPAY.connect))}`,
-    `frame-src ${sources("'self'", TURNSTILE, GOOGLE_MAPS, ...rzp(RAZORPAY.frame), ...EMBED_ALLOWED_HOSTS.map((h) => `https://${h}`))}`,
+    `connect-src ${sources("'self'", umami, sentry, ...RAZORPAY.connect)}`,
+    `frame-src ${sources("'self'", TURNSTILE, GOOGLE_MAPS, ...RAZORPAY.frame, ...EMBED_ALLOWED_HOSTS.map((h) => `https://${h}`))}`,
     // Monaco starts its web workers from data: URLs when it is loaded from another origin.
     `worker-src ${sources("'self'", 'blob:', admin ? 'data:' : undefined)}`,
     "frame-ancestors 'self'",

@@ -10,7 +10,10 @@ import { normalizeEmail } from './Leads'
 /** What the customer agreed to is a record: the API ignores staff edits to it. */
 const record = { update: () => false }
 
-/** Orders and invoices must be kept for the tax period (spec §11.2): anonymize such customers. */
+/**
+ * Orders and invoices must be kept for the tax period (spec §11.2): such customers are anonymized
+ * instead. Others go with their sessions (the sessions' customer column can't be emptied).
+ */
 const keepBuyers: CollectionBeforeDeleteHook = async ({ id, req }) => {
   const { totalDocs } = await req.payload.count({
     collection: 'orders',
@@ -20,10 +23,16 @@ const keepBuyers: CollectionBeforeDeleteHook = async ({ id, req }) => {
   })
   if (totalDocs) {
     throw new APIError(
-      'This customer has orders, which must be kept: delete the account from its sign-in instead, or anonymize it.',
+      'This customer has orders, which tax law requires keeping: anonymize the profile instead of deleting it.',
       400,
     )
   }
+  await req.payload.delete({
+    collection: 'customer-sessions',
+    where: { customer: { equals: id } },
+    overrideAccess: true,
+    req,
+  })
 }
 
 /**
@@ -60,7 +69,7 @@ export const Customers: CollectionConfig = {
       type: 'row',
       fields: [
         { name: 'name', type: 'text', maxLength: 100, admin: { width: '50%' } },
-        { name: 'phone', type: 'text', maxLength: 20, admin: { width: '50%' } },
+        { name: 'phone', type: 'text', maxLength: 25, admin: { width: '50%' } },
       ],
     },
     {

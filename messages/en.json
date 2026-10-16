@@ -174,7 +174,8 @@
       "buy": "Buy {plan}",
       "soon": "Available soon",
       "fullPricing": "See full pricing",
-      "inclGst": "incl. GST"
+      "inclGst": "incl. GST",
+      "plusGst": "+ GST"
     },
     "release": {
       "version": "Version {version}",

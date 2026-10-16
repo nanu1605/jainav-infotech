@@ -2,7 +2,7 @@
 
 import NextLink from 'next/link'
 import { useLocale, useTranslations } from 'next-intl'
-import { Fragment } from 'react'
+import { Fragment, useSyncExternalStore } from 'react'
 
 import { getPathname, usePathname } from '@/i18n/navigation'
 import { routing, type Locale } from '@/i18n/routing'
@@ -18,11 +18,21 @@ export function rememberLocale(locale: Locale) {
   }
 }
 
+const noSubscribe = () => () => {}
+
 /** "EN | हिंदी" — keeps the visitor on the same page and remembers the choice (spec §6). */
 export function LanguageSwitch({ className }: { className?: string }) {
   const t = useTranslations('language')
   const current = useLocale()
   const pathname = usePathname()
+  // The query too (an order number, a sign-in's next page). Read from location rather than
+  // useSearchParams, which would make every static page render on the client; the header
+  // re-renders on each navigation, so it stays current.
+  const search = useSyncExternalStore(
+    noSubscribe,
+    () => window.location.search,
+    () => '',
+  )
 
   return (
     <nav aria-label={t('label')} className={cn('flex items-center text-sm', className)}>
@@ -36,7 +46,7 @@ export function LanguageSwitch({ className }: { className?: string }) {
           {/* next/link on purpose: given `locale`, next-intl's Link forces /en/… for English,
               which only 307-redirects here (docs/decisions.md). */}
           <NextLink
-            href={getPathname({ href: pathname, locale })}
+            href={getPathname({ href: pathname, locale }) + search}
             lang={locale}
             hrefLang={locale}
             aria-current={locale === current ? 'true' : undefined}

@@ -40,7 +40,7 @@ const RULES = {
   goClick: { points: 60, duration: 60, key: ipKey },
   /** Sign-in codes requested from one IP, and sent to one address (spec §11.2). */
   otpRequestIp: { points: 10, duration: 10 * 60, key: ipKey },
-  otpRequestEmail: { points: 5, duration: 60 * 60, key: (email: string) => email },
+  otpRequestEmail: { points: 5, duration: 60 * 60, key: inboxKey },
   /** Code guesses from one IP (each code also allows only 5). */
   otpVerifyIp: { points: 30, duration: 10 * 60, key: ipKey },
   /** Account changes, quotes and orders from one IP and by one customer (spec §16). */

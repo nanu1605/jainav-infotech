@@ -146,7 +146,14 @@ export const CommerceSettings: GlobalConfig = {
                   type: 'text',
                   required: true,
                   defaultValue: 'JC',
-                  validate: prefix,
+                  // Each prefix is its own numbering series (invoice-counters).
+                  validate: (
+                    value: string | null | undefined,
+                    { siblingData }: { siblingData: Partial<{ invoicePrefix: string }> },
+                  ) =>
+                    value && value === siblingData.invoicePrefix
+                      ? 'Must differ from the invoice prefix'
+                      : prefix(value),
                   admin: { width: '50%', description: 'e.g. JC → JC/26-27/00001' },
                 },
               ],

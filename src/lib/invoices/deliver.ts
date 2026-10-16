@@ -28,8 +28,8 @@ export const pdfFilename = (invoice: Pick<Invoice, 'number'>) =>
   `${invoice.number.replaceAll('/', '-')}.pdf`
 
 /**
- * The renderInvoicePdf job (spec §11.3 step 8): stores the invoice PDF in the private bucket,
- * links it (once: a parallel run's copy is deleted) and queues the order email.
+ * The renderInvoicePdf job (spec §11.3 step 8): stores the invoice PDF in the private bucket as
+ * the archived original and links it (once: a parallel run's copy is deleted).
  */
 export async function storeInvoicePdf(id: number) {
   const payload = await getClient()
@@ -64,11 +64,6 @@ export async function storeInvoicePdf(id: number) {
       overrideAccess: true,
       depth: 0,
     })
-    return
-  }
-  const orderId = typeof invoice.order === 'object' ? invoice.order.id : invoice.order
-  if (invoice.kind === 'invoice') {
-    await payload.jobs.queue({ task: 'sendOrderEmail', input: { id: orderId } })
   }
 }
 

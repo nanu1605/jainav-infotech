@@ -211,7 +211,10 @@ export async function fulfilOrder(
       req,
     })
     await tx.execute(sql`UPDATE orders SET invoice_id = ${invoice.id} WHERE id = ${orderId}`)
+    // Both jobs exist only if this commits. The email draws its own copy of the PDF, so a
+    // failing archive job never holds it back.
     await payload.jobs.queue({ task: 'renderInvoicePdf', input: { id: invoice.id }, req })
+    await payload.jobs.queue({ task: 'sendOrderEmail', input: { id: orderId }, req })
     await commitTransaction(req)
     return 'fulfilled'
   } catch (error) {
@@ -269,7 +272,7 @@ async function alreadyPaid(
 let running: Promise<void> = Promise.resolve()
 
 /**
- * Runs queued jobs now (the invoice PDF, then the email it queues), so a buyer's email doesn't
+ * Runs queued jobs now (the invoice PDF and the email), so a buyer's email doesn't
  * wait for the next autoRun tick. Call it inside after(); the cron is the safety net. Payload
  * doesn't claim jobs atomically, so runs in this process go one at a time, and a run that loses
  * a race with the cron (the job finished and was deleted under it) is only logged: every

@@ -92,8 +92,16 @@ export const Coupons: CollectionConfig = {
     {
       type: 'row',
       fields: [
-        { name: 'validFrom', type: 'date', admin: { width: '50%' } },
-        { name: 'validTo', type: 'date', admin: { width: '50%' } },
+        {
+          name: 'validFrom',
+          type: 'date',
+          admin: { width: '50%', description: 'First day it works (India time).' },
+        },
+        {
+          name: 'validTo',
+          type: 'date',
+          admin: { width: '50%', description: 'Last day it works (India time).' },
+        },
       ],
     },
     {

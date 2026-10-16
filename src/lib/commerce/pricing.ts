@@ -1,3 +1,4 @@
+import { istDate } from '@/lib/format'
 import { computeTax, divRoundHalfUp, type Tax, type TaxSettings } from '@/lib/tax/gst'
 
 /** Razorpay's smallest charge: a coupon can't bring the total under ₹1 (spec §11.5). */
@@ -28,8 +29,10 @@ export function couponProblem(
   { productId, planId, now = new Date() }: { productId: number; planId: number; now?: Date },
 ): CouponProblem | null {
   if (!coupon.active) return 'invalid'
-  if (coupon.validFrom && now < new Date(coupon.validFrom)) return 'invalid'
-  if (coupon.validTo && now > new Date(coupon.validTo)) return 'expired'
+  // Whole days in India time: the admin's date picker stores a day, not an instant (spec §3).
+  const today = istDate(now)
+  if (coupon.validFrom && today < istDate(new Date(coupon.validFrom))) return 'invalid'
+  if (coupon.validTo && today > istDate(new Date(coupon.validTo))) return 'expired'
   const products = ids(coupon.products)
   const plans = ids(coupon.plans)
   if (products.length && !products.includes(productId)) return 'not_applicable'
