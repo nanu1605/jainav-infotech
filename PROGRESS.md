@@ -58,8 +58,9 @@ Tasks from spec §20. Each phase ends with all checks green, a phase report, and
 
 ### Phase 5 — Signature animations and polish
 
-- [ ] Home hero gradient mesh; MenuMesh, VYRO and Baby hero animations; feature scroller; product card effects; micro-interactions.
-- [ ] Performance tuning.
+- [x] Home hero gradient mesh; MenuMesh, VYRO and Baby hero animations; feature scroller; product card effects; micro-interactions.
+- [x] Performance tuning.
+- [x] About: founder section with Tanishq's photo, a quote and the bio (seeded).
 
 ### Phase 6 — Deploy and launch the company website
 

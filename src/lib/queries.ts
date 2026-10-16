@@ -40,16 +40,18 @@ export const getProducts = (locale: Locale, { retired = true }: { retired?: bool
         platforms: true,
         accentColor: true,
         logo: true,
+        cardPreview: true,
         featured: true,
         category: true,
         hostingMode: true,
       },
       ...as(v),
     })
-    // depth 1 leaves an unreadable logo as its id.
-    return docs.map((d) => ({
+    // depth 1 leaves an unreadable logo or preview as its id.
+    return docs.map(({ cardPreview, ...d }) => ({
       ...d,
       logo: typeof d.logo === 'object' ? (d.logo as Media | null) : null,
+      preview: typeof cardPreview === 'object' ? (cardPreview as Media | null) : null,
     }))
   })
 

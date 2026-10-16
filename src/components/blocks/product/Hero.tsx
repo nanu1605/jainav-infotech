@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server'
 
 import { Container } from '@/components/layout/Container'
 import { ResponsiveImage } from '@/components/media/ResponsiveImage'
+import { BabyOrb, MenuMeshDemo, VyroGauges } from '@/components/product/animations/lazy'
 import { ProductButtons } from '@/components/product/ProductButtons'
 import { PlatformBadge, StatusBadge } from '@/components/ui/Badge'
 import type { Locale } from '@/i18n/routing'
@@ -15,8 +16,8 @@ import { media } from '../shared'
 
 /**
  * Product hero (spec §8.4): status and platforms, heading (the product name by default), buttons
- * and secondary links. Signature animations replace the media in Phase 5; until then a product
- * with an animation and no media shows an accent panel with its logo.
+ * and secondary links, then the product's signature animation, its media, or an accent panel
+ * with its logo. Animations reserve their own box and show on mobile too.
  */
 export async function ProductHero({
   block,
@@ -31,6 +32,14 @@ export async function ProductHero({
   const t = await getTranslations('ui.productHero')
   const image = media(block.media) ?? media(product.heroMedia)
   const logo = media(product.logo)
+  // The signature animation takes the media's place (spec §14).
+  const animation = block.animation && block.animation !== 'none' ? block.animation : null
+  const samples = block.samples?.flatMap((s) => {
+    const src = media(s.audio)?.url
+    return src && s.label
+      ? [{ label: s.label, src, lang: s.lang ?? undefined, transcript: s.transcript ?? undefined }]
+      : []
+  })
 
   return (
     <section
@@ -83,7 +92,13 @@ export async function ProductHero({
             </ul>
           )}
         </div>
-        {image ? (
+        {animation ? (
+          <div data-hero-animation={animation}>
+            {animation === 'menumesh' && <MenuMeshDemo />}
+            {animation === 'vyro' && <VyroGauges />}
+            {animation === 'baby' && <BabyOrb samples={samples} />}
+          </div>
+        ) : image ? (
           <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-surface shadow-lg">
             <ResponsiveImage
               media={image}

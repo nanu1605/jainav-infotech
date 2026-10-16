@@ -236,6 +236,101 @@
       "docsNav": "डॉक्स",
       "docsIntro": "{name} के लिए गाइड और जवाब। कोई विषय चुनें।",
       "noDocs": "डॉक्स जल्द आ रहे हैं।"
+    },
+    "demo": {
+      "menumesh": {
+        "label": "MenuMesh का चित्रण: एक मेहमान टेबल 4 पर लगा QR कोड स्कैन करता है, फ़ोन पर मेन्यू देखता है, मसाला डोसा और कोल्ड कॉफ़ी कार्ट में जोड़ता है, और ऑर्डर किचन की स्क्रीन पर दिखने लगता है। व्यंजन और दाम सिर्फ़ उदाहरण हैं।",
+        "steps": {
+          "scan": "टेबल का QR कोड स्कैन करें",
+          "browse": "मेन्यू देखें",
+          "cart": "कार्ट में जोड़ें",
+          "kitchen": "ऑर्डर सीधे किचन तक"
+        },
+        "restaurant": "स्पाइस रूट",
+        "table": "टेबल 4",
+        "categories": {
+          "starters": "स्टार्टर",
+          "mains": "मेन कोर्स",
+          "drinks": "ड्रिंक्स"
+        },
+        "dishes": {
+          "paneerTikka": {
+            "name": "पनीर टिक्का",
+            "description": "तंदूर में सिका पनीर और शिमला मिर्च"
+          },
+          "chicken65": {
+            "name": "चिकन 65",
+            "description": "करी पत्ते वाला चटपटा फ़्राइड चिकन"
+          },
+          "masalaDosa": {
+            "name": "मसाला डोसा",
+            "description": "मसालेदार आलू भरा कुरकुरा डोसा"
+          },
+          "coldCoffee": {
+            "name": "कोल्ड कॉफ़ी",
+            "description": "आइसक्रीम के साथ ठंडी कॉफ़ी"
+          }
+        },
+        "add": "जोड़ें",
+        "items": "2 आइटम",
+        "placeOrder": "ऑर्डर करें",
+        "sent": "किचन को भेजा",
+        "scanToOrder": "ऑर्डर के लिए स्कैन करें",
+        "kitchen": "किचन",
+        "new": "नया",
+        "round": "राउंड 1",
+        "now": "अभी",
+        "ticketLine": "{count} × {dish}",
+        "start": "शुरू करें"
+      },
+      "vyro": {
+        "label": "VYRO डैशबोर्ड का चित्र: CPU और GPU के स्पीडोमीटर और CPU तापमान का ग्राफ़, उदाहरण के मानों के साथ",
+        "illustrative": "उदाहरण के मान",
+        "cpu": "CPU",
+        "gpu": "GPU",
+        "temperature": "CPU तापमान",
+        "percent": "%",
+        "mhz": "MHz",
+        "celsius": "°C",
+        "pause": "एनिमेशन रोकें",
+        "play": "एनिमेशन चलाएँ"
+      },
+      "baby": {
+        "label": "एक तय बातचीत में Baby के वॉइस ऑर्ब का एनिमेटेड डेमो। अंग्रेज़ी में कहने पर Baby, Spotify खोलता है; हिंदी में कहने पर रेज़्यूमे की फ़ाइल ढूँढता है; और हिंग्लिश में कहने पर बैकग्राउंड में रिसर्च का काम शुरू करता है।",
+        "you": "आप",
+        "baby": "Baby",
+        "listening": "सुन रहा है…",
+        "thinking": "सोच रहा है…",
+        "speaking": "बोल रहा है",
+        "hear": "Baby की आवाज़ सुनिए",
+        "languages": {
+          "english": "अंग्रेज़ी",
+          "hindi": "हिंदी",
+          "hinglish": "हिंग्लिश"
+        },
+        "script": {
+          "english": {
+            "you": "Open Spotify for me.",
+            "baby": "Sure, Spotify is open."
+          },
+          "hindi": {
+            "you": "मेरी रेज़्यूमे वाली फ़ाइल ढूँढ दो।",
+            "baby": "मिल गई। Downloads फ़ोल्डर में Resume.pdf है।"
+          },
+          "hinglish": {
+            "you": "Background mein top 3 EVs under 15 lakh research karo.",
+            "baby": "Theek hai, shuru kar diya. Ho jaate hi bata dunga."
+          }
+        },
+        "pause": "एनिमेशन रोकें",
+        "play": "एनिमेशन चलाएँ"
+      }
+    },
+    "mesh": {
+      "pause": "बैकग्राउंड एनिमेशन रोकें"
+    },
+    "team": {
+      "aboutFounder": "हमारे संस्थापक के बारे में"
     }
   },
   "styleguide": {

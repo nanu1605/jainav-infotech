@@ -1,5 +1,6 @@
 import Image, { type ImageProps } from 'next/image'
 
+import { SITE_URL } from '@/lib/seo'
 import type { Media } from '@/payload-types'
 
 type Source =
@@ -43,8 +44,12 @@ export function ResponsiveImage({
       'ResponsiveImage: missing alt text. Pass alt, or decorative for decorative images.',
     )
   }
-  const url = media ? media.url : src
-  if (!url) return null
+  const raw = media ? media.url : src
+  if (!raw) return null
+  // Payload prefixes local uploads with serverURL; next/image only accepts them as paths
+  // (images.localPatterns), and Next 16 won't optimize a localhost remote image.
+  const url =
+    typeof raw === 'string' && raw.startsWith(`${SITE_URL}/`) ? raw.slice(SITE_URL.length) : raw
 
   const focal =
     media?.focalX != null && media.focalY != null ? `${media.focalX}% ${media.focalY}%` : undefined

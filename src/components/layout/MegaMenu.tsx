@@ -1,10 +1,17 @@
 'use client'
 
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, ChevronDown } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import Image from 'next/image'
-import { NavigationMenu } from 'radix-ui'
-import type { ComponentProps } from 'react'
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ComponentProps,
+  type FocusEvent,
+  type PointerEvent,
+} from 'react'
 
 import { StatusBadge } from '@/components/ui/Badge'
 import { Link, usePathname } from '@/i18n/navigation'
@@ -68,39 +75,153 @@ export function ProductEntry({ product, className, ...props }: ProductEntryProps
   )
 }
 
-/** Products mega-menu panel; render inside a `NavigationMenu.Item`, after its trigger. */
-export function MegaMenu({ products, href }: { products: MenuProduct[]; href: string }) {
+// Hover opens after a short pause and closes after a longer one, so passing over the trigger
+// or moving down into the panel doesn't flicker it.
+const OPEN_DELAY = 120
+const CLOSE_DELAY = 300
+
+/**
+ * The header's products menu (spec §8.1): a disclosure button and its panel (WAI disclosure
+ * navigation pattern). Opens on click, Enter or Space, or on hover with a mouse (a click then
+ * pins it open); closes on Escape (focus returns to the button when it was in the menu), a
+ * click or focus outside, the mouse leaving a hover-opened panel, and navigation. Hand-built
+ * rather than Radix NavigationMenu, which put about 15 KB into every page's initial JS (§15).
+ */
+export function ProductsMenu({
+  label,
+  href,
+  products,
+  triggerClassName,
+  defaultOpen = false,
+}: {
+  label: string
+  href: string
+  products: MenuProduct[]
+  triggerClassName?: string
+  /** Styleguide only: start open. */
+  defaultOpen?: boolean
+}) {
   const t = useTranslations('ui.header')
   const pathname = usePathname()
+  const id = useId()
+  const root = useRef<HTMLDivElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  // Opened by click or keyboard: stays open when the mouse leaves.
+  const pinned = useRef(false)
+  // Open on the page it was opened on, so navigating closes it without an effect.
+  const [openOn, setOpenOn] = useState<string | null>(defaultOpen ? pathname : null)
+  const open = openOn === pathname
+
+  const set = (next: boolean, delay = 0) => {
+    clearTimeout(timer.current)
+    const apply = () => {
+      if (!next) pinned.current = false
+      setOpenOn(next ? pathname : null)
+    }
+    if (delay) timer.current = setTimeout(apply, delay)
+    else apply()
+  }
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (e: globalThis.PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) set(false)
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      // Only take focus back from inside the menu; a hover-opened panel just closes.
+      if (root.current?.contains(document.activeElement)) trigger.current?.focus()
+      set(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+    // `set` only closes here; it changes identity every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+  useEffect(() => () => clearTimeout(timer.current), [])
+
+  // Focus moving to another element closes it. No relatedTarget (a press on the panel's padding,
+  // or Safari not focusing a clicked link) isn't leaving: outside presses close it above.
+  const blur = (e: FocusEvent) => {
+    if (e.relatedTarget && !root.current?.contains(e.relatedTarget as Node)) set(false)
+  }
+  const active = isCurrent(pathname, href)
 
   return (
-    <NavigationMenu.Content className="absolute top-full left-0 z-50 pt-3 transition-[opacity,translate] duration-(--duration-base) ease-out starting:-translate-y-1 starting:opacity-0">
-      <div className="w-[40rem] rounded-xl border border-border bg-surface-raised p-2 text-fg shadow-lg">
-        <ul className="grid grid-cols-2 gap-1">
-          {products.map((product) => (
-            <li key={product.slug}>
-              <NavigationMenu.Link
-                asChild
-                active={isCurrent(pathname, `/products/${product.slug}`)}
-                aria-current={currentAttr(pathname, `/products/${product.slug}`)}
+    <div
+      ref={root}
+      className="relative"
+      onPointerEnter={(e: PointerEvent) => {
+        if (e.pointerType !== 'mouse') return
+        if (open) clearTimeout(timer.current)
+        else set(true, OPEN_DELAY)
+      }}
+      onPointerLeave={(e: PointerEvent) => {
+        if (e.pointerType === 'mouse' && !pinned.current) set(false, CLOSE_DELAY)
+      }}
+      onBlur={blur}
+    >
+      <button
+        ref={trigger}
+        type="button"
+        aria-expanded={open}
+        // Only while the panel exists: a reference to a missing id is invalid ARIA.
+        aria-controls={open ? id : undefined}
+        aria-current={active ? 'true' : undefined}
+        data-active={active ? '' : undefined}
+        data-state={open ? 'open' : 'closed'}
+        onClick={() => {
+          // The click that usually follows a hover-open pins the panel instead of closing it.
+          if (open && !pinned.current) {
+            clearTimeout(timer.current)
+            pinned.current = true
+            return
+          }
+          set(!open)
+          pinned.current = !open
+        }}
+        className={cn('group/trigger', triggerClassName)}
+      >
+        {label}
+        <ChevronDown
+          aria-hidden
+          className="size-3.5 transition-transform duration-(--duration-fast) group-data-[state=open]/trigger:rotate-180"
+        />
+      </button>
+      {open && (
+        <div
+          id={id}
+          className="absolute top-full left-0 z-50 pt-3 transition-[opacity,translate] duration-(--duration-base) ease-out starting:-translate-y-1 starting:opacity-0"
+        >
+          <div className="w-[40rem] rounded-xl border border-border bg-surface-raised p-2 text-fg shadow-lg">
+            <ul className="grid grid-cols-2 gap-1">
+              {products.map((product) => (
+                <li key={product.slug}>
+                  <ProductEntry
+                    product={product}
+                    aria-current={currentAttr(pathname, `/products/${product.slug}`)}
+                  />
+                </li>
+              ))}
+            </ul>
+            <div className="mt-1 border-t border-border px-3 pt-1">
+              <Link
+                href={href}
+                aria-current={pathname === href ? 'page' : undefined}
+                className="inline-flex h-10 items-center gap-1.5 text-sm font-medium text-fg underline-offset-4 hover:underline"
               >
-                <ProductEntry product={product} />
-              </NavigationMenu.Link>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-1 border-t border-border px-3 pt-1">
-          <NavigationMenu.Link asChild active={pathname === href}>
-            <Link
-              href={href}
-              className="inline-flex h-10 items-center gap-1.5 text-sm font-medium text-fg underline-offset-4 hover:underline"
-            >
-              {t('allProducts')}
-              <ArrowRight aria-hidden className="size-4" />
-            </Link>
-          </NavigationMenu.Link>
+                {t('allProducts')}
+                <ArrowRight aria-hidden className="size-4" />
+              </Link>
+            </div>
+          </div>
         </div>
-      </div>
-    </NavigationMenu.Content>
+      )}
+    </div>
   )
 }

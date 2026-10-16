@@ -47,6 +47,7 @@ import { FaqList } from '../FaqList'
 import { Testimonials as QuoteGrid } from '../page/Sections'
 import { resolveStats, StatGrid } from '../Stats'
 import { ButtonRow, docs, LinkButton, media } from '../shared'
+import { FeatureScrollerSync } from './FeatureScroller.client'
 
 export type ProductBlockProps<B> = { block: B; locale: Locale; loaded: LoadedProduct }
 
@@ -114,37 +115,86 @@ export function IconGrid({
   )
 }
 
-/** Alternating feature rows. The scroll-linked media swap arrives in Phase 5 (spec §20). */
+/**
+ * Feature rows (spec §8.4). When any item has media, md+ screens without reduced motion get the
+ * scroll-linked layout (`motion-safe:md:`): the steps scroll past a sticky 4:3 frame that
+ * cross-fades to the media of the step crossing the viewport's middle (FeatureScrollerSync).
+ * Small screens, reduced motion and media-less blocks keep alternating rows with their own images.
+ */
 export function FeatureScroller({ block }: ProductBlockProps<ProductFeatureScrollerBlock>) {
   if (!block.items?.length) return null
+  const items = block.items.map((item) => ({ ...item, image: media(item.media) }))
+  const first = items.findIndex((item) => item.image)
+  const scroll = first >= 0
+  const sizes = '(min-width: 768px) 36rem, 100vw'
+
+  const rows = (
+    <ol className={cn('space-y-16 sm:space-y-24', scroll && 'motion-safe:md:space-y-0')}>
+      {items.map(({ id, title, text, image }, i) => (
+        <li
+          key={id ?? title}
+          data-step={scroll ? i : undefined}
+          data-active={scroll && i === 0 ? '' : undefined}
+          className={cn(
+            'group/step grid items-center gap-8 md:grid-cols-2 md:gap-16',
+            scroll && 'motion-safe:md:flex motion-safe:md:min-h-[70svh]',
+          )}
+        >
+          <div
+            className={cn(
+              i % 2 === 1 && image && 'md:order-2',
+              scroll &&
+                'relative motion-safe:md:border-s motion-safe:md:border-border motion-safe:md:ps-6',
+            )}
+          >
+            {scroll && (
+              <span
+                aria-hidden
+                className="absolute inset-y-0 -start-px hidden w-0.5 rounded-full bg-product-accent opacity-0 transition-opacity duration-(--duration-base) ease-out group-data-active/step:opacity-100 motion-safe:md:block"
+              />
+            )}
+            <h3 className="font-display text-2xl font-semibold text-fg">{title}</h3>
+            {text && <p className="mt-3 text-lg text-fg-muted">{text}</p>}
+          </div>
+          {image && (
+            <div
+              className={cn(
+                'relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-surface shadow-md',
+                scroll && 'motion-safe:md:hidden',
+              )}
+            >
+              <ResponsiveImage media={image} fill sizes={sizes} className="object-cover" />
+            </div>
+          )}
+        </li>
+      ))}
+    </ol>
+  )
+
+  if (!scroll) return <Section title={block.heading}>{rows}</Section>
   return (
     <Section title={block.heading}>
-      <ol className="space-y-16 sm:space-y-24">
-        {block.items.map((item, i) => {
-          const image = media(item.media)
-          return (
-            <li
-              key={item.id ?? item.title}
-              className="grid items-center gap-8 md:grid-cols-2 md:gap-16"
-            >
-              <div className={cn(i % 2 === 1 && image && 'md:order-2')}>
-                <h3 className="font-display text-2xl font-semibold text-fg">{item.title}</h3>
-                {item.text && <p className="mt-3 text-lg text-fg-muted">{item.text}</p>}
-              </div>
-              {image && (
-                <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-surface shadow-md">
+      <FeatureScrollerSync className="motion-safe:md:grid motion-safe:md:grid-cols-2 motion-safe:md:gap-16">
+        {rows}
+        <div className="hidden motion-safe:md:block">
+          <div className="sticky top-32 aspect-[4/3] overflow-hidden rounded-xl border border-border bg-surface shadow-md">
+            {items.map(
+              ({ id, title, image }, i) =>
+                image && (
                   <ResponsiveImage
+                    key={id ?? title}
                     media={image}
                     fill
-                    sizes="(min-width: 768px) 36rem, 100vw"
-                    className="object-cover"
+                    sizes={sizes}
+                    data-frame={i}
+                    data-active={i === first ? '' : undefined}
+                    className="scale-[1.03] object-cover opacity-0 transition-[opacity,scale] duration-(--duration-slow) ease-out data-active:scale-100 data-active:opacity-100"
                   />
-                </div>
-              )}
-            </li>
-          )
-        })}
-      </ol>
+                ),
+            )}
+          </div>
+        </div>
+      </FeatureScrollerSync>
     </Section>
   )
 }
@@ -436,7 +486,7 @@ export function CtaBand({ block, locale, loaded }: ProductBlockProps<ProductCtaB
   return (
     <section className="py-16 sm:py-24">
       <Container>
-        <div className="relative isolate overflow-hidden rounded-2xl border border-border bg-surface px-6 py-14 text-center shadow-md sm:px-16">
+        <div className="relative isolate overflow-hidden rounded-xl border border-border bg-surface px-6 py-14 text-center shadow-md sm:px-16">
           <div aria-hidden className="absolute inset-0 -z-10 bg-product-accent opacity-10" />
           {block.heading && (
             <h2 className="font-display text-3xl font-bold text-balance text-fg sm:text-4xl">

@@ -22,5 +22,35 @@ export const ProductHero: Block = {
       ],
       admin: { description: 'Signature animation in place of the media.' },
     },
+    {
+      // "Hear Baby speak" (spec §14): played on click only.
+      name: 'samples',
+      label: 'Voice samples',
+      type: 'array',
+      maxRows: 4,
+      admin: {
+        condition: (_, siblingData) => siblingData?.animation === 'baby',
+        description: 'Short audio clips of the assistant speaking, played on click.',
+      },
+      fields: [
+        { name: 'label', type: 'text', localized: true, required: true },
+        { name: 'audio', type: 'upload', relationTo: 'media', required: true },
+        {
+          // Sets the transcript's lang, so screen readers pronounce it right.
+          name: 'lang',
+          label: 'Spoken language',
+          type: 'select',
+          required: true,
+          defaultValue: 'en',
+          options: [
+            { label: 'English', value: 'en' },
+            { label: 'Hindi', value: 'hi' },
+            { label: 'Hinglish', value: 'hi-Latn' },
+          ],
+        },
+        // What the clip says, word for word (WCAG 1.2.1), whatever the page's language.
+        { name: 'transcript', type: 'textarea', required: true },
+      ],
+    },
   ],
 }

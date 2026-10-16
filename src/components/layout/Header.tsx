@@ -1,8 +1,7 @@
 'use client'
 
-import { ChevronDown, User } from 'lucide-react'
+import { User } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { NavigationMenu } from 'radix-ui'
 import { useSyncExternalStore } from 'react'
 
 import { Button } from '@/components/ui/Button'
@@ -14,7 +13,7 @@ import type { Navigation } from '@/payload-types'
 import { Container } from './Container'
 import { LanguageSwitch } from './LanguageSwitch'
 import { Logo } from './Logo'
-import { currentAttr, isCurrent, MegaMenu, type MenuProduct } from './MegaMenu'
+import { currentAttr, isCurrent, ProductsMenu, type MenuProduct } from './MegaMenu'
 import { MobileMenu } from './MobileMenu'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -82,41 +81,31 @@ export function Header({ nav, products, showAccount = false }: HeaderProps) {
           <Logo />
         </Link>
 
-        <NavigationMenu.Root aria-label={t('ui.header.mainNav')} className="hidden @5xl:block">
-          <NavigationMenu.List className="flex items-center gap-1">
+        <nav aria-label={t('ui.header.mainNav')} className="hidden @5xl:block">
+          <ul className="flex items-center gap-1">
             {links.map((item) => (
-              <NavigationMenu.Item key={`${item.href}-${item.label}`}>
+              <li key={`${item.href}-${item.label}`}>
                 {item.megaMenu === 'products' && products.length > 0 ? (
-                  <>
-                    <NavigationMenu.Trigger
-                      data-active={isCurrent(pathname, item.href) ? '' : undefined}
-                      aria-current={isCurrent(pathname, item.href) ? 'true' : undefined}
-                      className={cn(navItem, 'group/trigger')}
-                    >
-                      {item.label}
-                      <ChevronDown
-                        aria-hidden
-                        className="size-3.5 transition-transform duration-(--duration-fast) group-data-[state=open]/trigger:rotate-180"
-                      />
-                    </NavigationMenu.Trigger>
-                    <MegaMenu products={products} href={item.href} />
-                  </>
+                  <ProductsMenu
+                    label={item.label}
+                    href={item.href}
+                    products={products}
+                    triggerClassName={navItem}
+                  />
                 ) : (
-                  <NavigationMenu.Link
-                    asChild
-                    active={isCurrent(pathname, item.href)}
-                    // Radix would say "page" on every page below the link too.
+                  <Link
+                    href={item.href}
+                    data-active={isCurrent(pathname, item.href) ? '' : undefined}
                     aria-current={currentAttr(pathname, item.href)}
+                    className={navItem}
                   >
-                    <Link href={item.href} className={navItem}>
-                      {item.label}
-                    </Link>
-                  </NavigationMenu.Link>
+                    {item.label}
+                  </Link>
                 )}
-              </NavigationMenu.Item>
+              </li>
             ))}
-          </NavigationMenu.List>
-        </NavigationMenu.Root>
+          </ul>
+        </nav>
 
         <div className="ml-auto flex items-center gap-1">
           <LanguageSwitch className="hidden @2xl:flex" />

@@ -26,7 +26,18 @@ export const Team: CollectionConfig = {
   fields: [
     { name: 'name', type: 'text', required: true },
     { name: 'role', type: 'text', localized: true },
-    { name: 'bio', type: 'textarea', localized: true },
+    {
+      name: 'bio',
+      type: 'textarea',
+      localized: true,
+      admin: { description: 'A blank line starts a new paragraph.' },
+    },
+    {
+      name: 'quote',
+      type: 'textarea',
+      localized: true,
+      admin: { description: 'Founder section: shown on the photo.' },
+    },
     { name: 'photo', type: 'upload', relationTo: 'media' },
     {
       name: 'links',

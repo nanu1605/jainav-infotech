@@ -1,4 +1,4 @@
-import { ArrowRight, Check } from 'lucide-react'
+import { ArrowRight, Check, Quote as QuoteMark } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { Fragment } from 'react'
@@ -8,6 +8,7 @@ import { NewsletterForm } from '@/components/forms/NewsletterForm'
 import { RichText } from '@/components/content/RichText'
 import { Grid } from '@/components/layout/Grid'
 import { Section } from '@/components/layout/Section'
+import { ResponsiveImage } from '@/components/media/ResponsiveImage'
 import { Stagger, StaggerItem } from '@/components/motion/Stagger'
 import { ProductCard } from '@/components/product/ProductCard'
 import { Avatar } from '@/components/ui/Avatar'
@@ -16,7 +17,9 @@ import { Card, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Quote } from '@/components/ui/Quote'
 import { Steps } from '@/components/ui/Steps'
 import { Link } from '@/i18n/navigation'
+import { cn } from '@/lib/cn'
 import type {
+  Media,
   PageCompanyFactsBlock,
   PageCtaBlock,
   PageLatestBlock,
@@ -186,7 +189,11 @@ export function Testimonials({ items, className }: { items: Testimonial[]; class
 export async function ProductShowcase({ block, locale }: BlockProps<PageProductShowcaseBlock>) {
   const products =
     block.mode === 'selected'
-      ? docs<Product>(block.products).map((p) => ({ ...p, logo: media(p.logo) }))
+      ? docs<Product>(block.products).map((p) => ({
+          ...p,
+          logo: media(p.logo),
+          preview: media(p.cardPreview),
+        }))
       : (await getProducts(locale, { retired: false })).filter((p) => p.featured)
   if (!products.length) return null
   return (
@@ -265,40 +272,119 @@ export function ServiceCards({ services }: { services: Service[] }) {
   )
 }
 
+function MemberLinks({ links, className }: { links: Team['links']; className?: string }) {
+  if (!links?.length) return null
+  return (
+    <ul className={cn('flex flex-wrap gap-x-4 gap-y-1 text-sm', className)}>
+      {links.map((l) => (
+        <li key={l.id ?? l.url}>
+          <a
+            href={l.url}
+            target="_blank"
+            rel="noopener me"
+            className="font-medium text-fg underline underline-offset-4 hover:no-underline"
+          >
+            {l.label || new URL(l.url).hostname}
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Founders with a photo: a large portrait with their quote on it, the bio beside it. */
+function FounderFeature({
+  member: m,
+  photo,
+  label,
+}: {
+  member: Team
+  photo: Media
+  label: string
+}) {
+  return (
+    <article className="grid items-center gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
+      <div className="mx-auto w-full max-w-md lg:max-w-none">
+        <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-bg-subtle shadow-md">
+          {/* Decorative: the name is the caption and the heading right next to it. */}
+          <ResponsiveImage
+            media={photo}
+            decorative
+            fill
+            // The column stops at 480px once the container reaches its max width.
+            sizes="(min-width: 1280px) 480px, (min-width: 1024px) 38vw, (min-width: 480px) 28rem, 100vw"
+            className="object-cover"
+          />
+        </div>
+        {m.quote && (
+          <figure className="relative mx-4 -mt-20 rounded-lg border border-border bg-surface p-6 shadow-lg sm:mx-8">
+            <QuoteMark aria-hidden className="size-7 text-primary" />
+            <blockquote className="mt-3 font-display text-lg leading-relaxed text-pretty text-fg">
+              {m.quote}
+            </blockquote>
+            <figcaption className="mt-4 text-sm font-medium text-fg-muted">{m.name}</figcaption>
+          </figure>
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-fg-muted">
+          <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" />
+          {label}
+        </p>
+        <h3 className="font-display text-3xl font-bold text-fg sm:text-4xl [&:not(:lang(hi))]:tracking-tight">
+          {m.name}
+        </h3>
+        {m.role && <p className="mt-2 text-lg text-fg-muted">{m.role}</p>}
+        {m.bio && (
+          <div className="mt-6 space-y-4 text-lg text-pretty text-fg-muted">
+            {m.bio
+              .trim()
+              .split(/\s*\n\s*\n\s*/)
+              .map((p, i) => (
+                <p key={i}>{p}</p>
+              ))}
+          </div>
+        )}
+        <MemberLinks links={m.links} className="mt-6 text-base" />
+      </div>
+    </article>
+  )
+}
+
 export async function TeamBlock({ block, locale }: BlockProps<PageTeamBlock>) {
   const chosen = docs<Team>(block.members)
-  const members = chosen.length ? chosen : await getTeam(locale)
+  const [members, t] = await Promise.all([
+    chosen.length ? chosen : getTeam(locale),
+    getTranslations('ui.team'),
+  ])
   if (!members.length) return null
+  const featured = members.flatMap((m) => {
+    const photo = m.founder ? media(m.photo) : null
+    return photo ? [{ member: m, photo }] : []
+  })
+  const rest = members.filter((m) => !featured.some((f) => f.member.id === m.id))
   return (
     <Section title={block.heading}>
-      <ul className="grid gap-10 sm:grid-cols-2">
-        {members.map((m) => (
-          <li key={m.id} className="flex gap-5">
-            <Avatar name={m.name} image={media(m.photo)} size="lg" decorative />
-            <div className="min-w-0">
-              <h3 className="font-display text-lg font-semibold text-fg">{m.name}</h3>
-              {m.role && <p className="text-sm text-fg-muted">{m.role}</p>}
-              {m.bio && <p className="mt-3 text-fg-muted">{m.bio}</p>}
-              {!!m.links?.length && (
-                <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                  {m.links.map((l) => (
-                    <li key={l.id ?? l.url}>
-                      <a
-                        href={l.url}
-                        target="_blank"
-                        rel="noopener me"
-                        className="font-medium text-fg underline underline-offset-4 hover:no-underline"
-                      >
-                        {l.label || new URL(l.url).hostname}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </li>
+      <div className="space-y-20">
+        {featured.map((f) => (
+          <FounderFeature key={f.member.id} {...f} label={t('aboutFounder')} />
         ))}
-      </ul>
+        {rest.length > 0 && (
+          <ul className="grid gap-10 sm:grid-cols-2">
+            {rest.map((m) => (
+              <li key={m.id} className="flex gap-5">
+                <Avatar name={m.name} image={media(m.photo)} size="lg" decorative />
+                <div className="min-w-0">
+                  <h3 className="font-display text-lg font-semibold text-fg">{m.name}</h3>
+                  {m.role && <p className="text-sm text-fg-muted">{m.role}</p>}
+                  {m.bio && <p className="mt-3 whitespace-pre-line text-fg-muted">{m.bio}</p>}
+                  <MemberLinks links={m.links} className="mt-3" />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </Section>
   )
 }

@@ -305,3 +305,41 @@
     }
   }
 }
+
+/* Hero gradient mesh (spec §14), used only by src/components/motion/GradientMesh.tsx.
+   Blobs drift on `transform` (CSS keyframes, run by the compositor) and lean toward the pointer
+   on `translate` (--mesh-x/-y from -1 to 1, times each blob's --pull). --mesh-play pauses the
+   drift off-screen and in hidden tabs; a checked `[data-mesh-pause]` toggle that is a direct
+   child of the host keeps it paused (WCAG 2.2.2). Keyframes start and end at rest, so the
+   first paint is the still frame; with reduced motion there is no drift (and the component sets
+   no pointer). */
+@layer components {
+  .mesh-blob {
+    translate: calc(var(--mesh-x, 0) * var(--pull, 0px) + var(--tx, 0px))
+      calc(var(--mesh-y, 0) * var(--pull, 0px));
+    transition: translate calc(var(--duration-slow) * 3) var(--ease-out);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .mesh-blob {
+      animation: mesh-drift var(--drift, 30s) var(--ease-in-out) infinite;
+      animation-play-state: var(--mesh-play, running);
+      will-change: transform;
+    }
+    :has(> [data-mesh-pause] :checked) .mesh-blob {
+      animation-play-state: paused;
+    }
+  }
+}
+
+@keyframes mesh-drift {
+  0%,
+  100% {
+    transform: none;
+  }
+  33% {
+    transform: translate(6%, 4%) rotate(6deg) scale(1.08);
+  }
+  66% {
+    transform: translate(-5%, 3%) rotate(-4deg) scale(0.95);
+  }
+}

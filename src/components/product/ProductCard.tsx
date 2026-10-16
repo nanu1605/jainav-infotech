@@ -10,10 +10,16 @@ import { Link } from '@/i18n/navigation'
 import { accentVars } from '@/lib/accent'
 import type { Media, Product } from '@/payload-types'
 
+import { CardPreview } from './CardPreview'
+
 export type ProductCardData = Pick<
   Product,
   'name' | 'slug' | 'tagline' | 'status' | 'platforms' | 'accentColor'
-> & { logo?: Media | null }
+> & {
+  logo?: Media | null
+  /** The product's `cardPreview` video: a muted loop over the card's top area. */
+  preview?: Media | null
+}
 
 type Props = {
   product: ProductCardData
@@ -25,11 +31,12 @@ type Props = {
 /**
  * Product card for the products hub, mega-menu and home showcase (spec §8.3): logo, name, tagline,
  * status and platforms, with a glow in the product's accent color. The name's link covers the
- * whole card; the card shows the focus ring. Tilt and the cursor spotlight are mouse-only.
+ * whole card; the card shows the focus ring. Tilt and the cursor spotlight are mouse-only. A
+ * preview video plays on hover (mouse) or in view (touch: one card at a time, once, at most 5 s), see CardPreview.
  */
 export function ProductCard({ product, href, headingLevel: Heading = 'h3' }: Props) {
   const t = useTranslations('ui.productCard')
-  const { name, slug, tagline, status, platforms, accentColor, logo } = product
+  const { name, slug, tagline, status, platforms, accentColor, logo, preview } = product
 
   return (
     <Tilt className="h-full">
@@ -46,6 +53,9 @@ export function ProductCard({ product, href, headingLevel: Heading = 'h3' }: Pro
           aria-hidden
           className="pointer-events-none absolute inset-x-6 top-0 h-px bg-linear-to-r from-transparent via-product-accent to-transparent opacity-70"
         />
+        {preview?.url && preview.mimeType?.startsWith('video/') && (
+          <CardPreview src={preview.url} />
+        )}
 
         <div className="flex items-start justify-between gap-4">
           {logo?.url ? (
@@ -66,7 +76,10 @@ export function ProductCard({ product, href, headingLevel: Heading = 'h3' }: Pro
               {name.charAt(0)}
             </span>
           )}
-          <StatusBadge status={status} />
+          {/* Solid backing and stacked above the preview video; looks the same without it. */}
+          <span className="relative flex rounded-sm bg-surface">
+            <StatusBadge status={status} />
+          </span>
         </div>
 
         <Heading className="mt-6 font-display text-xl font-semibold text-fg">

@@ -49,6 +49,17 @@ test('unknown pages 404 inside the site, in the visitor’s language', async ({ 
   await expect(page.locator('h1')).toHaveText('यह पेज नहीं मिला')
 })
 
+test('the founder section shows the photo (a local upload) with a quote', async ({ page }) => {
+  await page.goto('/about')
+  const founder = page.locator('main article').filter({ hasText: 'About our founder' })
+  await expect(founder.locator('blockquote')).not.toBeEmpty()
+  const photo = founder.locator('img[src^="/_next/image"]')
+  await photo.scrollIntoViewIfNeeded()
+  await expect
+    .poll(() => photo.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBeGreaterThan(0)
+})
+
 test('vanity /vyro redirects permanently and keeps the language', async ({ request }) => {
   for (const [from, to] of [
     ['/vyro', '/products/vyro'],
@@ -148,6 +159,7 @@ for (const url of [
   '/products',
   '/products/vyro',
   '/products/vyro/pricing',
+  '/about',
   '/contact',
   '/services',
   '/careers',

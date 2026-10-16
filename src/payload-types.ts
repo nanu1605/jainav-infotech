@@ -491,6 +491,18 @@ export interface ProductHeroBlock {
    * Signature animation in place of the media.
    */
   animation: 'none' | 'menumesh' | 'vyro' | 'baby';
+  /**
+   * Short audio clips of the assistant speaking, played on click.
+   */
+  samples?:
+    | {
+        label?: string | null;
+        audio: number | Media;
+        lang: 'en' | 'hi' | 'hi-Latn';
+        transcript: string;
+        id?: string | null;
+      }[]
+    | null;
   id?: string | null;
   blockName?: string | null;
   blockType: 'productHero';
@@ -1179,7 +1191,14 @@ export interface Team {
   id: number;
   name: string;
   role?: string | null;
+  /**
+   * A blank line starts a new paragraph.
+   */
   bio?: string | null;
+  /**
+   * Founder section: shown on the photo.
+   */
+  quote?: string | null;
   photo?: (number | null) | Media;
   links?:
     | {
@@ -2199,6 +2218,7 @@ export interface TeamSelect<T extends boolean = true> {
   name?: T;
   role?: T;
   bio?: T;
+  quote?: T;
   photo?: T;
   links?:
     | T
@@ -2438,6 +2458,15 @@ export interface ProductHeroBlockSelect<T extends boolean = true> {
   subheading?: T;
   media?: T;
   animation?: T;
+  samples?:
+    | T
+    | {
+        label?: T;
+        audio?: T;
+        lang?: T;
+        transcript?: T;
+        id?: T;
+      };
   id?: T;
   blockName?: T;
 }
