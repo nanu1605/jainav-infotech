@@ -16,7 +16,8 @@ test('health check passes', async ({ request }) => {
 for (const [path, lang] of [
   ['/', 'en'],
   ['/hi', 'hi'],
-  ['/products/vyro', 'en'],
+  // Code-built pages: they render before any content is published.
+  ['/products', 'en'],
   ['/contact', 'en'],
 ] as const) {
   test(`${path} renders`, async ({ page }) => {
