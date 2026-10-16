@@ -105,7 +105,7 @@ test('VYRO without a release offers the waitlist and a disabled Buy Pro', async 
   await expect(page.locator('#waitlist')).toBeVisible()
 })
 
-test('coming-soon products show only the waitlist', async ({ page }) => {
+test('a beta with no published build shows only the waitlist', async ({ page }) => {
   await page.goto('/products/baby')
   await expect(page.getByRole('link', { name: 'Join the waitlist' }).first()).toBeVisible()
   await expect(page.getByRole('link', { name: /^Visit / })).toHaveCount(0)

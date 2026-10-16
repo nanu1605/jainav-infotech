@@ -65,7 +65,8 @@ test('contact form validates, sends, confirms and emails a localized auto-reply'
   await form.getByRole('button', { name: 'Send message' }).click()
 
   const done = page.getByRole('status').filter({ hasText: 'Thanks, your message' })
-  await expect(done).toBeVisible()
+  // The first submit compiles the forms API on a cold dev server.
+  await expect(done).toBeVisible({ timeout: 20_000 })
   await expect(done).toBeFocused()
   const mail = await mailTo(email)
   expect(mail.subject).toBe("We've received your message")
@@ -101,15 +102,18 @@ test('start a project walks five steps and sends the brief', async ({ page }) =>
   expect((await mailTo(email)).subject).toBe("We've received your project brief")
 })
 
-test('a coming-soon product takes waitlist sign-ups', async ({ page }) => {
+test('a product without a build takes waitlist sign-ups', async ({ page }) => {
   await page.goto('/products/baby')
   await page.getByRole('link', { name: 'Join the waitlist' }).first().click()
   const form = page.locator('#waitlist form')
   const email = address('waitlist')
-  await form.getByLabel(/^Email/).fill(email)
+  await form.getByRole('textbox', { name: /^Email/ }).fill(email)
+  // The box is the consent to the launch email, so only then is the email promised.
+  await form.getByLabel('Email me when Baby is ready (optional).').check()
   await turnstileReady(form)
   await form.getByRole('button', { name: 'Join the waitlist' }).click()
   await expect(page.getByRole('status').filter({ hasText: "You're on the list" })).toBeVisible()
+  await expect(page.getByText("We'll email you when Baby is ready.")).toBeVisible()
   expect((await mailTo(email)).subject).toBe("You're on the Baby waitlist")
 })
 

@@ -132,3 +132,11 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
 - **WhatsApp button:** floating, in its own labelled `aside` landmark, prefilled with the page's URL; it moves up while the language banner shows, and the footer has bottom room so it never covers the legal line.
 - **Scheduler ("Book a call")** is a plain external link on the contact page, so nothing loads until it is clicked.
 - **Not done in Phase 4:** lead retention (24 months) needs a scheduled job (spec §16); "Email this waitlist" is Phase 9. Axe's best-practice rule flags the header's two "Language" navigation landmarks (mobile and desktop); WCAG rules pass.
+
+## Content from Tanishq (2026-10-16)
+
+- **Founder:** bio written from Tanishq's resume, without pronouns, and without contact details, grades or study plans; links to LinkedIn and Instagram. The photo is uploaded in the admin.
+- **One company inbox:** `support@jainavinfotech.in` fills every inbox slot in site settings (hello, sales, support, careers, privacy), so every form's alert reaches it; the contact page lists it once. Business hours: 9:00 am – 6:00 pm IST (days to be confirmed).
+- **Product copy is checked against the products themselves** (MenuMesh's repo and menumesh.in, Baby's v6.0.1 code and releases, VYRO's repo and v0.3.0 release), so it claims only what ships: VYRO's sensor coverage depends on the hardware and is described per vendor; Baby's privacy block says that cloud models answer by default and what they receive; MenuMesh's kitchen view is named as a Growth/Pro feature. Accent colors are each product's own (MenuMesh #FF6606, VYRO #4CC9F0, Baby #6EA8FE); MenuMesh's orange is below 3:1 on white, so its accent falls back to the text color for accent text.
+- **Held back until Tanishq decides:** MenuMesh prices, trial and demo link (menumesh.in still shows a holding page), MenuMesh's status (`live` vs `beta`), Baby's download (host the GitHub v6.0.1 installer on the beta channel, or link GitHub), "Hey Jarvis" as Baby's wake phrase, VYRO's Pro plan and EULA (VYRO is open source under MIT or Apache-2.0 and has no licensing code), product screenshots and videos (none exist yet).
+- **Baby is `beta`** with a download button on the beta channel: until a beta build is published on the site, it falls back to "Join the waitlist" (spec §8.5).
