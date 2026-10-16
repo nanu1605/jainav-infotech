@@ -129,7 +129,7 @@ export function Header({ nav, products, showAccount = false }: HeaderProps) {
             </IconButton>
           )}
           <Button asChild size="sm" className="ml-2 hidden @2xl:inline-flex">
-            <Link href="/contact">{t('ui.header.cta')}</Link>
+            <Link href="/services#start">{t('ui.header.cta')}</Link>
           </Button>
           <MobileMenu
             nav={links}

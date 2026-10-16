@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { postgresAdapter } from '@payloadcms/db-postgres'
+import { resendAdapter } from '@payloadcms/email-resend'
 import { redirectsPlugin } from '@payloadcms/plugin-redirects'
 import { seoPlugin } from '@payloadcms/plugin-seo'
 import type { GenerateTitle, GenerateURL } from '@payloadcms/plugin-seo/types'
@@ -26,6 +27,7 @@ import { Media } from './collections/Media'
 import { Pages } from './collections/Pages'
 import { Plans } from './collections/Plans'
 import { Posts } from './collections/Posts'
+import { PrivateFiles } from './collections/PrivateFiles'
 import { Products } from './collections/Products'
 import { Releases } from './collections/Releases'
 import { Services } from './collections/Services'
@@ -36,6 +38,7 @@ import { Users } from './collections/Users'
 import { Navigation } from './globals/Navigation'
 import { SiteSettings } from './globals/SiteSettings'
 import { revalidateCollection } from './hooks/revalidate'
+import { outboxAdapter } from './lib/outbox'
 import { docPaths, publicPath, type RoutedCollection } from './lib/routes'
 import { migrations } from './migrations'
 import { auditPlugin } from './plugins/audit'
@@ -111,6 +114,15 @@ const generateURL: GenerateURL = ({ doc, collectionConfig, locale }) => {
 // Cloudflare R2 when configured; Payload's local disk otherwise (spec §2). `alwaysInsertFields`
 // keeps the schema identical either way, so dev and prod migrations don't drift.
 const storageEnabled = Boolean(process.env.S3_ENDPOINT && process.env.S3_BUCKET)
+const privateStorageEnabled = Boolean(process.env.S3_ENDPOINT && process.env.S3_PRIVATE_BUCKET)
+const s3Config = {
+  endpoint: process.env.S3_ENDPOINT,
+  region: process.env.S3_REGION || 'auto',
+  credentials: {
+    accessKeyId: process.env.S3_ACCESS_KEY_ID ?? '',
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? '',
+  },
+}
 const publicFileURL =
   (base: string | undefined) =>
   ({ filename, prefix }: { filename: string; prefix?: string }) =>
@@ -164,6 +176,7 @@ export default buildConfig({
     Changelog,
     Leads,
     DataRequests,
+    PrivateFiles,
     ShortLinks,
     Users,
     AuditLog,
@@ -180,6 +193,14 @@ export default buildConfig({
     fallback: true,
   },
   editor: lexicalEditor(),
+  // Resend when configured (spec §2); otherwise development writes emails to .outbox/.
+  email: process.env.RESEND_API_KEY
+    ? resendAdapter({
+        apiKey: process.env.RESEND_API_KEY,
+        defaultFromAddress: process.env.EMAIL_FROM || '',
+        defaultFromName: 'Jainav Infotech',
+      })
+    : outboxAdapter,
   graphQL: { disable: true },
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {
@@ -228,14 +249,7 @@ export default buildConfig({
       enabled: storageEnabled,
       alwaysInsertFields: true,
       bucket: process.env.S3_BUCKET ?? '',
-      config: {
-        endpoint: process.env.S3_ENDPOINT,
-        region: process.env.S3_REGION || 'auto',
-        credentials: {
-          accessKeyId: process.env.S3_ACCESS_KEY_ID ?? '',
-          secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? '',
-        },
-      },
+      config: s3Config,
       collections: {
         media: {
           disablePayloadAccessControl: true,
@@ -247,6 +261,15 @@ export default buildConfig({
           generateFileURL: publicFileURL(process.env.DOWNLOADS_BASE_URL),
         },
       },
+    }),
+    // Private bucket (CVs, Phase 7 invoices). Payload checks read access on
+    // /api/private-files/file/:filename, then the plugin redirects to a 5-minute signed URL.
+    s3Storage({
+      enabled: privateStorageEnabled,
+      alwaysInsertFields: true,
+      bucket: process.env.S3_PRIVATE_BUCKET ?? '',
+      config: s3Config,
+      collections: { 'private-files': { signedDownloads: { expiresIn: 300 } } },
     }),
     // Last, so collections added by the plugins above are covered too.
     liveDocPlugin,

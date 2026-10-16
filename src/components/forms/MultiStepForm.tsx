@@ -13,10 +13,11 @@ import {
   type FieldPath,
   type FieldValues,
 } from 'react-hook-form'
-import type { z } from 'zod'
+import type { $ZodType } from 'zod/v4/core'
 
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
+import { useHydrated } from '@/lib/useHydrated'
 import { MotionProvider } from '@/components/motion/MotionProvider'
 import { DURATION, EASE_OUT } from '@/lib/motion'
 
@@ -30,10 +31,11 @@ export type FormStep<T extends FieldValues> = {
 }
 
 export type MultiStepFormProps<TIn extends FieldValues, TOut> = {
-  schema: z.ZodType<TOut, TIn>
+  /** Classic Zod or zod/mini. */
+  schema: $ZodType<TOut, TIn>
   defaultValues: DefaultValues<TIn>
   steps: FormStep<TIn>[]
-  onSubmit: (values: TOut) => void | Promise<void>
+  onSubmit: (values: TOut) => unknown
   submitLabel?: string
   className?: string
 }
@@ -65,6 +67,9 @@ export function MultiStepForm<TIn extends FieldValues, TOut>({
   const step = steps[index]
   const last = index === steps.length - 1
   const { isSubmitting } = form.formState
+  // Disabled until hydrated: earlier input would be reset, and a native submit puts the fields
+  // in the URL.
+  const hydrated = useHydrated()
 
   useEffect(() => {
     if (direction) panelRef.current?.focus()
@@ -107,84 +112,86 @@ export function MultiStepForm<TIn extends FieldValues, TOut>({
                 }
           }
         >
-          <ol className="flex gap-2">
-            {steps.map((s, i) => (
-              <li
-                key={s.id}
-                aria-current={i === index ? 'step' : undefined}
-                className="grid min-w-0 flex-1 content-start gap-2"
-              >
-                <span aria-hidden className="h-1 overflow-hidden rounded-full bg-border">
+          <fieldset disabled={!hydrated} className="contents">
+            <ol className="flex gap-2">
+              {steps.map((s, i) => (
+                <li
+                  key={s.id}
+                  aria-current={i === index ? 'step' : undefined}
+                  className="grid min-w-0 flex-1 content-start gap-2"
+                >
+                  <span aria-hidden className="h-1 overflow-hidden rounded-full bg-border">
+                    <span
+                      className={cn(
+                        'block h-full origin-left bg-primary transition-transform duration-[var(--duration-slow)] ease-out',
+                        i <= index ? 'scale-x-100' : 'scale-x-0',
+                      )}
+                    />
+                  </span>
                   <span
                     className={cn(
-                      'block h-full origin-left bg-primary transition-transform duration-[var(--duration-slow)] ease-out',
-                      i <= index ? 'scale-x-100' : 'scale-x-0',
+                      'text-sm max-sm:sr-only',
+                      i === index ? 'font-medium text-fg' : 'text-fg-muted',
                     )}
-                  />
-                </span>
-                <span
-                  className={cn(
-                    'text-sm max-sm:sr-only',
-                    i === index ? 'font-medium text-fg' : 'text-fg-muted',
-                  )}
-                >
-                  {s.title}
-                  {i < index && <span className="sr-only"> ({t('completed')})</span>}
-                </span>
-              </li>
-            ))}
-          </ol>
+                  >
+                    {s.title}
+                    {i < index && <span className="sr-only"> ({t('completed')})</span>}
+                  </span>
+                </li>
+              ))}
+            </ol>
 
-          <div
-            ref={panelRef}
-            role="group"
-            tabIndex={-1}
-            aria-labelledby={`${id}-count ${id}-title`}
-            className="grid gap-5 outline-none"
-          >
-            <div>
-              <p id={`${id}-count`} className="text-sm text-fg-muted">
-                {t('progress', { current: index + 1, total: steps.length })}
-              </p>
-              <p id={`${id}-title`} className="mt-1 font-display text-xl font-semibold text-fg">
-                {step.title}
-              </p>
-            </div>
-            <m.div
-              key={step.id}
-              initial={direction ? { opacity: 0, x: direction * 16 } : false}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: DURATION.base, ease: EASE_OUT }}
-              className="grid gap-5"
+            <div
+              ref={panelRef}
+              role="group"
+              tabIndex={-1}
+              aria-labelledby={`${id}-count ${id}-title`}
+              className="grid gap-5 outline-none"
             >
-              {step.content}
-            </m.div>
-          </div>
+              <div>
+                <p id={`${id}-count`} className="text-sm text-fg-muted">
+                  {t('progress', { current: index + 1, total: steps.length })}
+                </p>
+                <p id={`${id}-title`} className="mt-1 font-display text-xl font-semibold text-fg">
+                  {step.title}
+                </p>
+              </div>
+              <m.div
+                key={step.id}
+                initial={direction ? { opacity: 0, x: direction * 16 } : false}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: DURATION.base, ease: EASE_OUT }}
+                className="grid gap-5"
+              >
+                {step.content}
+              </m.div>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {index > 0 && (
-              <Button variant="ghost" onClick={() => go(index - 1)}>
-                <ArrowLeft aria-hidden />
-                {t('back')}
-              </Button>
-            )}
-            <span role="status" className="sr-only">
-              {isSubmitting ? t('sending') : null}
-            </span>
-            <Button type="submit" aria-disabled={isSubmitting || undefined} className="ms-auto">
-              {last ? (
-                <>
-                  {isSubmitting && <LoaderCircle aria-hidden className="animate-spin" />}
-                  {submitLabel ?? t('submit')}
-                </>
-              ) : (
-                <>
-                  {t('next')}
-                  <ArrowRight aria-hidden />
-                </>
+            <div className="flex flex-wrap items-center gap-3">
+              {index > 0 && (
+                <Button variant="ghost" onClick={() => go(index - 1)}>
+                  <ArrowLeft aria-hidden />
+                  {t('back')}
+                </Button>
               )}
-            </Button>
-          </div>
+              <span role="status" className="sr-only">
+                {isSubmitting ? t('sending') : null}
+              </span>
+              <Button type="submit" aria-disabled={isSubmitting || undefined} className="ms-auto">
+                {last ? (
+                  <>
+                    {isSubmitting && <LoaderCircle aria-hidden className="animate-spin" />}
+                    {submitLabel ?? t('submit')}
+                  </>
+                ) : (
+                  <>
+                    {t('next')}
+                    <ArrowRight aria-hidden />
+                  </>
+                )}
+              </Button>
+            </div>
+          </fieldset>
         </form>
       </FormProvider>
     </MotionProvider>

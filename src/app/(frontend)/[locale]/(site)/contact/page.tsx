@@ -1,13 +1,15 @@
-import { Clock, Mail, MapPin, MessageCircle, Phone } from 'lucide-react'
+import { CalendarClock, Clock, Mail, MapPin, MessageCircle, Phone } from 'lucide-react'
 import type { Metadata } from 'next'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import type { ReactNode } from 'react'
 
 import { MapEmbed } from '@/components/content/MapEmbed'
 import { PageHeader } from '@/components/content/PageHeader'
+import { ContactForm } from '@/components/forms/lazy'
 import { Container } from '@/components/layout/Container'
+import { Link } from '@/i18n/navigation'
 import type { Locale } from '@/i18n/routing'
-import { getSettings } from '@/lib/queries'
+import { getProducts, getSettings } from '@/lib/queries'
 import { pageMetadata } from '@/lib/seo'
 
 type Props = { params: Promise<{ locale: string }> }
@@ -20,15 +22,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 const EMAILS = ['hello', 'sales', 'support', 'careers', 'privacy'] as const
 
+const link = 'font-medium text-fg underline-offset-4 hover:underline'
+
 /**
- * Contact (spec §8.9): email, phone, WhatsApp, address with a map on request, business hours.
- * The topic-routed contact form is wired in Phase 4 (spec §13); it goes in the first column.
+ * Contact (spec §8.9): the topic-routed form (spec §13), then email, phone, WhatsApp, a booking
+ * link, business hours and the address with a map on request.
  */
 export default async function ContactPage({ params }: Props) {
   const locale = (await params).locale as Locale
   setRequestLocale(locale)
-  const [{ company }, t] = await Promise.all([getSettings(locale), getTranslations('contact')])
-  const emails = EMAILS.flatMap((k) => (company?.emails?.[k] ? [[k, company.emails[k]!]] : []))
+  const [{ company, schedulerUrl }, products, t, tf] = await Promise.all([
+    getSettings(locale),
+    getProducts(locale, { retired: false }),
+    getTranslations('contact'),
+    getTranslations('forms.contact'),
+  ])
+  // An address that serves several inboxes is listed once, under its first label.
+  const emails = EMAILS.flatMap((k) =>
+    company?.emails?.[k] ? [[k, company.emails[k]!] as const] : [],
+  ).filter(([, email], i, all) => all.findIndex(([, e]) => e === email) === i)
 
   return (
     <main id="main" className="scroll-mt-16">
@@ -38,7 +50,24 @@ export default async function ContactPage({ params }: Props) {
         crumbs={[{ label: t('title'), href: '/contact' }]}
         locale={locale}
       />
-      <Container className="grid gap-12 py-16 sm:py-24 lg:grid-cols-2">
+      <Container className="grid gap-12 py-16 sm:py-24 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-16">
+        <section aria-labelledby="contact-form">
+          <h2 id="contact-form" className="font-display text-2xl font-semibold text-fg">
+            {tf('title')}
+          </h2>
+          <p className="mt-2 text-fg-muted">
+            {tf.rich('planning', {
+              link: (chunks) => (
+                <Link href="/services#start" className="text-fg underline underline-offset-4">
+                  {chunks}
+                </Link>
+              ),
+            })}
+          </p>
+          <div className="mt-8">
+            <ContactForm products={products.map(({ slug, name }) => ({ slug, name }))} />
+          </div>
+        </section>
         <div className="space-y-8">
           {emails.length > 0 && (
             <Channel icon={<Mail aria-hidden />} label={t('email')}>
@@ -46,10 +75,7 @@ export default async function ContactPage({ params }: Props) {
                 {emails.map(([kind, email]) => (
                   <li key={kind}>
                     <span className="text-fg-muted">{t(`emails.${kind}`)}: </span>
-                    <a
-                      href={`mailto:${email}`}
-                      className="font-medium text-fg underline-offset-4 hover:underline"
-                    >
+                    <a href={`mailto:${email}`} className={link}>
                       {email}
                     </a>
                   </li>
@@ -59,10 +85,7 @@ export default async function ContactPage({ params }: Props) {
           )}
           {company?.phone && (
             <Channel icon={<Phone aria-hidden />} label={t('phone')}>
-              <a
-                href={`tel:${company.phone.replace(/[^\d+]/g, '')}`}
-                className="font-medium text-fg underline-offset-4 hover:underline"
-              >
+              <a href={`tel:${company.phone.replace(/[^\d+]/g, '')}`} className={link}>
                 {company.phone}
               </a>
             </Channel>
@@ -73,9 +96,18 @@ export default async function ContactPage({ params }: Props) {
                 href={`https://wa.me/${company.whatsapp}?text=${encodeURIComponent(t('whatsappMessage'))}`}
                 target="_blank"
                 rel="noopener"
-                className="font-medium text-fg underline-offset-4 hover:underline"
+                className={link}
               >
                 {t('whatsappCta')}
+                <span className="sr-only"> {t('newTab')}</span>
+              </a>
+            </Channel>
+          )}
+          {/* A plain link: the scheduler loads nothing until it is opened. */}
+          {schedulerUrl && (
+            <Channel icon={<CalendarClock aria-hidden />} label={tf('bookCall')}>
+              <a href={schedulerUrl} target="_blank" rel="noopener" className={link}>
+                {tf('bookCallText')}
                 <span className="sr-only"> {t('newTab')}</span>
               </a>
             </Channel>
@@ -86,14 +118,16 @@ export default async function ContactPage({ params }: Props) {
             </Channel>
           )}
           {company?.registeredAddress && (
-            <Channel icon={<MapPin aria-hidden />} label={t('office')}>
-              <address className="whitespace-pre-line text-fg not-italic">
-                {company.registeredAddress}
-              </address>
-            </Channel>
+            <>
+              <Channel icon={<MapPin aria-hidden />} label={t('office')}>
+                <address className="whitespace-pre-line text-fg not-italic">
+                  {company.registeredAddress}
+                </address>
+              </Channel>
+              <MapEmbed address={company.registeredAddress} />
+            </>
           )}
         </div>
-        {company?.registeredAddress && <MapEmbed address={company.registeredAddress} />}
       </Container>
     </main>
   )

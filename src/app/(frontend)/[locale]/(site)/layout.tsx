@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import type { ReactNode } from 'react'
 
+import { NewsletterForm } from '@/components/forms/NewsletterForm'
 import { AnnouncementBar } from '@/components/layout/AnnouncementBar'
 import { Footer } from '@/components/layout/Footer'
 import { Header } from '@/components/layout/Header'
@@ -8,6 +9,7 @@ import { LanguageSuggestion } from '@/components/layout/LanguageSuggestion'
 import { LivePreviewRefresh } from '@/components/layout/LivePreviewRefresh'
 import { Maintenance } from '@/components/layout/Maintenance'
 import { PreviewBar } from '@/components/layout/PreviewBar'
+import { WhatsAppButton } from '@/components/layout/WhatsAppButton'
 import type { Locale } from '@/i18n/routing'
 import { isPreview } from '@/lib/cms'
 import { getNavigation, getProducts, getSettings } from '@/lib/queries'
@@ -15,7 +17,7 @@ import { SITE_URL } from '@/lib/seo'
 
 type Props = { children: ReactNode; params: Promise<{ locale: string }> }
 
-/** Header, footer and announcement for every public page (spec §8.1). */
+/** Header, footer, announcement and WhatsApp button for every public page (spec §8.1). */
 export default async function SiteLayout({ children, params }: Props) {
   const locale = (await params).locale as Locale
   setRequestLocale(locale)
@@ -61,8 +63,13 @@ export default async function SiteLayout({ children, params }: Props) {
           email: company?.emails?.hello,
           phone: company?.phone,
         }}
+        newsletter={<NewsletterForm />}
       />
-      <LanguageSuggestion />
+      {/* WhatsAppButton moves up while this holds the suggestion: keep them adjacent. */}
+      <div data-language-suggestion>
+        <LanguageSuggestion />
+      </div>
+      {company?.whatsapp && <WhatsAppButton number={company.whatsapp} />}
     </>
   )
 }

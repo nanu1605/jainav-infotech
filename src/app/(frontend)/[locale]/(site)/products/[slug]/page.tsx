@@ -25,7 +25,7 @@ export default async function ProductPage({ params }: Props) {
   const { locale, slug } = (await params) as { locale: Locale; slug: string }
   setRequestLocale(locale)
   const loaded = await loadProduct(locale, slug)
-  const { product, plans, buttons, settings } = loaded
+  const { product, plans, buttons } = loaded
 
   return (
     <ProductShell loaded={loaded} active="overview">
@@ -34,11 +34,7 @@ export default async function ProductPage({ params }: Props) {
         <ProductBlocks loaded={loaded} locale={locale} />
       </div>
       {buttons.some((b) => b.kind === 'waitlist') && (
-        <WaitlistSlot
-          name={product.name}
-          slug={product.slug}
-          email={settings.company?.emails?.hello}
-        />
+        <WaitlistSlot name={product.name} slug={product.slug} />
       )}
       <JsonLd
         data={{

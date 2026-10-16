@@ -109,7 +109,7 @@ export function MobileMenuDialog({
               </Button>
             )}
             <Button asChild size="lg" className="w-full">
-              <Link href="/contact">{t('ui.header.cta')}</Link>
+              <Link href="/services#start">{t('ui.header.cta')}</Link>
             </Button>
           </div>
         </Dialog.Content>

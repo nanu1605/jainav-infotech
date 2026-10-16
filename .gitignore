@@ -54,3 +54,7 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Local email outbox (dev) and private uploads
+/.outbox
+/private-files

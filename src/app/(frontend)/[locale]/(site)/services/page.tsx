@@ -4,7 +4,9 @@ import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { ServiceCards } from '@/components/blocks/page/Sections'
 import { PageHeader } from '@/components/content/PageHeader'
 import { PageView } from '@/components/content/PageView'
+import { ProjectForm } from '@/components/forms/lazy'
 import { Container } from '@/components/layout/Container'
+import { Section } from '@/components/layout/Section'
 import type { Locale } from '@/i18n/routing'
 import { getPage, getServices } from '@/lib/queries'
 import { pageMetadata } from '@/lib/seo'
@@ -29,15 +31,43 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 /**
  * Services (spec §8.7): the Pages document `services` (hero, pillars, process, engagement
- * models, FAQ). Until it is published, the four pillars from the services collection.
+ * models, FAQ). Until it is published, the four pillars from the services collection. Both end
+ * with the start-a-project form (#start), where "Start a project" links lead.
  */
 export default async function ServicesPage({ params }: Props) {
   const locale = (await params).locale as Locale
   setRequestLocale(locale)
-  const page = await getPage(locale, 'services')
-  if (page) return <PageView page={page} locale={locale} />
+  const [page, services, t, tf] = await Promise.all([
+    getPage(locale, 'services'),
+    getServices(locale),
+    getTranslations('services'),
+    getTranslations('forms.project'),
+  ])
+  const start = (
+    <Section
+      id="start"
+      size="prose"
+      title={tf('title')}
+      intro={tf('intro')}
+      className="scroll-mt-16"
+    >
+      <ProjectForm
+        services={services.map((s) => ({
+          slug: s.slug,
+          title: s.title ?? '',
+          summary: s.summary,
+        }))}
+      />
+    </Section>
+  )
 
-  const [services, t] = await Promise.all([getServices(locale), getTranslations('services')])
+  if (page)
+    return (
+      <PageView page={page} locale={locale}>
+        {start}
+      </PageView>
+    )
+
   return (
     <main id="main" className="scroll-mt-16">
       <PageHeader
@@ -49,6 +79,7 @@ export default async function ServicesPage({ params }: Props) {
       <Container className="py-16 sm:py-24">
         <ServiceCards services={services} />
       </Container>
+      {start}
     </main>
   )
 }

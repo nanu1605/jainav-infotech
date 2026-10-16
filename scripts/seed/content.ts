@@ -23,6 +23,9 @@ const draftHi = { hiStatus: 'draft' } as const
 
 // ─── Products ────────────────────────────────────────────────────────────────
 
+// Product copy checked against each product's own code, site and releases on 2026-10-16
+// (MenuMesh: its repo and menumesh.in; Baby: nanu1605/baby v6.0.1; VYRO: nanu1605/vyro and
+// vyro-releases v0.3.0). MenuMesh's Hindi follows MenuMesh's own approved words (ग्राहक, डिश).
 export const products: SeedDoc<'products'>[] = [
   {
     en: {
@@ -30,14 +33,14 @@ export const products: SeedDoc<'products'>[] = [
       slug: 'menumesh',
       tagline: 'QR table ordering for restaurants.',
       summary:
-        'Guests scan the table QR, browse the menu and order from their phone. Orders reach waiters and the kitchen instantly, and managers handle menus, prices, per-table billing and printed bills.',
+        'Guests scan the QR code on their table and order from their own phone, in English or Hindi. Waiters and the kitchen follow every dish until it’s served, and the bill, with your GST and charges, is ready in one tap. Guests pay you directly, and MenuMesh takes no commission.',
       type: 'saas',
       category: 'restaurants',
       platforms: ['web'],
-      status: 'live', // {{CONFIRM}}
+      status: 'live', // {{CONFIRM}}: menumesh.in is still a holding page; 'beta' until it opens?
       hostingMode: 'external',
-      externalUrl: null, // {{MENUMESH_URL}}
-      accentColor: '#EA580C', // placeholder
+      externalUrl: 'https://menumesh.in',
+      accentColor: '#FF6606', // MenuMesh's brand orange
       primaryButton: { type: 'visit' },
       featured: true,
       sortOrder: 1,
@@ -47,37 +50,81 @@ export const products: SeedDoc<'products'>[] = [
           blockType: 'productHero',
           eyebrow: 'MenuMesh by Jainav',
           heading: 'QR table ordering for restaurants.',
-          subheading: 'Guests order from their phone. The kitchen sees it instantly.',
+          subheading:
+            'Guests order from their own phone. Waiters and the kitchen see every dish live, and the bill is ready in one tap.',
           animation: 'menumesh',
         },
         {
           blockType: 'howItWorks',
           heading: 'How it works',
           steps: [
-            { title: 'Scan the table QR', text: 'Each table has its own QR code.' },
             {
-              title: 'Browse the menu',
-              text: 'The menu opens on the guest’s phone. No app to install.',
+              title: 'Scan',
+              text: 'Each table has its own QR code. Guests scan it and your menu opens for that table. No app, no login.',
             },
-            { title: 'Order', text: 'The order is linked to the table and the waiter serving it.' },
-            { title: 'Kitchen gets it', text: 'Waiters and the kitchen see new orders at once.' },
+            {
+              title: 'Order',
+              text: 'Guests pick dishes, sizes and add-ons, add a note for the kitchen and place the order. Friends at the table can order from their own phones.',
+            },
+            {
+              title: 'Cook and serve',
+              text: 'Waiters see the order straight away, and the kitchen gets it once a waiter takes the table. Guests see each dish move from placed to served.',
+            },
+            {
+              title: 'Bill and pay',
+              text: 'One tap makes the bill with every dish, your taxes and any other charges. Print it, take payment the way you already do, and the table is free for the next guests.',
+            },
           ],
         },
         {
           blockType: 'featureGrid',
           heading: 'Everything a busy floor needs',
           items: [
-            { icon: 'qr-code', title: 'Table QR ordering' },
-            { icon: 'user-round-check', title: 'A waiter assigned to each table order' },
-            { icon: 'chef-hat', title: 'Waiter and kitchen panel', text: 'Mark dishes as served.' },
             {
-              icon: 'layout-dashboard',
-              title: 'Manager panel',
-              text: 'Menu, pricing, per-table bills, printed bills and order history.',
+              icon: 'qr-code',
+              title: 'Table QR ordering',
+              text: 'No app to install and no login for your guests.',
             },
-            { icon: 'rotate-ccw', title: 'Tables reset after billing' },
-            { icon: 'bar-chart-3', title: 'Waiter reports', text: 'On the Growth and Pro plans.' },
-            { icon: 'store', title: 'Multi-restaurant management' },
+            {
+              icon: 'languages',
+              title: 'Menu in English and Hindi',
+              text: 'Guests switch in one tap. Dish names are written in Hindi for you, and you can change any of them.',
+            },
+            {
+              icon: 'user-round-check',
+              title: 'A waiter for every table',
+              text: 'Assign a waiter to each table, and approve a table’s first order to stop prank orders.',
+            },
+            {
+              icon: 'layout-grid',
+              title: 'Live board for waiters',
+              text: 'Every table at a glance, coloured by dish status. A badge shows when a guest calls a waiter or asks for the bill.',
+            },
+            {
+              icon: 'chef-hat',
+              title: 'Kitchen view',
+              text: 'Tickets in columns for new, preparing and ready. On the Growth and Pro plans.',
+            },
+            {
+              icon: 'receipt-text',
+              title: 'Bills in one tap',
+              text: 'GST and service charge added the same way every time, printed on 80 mm or 58 mm receipt printers. The table is free once it’s billed.',
+            },
+            {
+              icon: 'image-up',
+              title: 'Menu from a photo',
+              text: 'Photograph your printed menu, or upload a PDF or CSV. Check the dishes, then add them in one go.',
+            },
+            {
+              icon: 'wifi-off',
+              title: 'Ready for a Wi-Fi drop',
+              text: 'Dish updates on the staff board are kept on the device and sent when the connection is back.',
+            },
+            {
+              icon: 'chart-column',
+              title: 'Sales and reports',
+              text: 'Today’s sales on every plan. Reports by dish and waiter, busy hours and CSV export on Growth and Pro.',
+            },
           ],
         },
         {
@@ -90,38 +137,71 @@ export const products: SeedDoc<'products'>[] = [
     hi: {
       tagline: 'रेस्टोरेंट के लिए QR टेबल ऑर्डरिंग।',
       summary:
-        'मेहमान टेबल का QR स्कैन करते हैं, मेन्यू देखते हैं और अपने फ़ोन से ऑर्डर करते हैं। ऑर्डर तुरंत वेटर और किचन तक पहुँचते हैं, और मैनेजर मेन्यू, दाम, हर टेबल का बिल और प्रिंटेड बिल संभालते हैं।',
+        'ग्राहक अपनी टेबल का QR कोड स्कैन करके अपने फ़ोन से ऑर्डर करते हैं, अंग्रेज़ी या हिंदी में। वेटर और किचन हर डिश को परोसे जाने तक देखते रहते हैं, और आपके GST और शुल्कों के साथ बिल एक टैप में तैयार हो जाता है। ग्राहक सीधे आपको भुगतान करते हैं, और MenuMesh कोई कमीशन नहीं लेता।',
       layout: [
         {
           eyebrow: 'MenuMesh, Jainav की ओर से',
           heading: 'रेस्टोरेंट के लिए QR टेबल ऑर्डरिंग।',
-          subheading: 'मेहमान फ़ोन से ऑर्डर करते हैं। किचन को तुरंत दिखता है।',
+          subheading:
+            'ग्राहक अपने फ़ोन से ऑर्डर करते हैं। वेटर और किचन हर डिश लाइव देखते हैं, और बिल एक टैप में तैयार हो जाता है।',
         },
         {
           heading: 'यह कैसे काम करता है',
           steps: [
-            { title: 'टेबल का QR स्कैन करें', text: 'हर टेबल का अपना QR कोड होता है।' },
             {
-              title: 'मेन्यू देखें',
-              text: 'मेन्यू मेहमान के फ़ोन पर खुलता है। कोई ऐप इंस्टॉल नहीं करना।',
+              title: 'स्कैन',
+              text: 'हर टेबल का अपना QR कोड होता है। ग्राहक उसे स्कैन करते हैं और आपका मेन्यू उसी टेबल के लिए खुल जाता है। न कोई ऐप, न लॉग इन।',
             },
-            { title: 'ऑर्डर करें', text: 'ऑर्डर टेबल और उसे सर्व करने वाले वेटर से जुड़ जाता है।' },
-            { title: 'किचन तक पहुँचे', text: 'वेटर और किचन नए ऑर्डर तुरंत देखते हैं।' },
+            {
+              title: 'ऑर्डर',
+              text: 'ग्राहक डिश, साइज़ और ऐड-ऑन चुनते हैं, किचन के लिए नोट लिखते हैं और ऑर्डर कर देते हैं। टेबल पर बैठे दोस्त अपने-अपने फ़ोन से ऑर्डर कर सकते हैं।',
+            },
+            {
+              title: 'बनाना और परोसना',
+              text: 'वेटर को ऑर्डर तुरंत दिखता है, और जैसे ही कोई वेटर टेबल सँभालता है, ऑर्डर किचन पहुँच जाता है। ग्राहक हर डिश को “ऑर्डर हुआ” से “परोसा गया” तक बढ़ते देखते हैं।',
+            },
+            {
+              title: 'बिल और भुगतान',
+              text: 'एक टैप में बिल बन जाता है, जिसमें हर डिश, आपके टैक्स और लागू होने पर दूसरे शुल्क शामिल होते हैं। उसे प्रिंट करें, भुगतान वैसे ही लें जैसे अभी लेते हैं, और टेबल अगले ग्राहकों के लिए ख़ाली हो जाती है।',
+            },
           ],
         },
         {
           heading: 'व्यस्त रेस्टोरेंट की हर ज़रूरत',
           items: [
-            { title: 'टेबल QR ऑर्डरिंग' },
-            { title: 'हर टेबल ऑर्डर के लिए तय वेटर' },
-            { title: 'वेटर और किचन पैनल', text: 'सर्व किए गए व्यंजन मार्क करें।' },
+            { title: 'टेबल QR ऑर्डरिंग', text: 'ग्राहकों को न कोई ऐप इंस्टॉल करना है, न लॉग इन।' },
             {
-              title: 'मैनेजर पैनल',
-              text: 'मेन्यू, दाम, हर टेबल का बिल, प्रिंटेड बिल और ऑर्डर हिस्ट्री।',
+              title: 'अंग्रेज़ी और हिंदी में मेन्यू',
+              text: 'ग्राहक एक टैप में भाषा बदलते हैं। डिश के नाम आपके लिए हिंदी में लिखे जाते हैं, और आप इनमें से कोई भी नाम बदल सकते हैं।',
             },
-            { title: 'बिलिंग के बाद टेबल रीसेट' },
-            { title: 'वेटर रिपोर्ट', text: 'Growth और Pro प्लान में।' },
-            { title: 'कई रेस्टोरेंट का प्रबंधन' },
+            {
+              title: 'हर टेबल के लिए वेटर',
+              text: 'हर टेबल पर एक वेटर तय करें, और फ़र्ज़ी ऑर्डर रोकने के लिए टेबल का पहला ऑर्डर मंज़ूर करें।',
+            },
+            {
+              title: 'वेटरों का लाइव बोर्ड',
+              text: 'हर टेबल एक नज़र में, डिश के स्टेटस के हिसाब से रंगों में। ग्राहक वेटर बुलाएँ या बिल माँगें, तो एक बैज दिखता है।',
+            },
+            {
+              title: 'किचन स्क्रीन',
+              text: 'नए, बन रहे और तैयार के कॉलम में टिकट। Growth और Pro प्लान में।',
+            },
+            {
+              title: 'एक टैप में बिल',
+              text: 'हर बिल पर GST और सर्विस चार्ज एक ही तरह से जुड़ते हैं, और बिल 80 mm या 58 mm रसीद प्रिंटर पर प्रिंट होता है। बिल बनते ही टेबल ख़ाली हो जाती है।',
+            },
+            {
+              title: 'फ़ोटो से मेन्यू',
+              text: 'अपने छपे हुए मेन्यू की फ़ोटो लें, या PDF या CSV अपलोड करें। डिश जाँचें, फिर सब एक साथ जोड़ दें।',
+            },
+            {
+              title: 'Wi-Fi जाए तो भी चिंता नहीं',
+              text: 'स्टाफ़ बोर्ड पर डिश के अपडेट डिवाइस पर सेव रहते हैं, और कनेक्शन लौटते ही भेज दिए जाते हैं।',
+            },
+            {
+              title: 'बिक्री और रिपोर्ट',
+              text: 'आज की बिक्री हर प्लान में। डिश और वेटर के हिसाब से रिपोर्ट, भीड़ के घंटे और CSV एक्सपोर्ट Growth और Pro प्लान में।',
+            },
           ],
         },
         { heading: 'अपने रेस्टोरेंट में QR ऑर्डरिंग लाएँ' },
@@ -132,18 +212,18 @@ export const products: SeedDoc<'products'>[] = [
     en: {
       name: 'Baby',
       slug: 'baby',
-      tagline: 'Your private voice assistant for Windows.',
+      tagline: 'Your personal voice assistant for Windows.',
       summary:
-        'Talk to your PC in English, Hindi or Hinglish. The wake word, speech recognition, voice and memory run on your computer; only what’s needed to answer goes to the AI model.',
+        'Talk to your PC in English, Hindi or Hinglish. Baby opens and closes apps, finds files, browses the web and runs longer jobs in the background, and it asks before it changes anything. Listening for the wake phrase and speech recognition run on your PC, and your chats and memory are saved there.',
       type: 'desktop',
       category: 'assistants',
       platforms: ['windows'],
-      status: 'coming-soon',
+      status: 'beta',
       hostingMode: 'external',
       externalUrl: null, // {{BABY_URL}}
-      accentColor: '#9333EA', // placeholder
-      // While Baby is coming soon the button resolves to "Join the waitlist" (spec §8.5).
-      primaryButton: { type: 'contact' },
+      accentColor: '#6EA8FE', // Baby's app accent
+      // Until a beta build is published here the button resolves to "Join the waitlist" (spec §8.5).
+      primaryButton: { type: 'download', channel: 'beta' },
       featured: true,
       sortOrder: 3,
       ...draftHi,
@@ -151,7 +231,7 @@ export const products: SeedDoc<'products'>[] = [
         {
           blockType: 'productHero',
           eyebrow: 'Baby by Jainav',
-          heading: 'Your private voice assistant for Windows.',
+          heading: 'Your personal voice assistant for Windows.',
           subheading: 'Talk to your PC in English, Hindi or Hinglish.',
           animation: 'baby',
         },
@@ -159,60 +239,219 @@ export const products: SeedDoc<'products'>[] = [
           blockType: 'privacy',
           heading: 'What stays on your PC',
           local: [
-            { text: 'Wake word' },
-            { text: 'Speech-to-text' },
-            { text: 'Voice' },
-            { text: 'Memory' },
+            { text: 'Listening for the wake phrase' },
+            { text: 'Turning your speech into text' },
+            { text: 'Baby’s spoken replies' },
+            { text: 'Your chats, memory and settings' },
+            { text: 'Your API keys, sent only to their own provider' },
+            { text: 'Files Baby reads and command results (Full install)' },
           ],
           cloud: [
-            { text: 'The text of your request (and relevant memory context) for the AI model' },
+            {
+              text: 'Your messages, recent chat and relevant memories, to the AI provider you set up',
+            },
+            {
+              text: 'A screenshot, if you ask about your screen and the local model can’t answer (Google Gemini)',
+            },
+            { text: 'Web searches and the pages you ask Baby to open' },
           ],
-          note: 'To be confirmed before publishing.',
+          note: 'Cloud models answer most messages by default because they’re faster. A cloud-only install has no local model, so everything you type or say goes to your provider as text. Skip the key on a Full install and every answer comes from your GPU. Nothing is sent to Jainav: there’s no account and no telemetry.',
         },
         {
           blockType: 'featureGrid',
           heading: 'What Baby does',
           items: [
-            { icon: 'audio-lines', title: 'Wake word' },
-            { icon: 'mic', title: 'On-device speech recognition' },
-            { icon: 'volume-2', title: 'Natural voice' },
-            { icon: 'languages', title: 'English, Hindi and Hinglish' },
-            { icon: 'brain', title: 'Local memory' },
-            { icon: 'shield-check', title: 'Safe, allow-listed system actions' },
+            {
+              icon: 'mic',
+              title: 'Hands-free voice',
+              text: 'Speech recognition runs on your PC. Talk over Baby to interrupt it.',
+            },
+            { icon: 'app-window', title: 'Opens, closes and switches apps' },
+            { icon: 'folder-search', title: 'Finds files on your PC' },
+            {
+              icon: 'globe',
+              title: 'Browses the web',
+              text: 'Reads pages for you, and asks once before it clicks or types on a site.',
+            },
+            {
+              icon: 'list-checks',
+              title: 'Works in the background',
+              text: 'Hand off a longer job, keep talking, and hear back when it’s done.',
+            },
+            {
+              icon: 'brain',
+              title: 'Remembers what you tell it',
+              text: 'Across restarts, stored on your PC. Say “forget that” to remove it.',
+            },
+            {
+              icon: 'languages',
+              title: 'English, Hindi and Hinglish',
+              text: 'Replies in your language, with a separate Hindi voice.',
+            },
+            {
+              icon: 'shield-check',
+              title: 'Asks before it changes anything',
+              text: 'Dangerous commands are refused, and every action is logged.',
+            },
+            {
+              icon: 'wifi-off',
+              title: 'Works offline',
+              text: 'On a Full install, the local model takes over when the internet drops.',
+            },
+          ],
+        },
+        {
+          blockType: 'howItWorks',
+          heading: 'How it works',
+          steps: [
+            { title: 'Say the wake phrase', text: 'Or press Ctrl+Alt+B, or just type.' },
+            { title: 'Ask in your own words', text: 'In English, Hindi or Hinglish.' },
+            {
+              title: 'Baby does the work',
+              text: 'It uses your apps, files and the web, and asks before anything changes.',
+            },
+            {
+              title: 'Hear the answer',
+              text: 'Baby replies aloud, and the activity feed shows every step.',
+            },
+          ],
+        },
+        {
+          blockType: 'requirements',
+          heading: 'System requirements',
+          rows: [
+            { label: 'Windows', minimum: 'Windows 11, 64-bit' },
+            {
+              label: 'Graphics',
+              minimum: 'Any (cloud-only install)',
+              recommended: 'NVIDIA GPU with 8 GB VRAM (Full install)',
+            },
+            {
+              label: 'Disk space',
+              minimum: 'About 3 GB (cloud-only)',
+              recommended: 'About 8 GB (Full)',
+            },
+            {
+              label: 'Internet',
+              minimum: 'Needed for the first run',
+              recommended: 'Optional afterwards on a Full install',
+            },
+            {
+              label: 'AI provider key',
+              minimum: 'An OpenRouter key (cloud-only)',
+              recommended: 'Optional on a Full install',
+            },
+            { label: 'Microphone', minimum: 'Optional; you can type instead' },
+            { label: 'Admin rights', minimum: 'Not needed to install' },
           ],
         },
       ],
     },
     hi: {
-      tagline: 'Windows के लिए आपका निजी वॉइस असिस्टेंट।',
+      tagline: 'Windows के लिए आपका पर्सनल वॉइस असिस्टेंट।',
       summary:
-        'अपने PC से अंग्रेज़ी, हिंदी या हिंग्लिश में बात करें। वेक वर्ड, स्पीच रिकग्निशन, आवाज़ और मेमोरी आपके कंप्यूटर पर चलते हैं; जवाब के लिए ज़रूरी जानकारी ही AI मॉडल तक जाती है।',
+        'अपने PC से अंग्रेज़ी, हिंदी या हिंग्लिश में बात करें। Baby ऐप खोलता-बंद करता है, फ़ाइलें ढूँढता है, वेब ब्राउज़ करता है और लंबे काम बैकग्राउंड में करता है, और कुछ भी बदलने से पहले आपसे पूछता है। वेक फ़्रेज़ सुनना और आपकी आवाज़ को टेक्स्ट में बदलना आपके PC पर होता है, और आपकी चैट और मेमोरी वहीं सेव रहती हैं।',
       layout: [
         {
           eyebrow: 'Baby, Jainav की ओर से',
-          heading: 'Windows के लिए आपका निजी वॉइस असिस्टेंट।',
+          heading: 'Windows के लिए आपका पर्सनल वॉइस असिस्टेंट।',
           subheading: 'अपने PC से अंग्रेज़ी, हिंदी या हिंग्लिश में बात करें।',
         },
         {
           heading: 'आपके PC पर क्या रहता है',
           local: [
-            { text: 'वेक वर्ड' },
-            { text: 'स्पीच-टू-टेक्स्ट' },
-            { text: 'आवाज़' },
-            { text: 'मेमोरी' },
+            { text: 'वेक फ़्रेज़ के लिए सुनना' },
+            { text: 'आपकी आवाज़ को टेक्स्ट में बदलना' },
+            { text: 'Baby के बोले गए जवाब' },
+            { text: 'आपकी चैट, मेमोरी और सेटिंग्स' },
+            { text: 'आपकी API keys, जो सिर्फ़ अपने प्रोवाइडर को भेजी जाती हैं' },
+            { text: 'Baby जो फ़ाइलें पढ़ता है और कमांड के नतीजे (Full इंस्टॉल)' },
           ],
-          cloud: [{ text: 'AI मॉडल के लिए आपके अनुरोध का टेक्स्ट (और ज़रूरी मेमोरी संदर्भ)' }],
-          note: 'प्रकाशित करने से पहले पुष्टि की जाएगी।',
+          cloud: [
+            { text: 'आपके मैसेज, हाल की चैट और काम की मेमोरी, आपके चुने AI प्रोवाइडर तक' },
+            {
+              text: 'स्क्रीनशॉट, अगर आप स्क्रीन के बारे में पूछें और लोकल मॉडल जवाब न दे पाए (Google Gemini)',
+            },
+            { text: 'वेब सर्च और वे पेज जो आप Baby से खुलवाते हैं' },
+          ],
+          note: 'ज़्यादातर मैसेज का जवाब डिफ़ॉल्ट रूप से क्लाउड मॉडल देते हैं, क्योंकि वे तेज़ हैं। सिर्फ़-क्लाउड इंस्टॉल में लोकल मॉडल नहीं होता, इसलिए आप जो भी लिखते या बोलते हैं, वह टेक्स्ट बनकर आपके प्रोवाइडर तक जाता है। Full इंस्टॉल में key न डालें, तो हर जवाब आपके GPU से आता है। Jainav को कुछ नहीं भेजा जाता: न कोई अकाउंट है, न टेलीमेट्री।',
         },
         {
           heading: 'Baby क्या करता है',
           items: [
-            { title: 'वेक वर्ड' },
-            { title: 'डिवाइस पर स्पीच रिकग्निशन' },
-            { title: 'स्वाभाविक आवाज़' },
-            { title: 'अंग्रेज़ी, हिंदी और हिंग्लिश' },
-            { title: 'लोकल मेमोरी' },
-            { title: 'सुरक्षित, अनुमति-सूची वाले सिस्टम एक्शन' },
+            {
+              title: 'हैंड्स-फ़्री वॉइस',
+              text: 'स्पीच रिकग्निशन आपके PC पर चलती है। बीच में बोलकर Baby को रोक सकते हैं।',
+            },
+            { title: 'ऐप खोलता, बंद करता और बदलता है' },
+            { title: 'आपके PC पर फ़ाइलें ढूँढता है' },
+            {
+              title: 'वेब ब्राउज़ करता है',
+              text: 'आपके लिए पेज पढ़ता है, और किसी साइट पर क्लिक या टाइप करने से पहले एक बार पूछता है।',
+            },
+            {
+              title: 'बैकग्राउंड में काम करता है',
+              text: 'लंबा काम सौंपिए, बात करते रहिए, पूरा होते ही Baby बता देगा।',
+            },
+            {
+              title: 'आपकी बताई बातें याद रखता है',
+              text: 'रीस्टार्ट के बाद भी, आपके PC पर सेव। हटाने के लिए “forget that” कहें।',
+            },
+            {
+              title: 'अंग्रेज़ी, हिंदी और हिंग्लिश',
+              text: 'आपकी भाषा में जवाब देता है, हिंदी के लिए अलग आवाज़ में।',
+            },
+            {
+              title: 'कुछ भी बदलने से पहले पूछता है',
+              text: 'ख़तरनाक कमांड रोक दी जाती हैं, और हर एक्शन का रिकॉर्ड रहता है।',
+            },
+            {
+              title: 'ऑफ़लाइन भी चलता है',
+              text: 'Full इंस्टॉल में इंटरनेट जाने पर लोकल मॉडल काम संभाल लेता है।',
+            },
+          ],
+        },
+        {
+          heading: 'यह कैसे काम करता है',
+          steps: [
+            { title: 'वेक फ़्रेज़ बोलें', text: 'या Ctrl+Alt+B दबाएँ, या सीधे टाइप करें।' },
+            { title: 'अपने शब्दों में पूछें', text: 'अंग्रेज़ी, हिंदी या हिंग्लिश में।' },
+            {
+              title: 'Baby काम करता है',
+              text: 'आपके ऐप, फ़ाइलें और वेब इस्तेमाल करता है, और कुछ भी बदलने से पहले पूछता है।',
+            },
+            {
+              title: 'जवाब सुनें',
+              text: 'Baby बोलकर जवाब देता है, और एक्टिविटी फ़ीड में हर कदम दिखता है।',
+            },
+          ],
+        },
+        {
+          heading: 'सिस्टम की ज़रूरतें',
+          rows: [
+            { label: 'Windows', minimum: 'Windows 11, 64-bit' },
+            {
+              label: 'ग्राफ़िक्स',
+              minimum: 'कोई भी (सिर्फ़-क्लाउड इंस्टॉल)',
+              recommended: '8 GB VRAM वाला NVIDIA GPU (Full इंस्टॉल)',
+            },
+            {
+              label: 'डिस्क स्पेस',
+              minimum: 'लगभग 3 GB (सिर्फ़-क्लाउड)',
+              recommended: 'लगभग 8 GB (Full)',
+            },
+            {
+              label: 'इंटरनेट',
+              minimum: 'पहली बार चलाने के लिए ज़रूरी',
+              recommended: 'Full इंस्टॉल में बाद में ज़रूरी नहीं',
+            },
+            {
+              label: 'AI प्रोवाइडर की key',
+              minimum: 'OpenRouter key (सिर्फ़-क्लाउड)',
+              recommended: 'Full इंस्टॉल में ज़रूरी नहीं',
+            },
+            { label: 'माइक्रोफ़ोन', minimum: 'ज़रूरी नहीं; टाइप भी कर सकते हैं' },
+            { label: 'एडमिन अधिकार', minimum: 'इंस्टॉल के लिए ज़रूरी नहीं' },
           ],
         },
       ],
@@ -224,13 +463,13 @@ export const products: SeedDoc<'products'>[] = [
       slug: 'vyro',
       tagline: 'Know your machine.',
       summary:
-        'Live temperatures, fan speeds, voltages and clocks for your CPU, GPU, RAM, storage and motherboard, plus full system and multi-monitor details, in a light, fast app with animated gauges.',
+        'See what your Windows PC is doing right now, on animated gauges: usage, clocks, temperatures, power and fan speeds, with seven days of history, health checks and alerts. Gamers also get frame rates, an overlay on top of the game and replays of recent sessions.',
       type: 'desktop',
       category: 'pc-tools',
       platforms: ['windows'],
       status: 'beta', // {{CONFIRM}}
       hostingMode: 'hosted',
-      accentColor: '#0891B2', // placeholder
+      accentColor: '#4CC9F0', // VYRO's app accent
       primaryButton: { type: 'download', channel: 'stable' },
       // secondaryButton (Buy Pro) is linked to the Pro plan once plans exist (see seed.ts).
       featured: true,
@@ -246,7 +485,7 @@ export const products: SeedDoc<'products'>[] = [
         },
         {
           blockType: 'featureGrid',
-          heading: 'Every sensor, one glance',
+          heading: 'Your PC at a glance',
           items: [
             {
               icon: 'gauge',
@@ -256,32 +495,100 @@ export const products: SeedDoc<'products'>[] = [
             {
               icon: 'thermometer',
               title: 'Temperatures',
-              text: 'CPU, GPU, RAM, storage and motherboard.',
+              text: 'GPU and drives. CPU on AMD Ryzen, DDR5 memory on AMD systems, and the motherboard on supported MSI boards.',
             },
-            { icon: 'fan', title: 'Every fan speed' },
+            {
+              icon: 'fan',
+              title: 'Fan and pump speeds',
+              text: 'GPU fans, plus motherboard fans and pumps on supported MSI boards.',
+            },
             { icon: 'zap', title: 'Voltages and clocks' },
             { icon: 'cpu', title: 'Full system information' },
             { icon: 'monitor', title: 'Single and multi-monitor details' },
             {
               icon: 'scan-search',
               title: 'Reads sensors directly',
-              text: 'No third-party monitoring tools.',
+              text: 'No other monitoring app needed.',
             },
             {
               icon: 'feather',
               title: 'Low CPU and memory use',
-              text: 'Built with Rust and Tauri.',
+              text: 'Under 1% CPU on average with the window open, measured on our test PC with version 0.2.',
+            },
+            {
+              icon: 'chart-line',
+              title: '7 days of history',
+              text: 'Charts from the last 5 minutes to the last 7 days, recorded even while the app is closed.',
+            },
+            {
+              icon: 'bell',
+              title: 'Health checks and alerts',
+              text: 'Set a limit for any sensor and get a Windows notification when a reading crosses it.',
+            },
+            {
+              icon: 'sliders-horizontal',
+              title: 'Fan and pump control',
+              text: 'Your own fan curves, with safety limits. If anything goes wrong, the BIOS settings come back. Only on the MSI B650M GAMING PLUS WIFI for now.',
             },
           ],
         },
+        {
+          blockType: 'featureGrid',
+          heading: 'Made for gaming',
+          items: [
+            {
+              icon: 'gamepad-2',
+              title: 'Frame rate and overlay',
+              text: 'FPS, 1% lows and frame time, shown over borderless and windowed games. Nothing is injected into the game.',
+            },
+            {
+              icon: 'repeat',
+              title: 'Automatic game profiles',
+              text: 'Start a game and VYRO switches its profile, fan settings and overlay. Quit, and everything goes back.',
+            },
+            {
+              icon: 'rewind',
+              title: 'Session replay',
+              text: 'Replay your last 100 game sessions with markers for frame-rate drops, stutters and heat or power limits.',
+            },
+          ],
+        },
+        {
+          blockType: 'requirements',
+          heading: 'System requirements',
+          rows: [
+            {
+              label: 'Windows',
+              minimum: 'Windows 10 (21H2) or Windows 11, 64-bit (x64)',
+              recommended: 'Windows 11',
+            },
+            {
+              label: 'CPU sensors',
+              minimum: 'Any 64-bit CPU: usage and clocks',
+              recommended: 'AMD Ryzen: also temperature, power and voltage',
+            },
+            {
+              label: 'Motherboard sensors',
+              minimum: 'MSI board with a Nuvoton NCT6687 chip',
+              recommended: 'MSI B650M GAMING PLUS WIFI: also fan and pump control',
+            },
+            { label: 'Install', minimum: 'Administrator rights' },
+            { label: 'Disk space', minimum: 'Up to 200 MB for history' },
+          ],
+        },
         { blockType: 'pricing', heading: 'Free and Pro', source: 'plans' },
-        { blockType: 'download', heading: 'Download VYRO', channel: 'stable' },
+        {
+          blockType: 'download',
+          heading: 'Download VYRO',
+          channel: 'stable',
+          note: 'The installer isn’t code-signed yet, so Windows SmartScreen may warn before it runs. Setup also installs the PawnIO driver, which VYRO uses to read CPU, fan and memory sensors.',
+        },
       ],
     },
     hi: {
       tagline: 'अपनी मशीन को जानिए।',
       summary:
-        'आपके CPU, GPU, RAM, स्टोरेज और मदरबोर्ड का लाइव तापमान, फ़ैन स्पीड, वोल्टेज और क्लॉक, साथ ही पूरी सिस्टम और मल्टी-मॉनिटर जानकारी, एनिमेटेड गेज वाले हल्के और तेज़ ऐप में।',
+        'देखिए आपका Windows PC अभी क्या कर रहा है, एनिमेटेड गेज पर: इस्तेमाल, क्लॉक, तापमान, पावर और फ़ैन स्पीड, साथ में सात दिन की हिस्ट्री, हेल्थ चेक और अलर्ट। गेमर्स के लिए फ़्रेम रेट, गेम के ऊपर ओवरले और हाल के गेम सेशन का रीप्ले भी।',
       layout: [
         {
           eyebrow: 'VYRO, Jainav की ओर से',
@@ -289,23 +596,83 @@ export const products: SeedDoc<'products'>[] = [
           subheading: 'लाइव तापमान, फ़ैन स्पीड, वोल्टेज और क्लॉक, एक हल्के और तेज़ ऐप में।',
         },
         {
-          heading: 'हर सेंसर, एक नज़र में',
+          heading: 'आपका PC, एक नज़र में',
           items: [
             { title: 'एनिमेटेड CPU और GPU स्पीडोमीटर', text: 'लाइव क्लॉक स्पीड के साथ।' },
-            { title: 'तापमान', text: 'CPU, GPU, RAM, स्टोरेज और मदरबोर्ड।' },
-            { title: 'हर फ़ैन की स्पीड' },
+            {
+              title: 'तापमान',
+              text: 'GPU और ड्राइव; AMD Ryzen पर CPU, AMD सिस्टम पर DDR5 मेमोरी, और सपोर्टेड MSI बोर्ड पर मदरबोर्ड।',
+            },
+            {
+              title: 'फ़ैन और पंप की स्पीड',
+              text: 'GPU फ़ैन, और सपोर्टेड MSI बोर्ड पर मदरबोर्ड के फ़ैन और पंप भी।',
+            },
             { title: 'वोल्टेज और क्लॉक' },
             { title: 'पूरी सिस्टम जानकारी' },
             { title: 'सिंगल और मल्टी-मॉनिटर जानकारी' },
+            { title: 'सेंसर सीधे पढ़ता है', text: 'किसी दूसरे मॉनिटरिंग ऐप की ज़रूरत नहीं।' },
             {
-              title: 'सेंसर सीधे पढ़ता है',
-              text: 'किसी थर्ड-पार्टी मॉनिटरिंग टूल की ज़रूरत नहीं।',
+              title: 'कम CPU और मेमोरी उपयोग',
+              text: 'हमारे टेस्ट PC पर वर्ज़न 0.2 में, विंडो खुली रहने पर भी औसतन 1% से कम CPU।',
             },
-            { title: 'कम CPU और मेमोरी उपयोग', text: 'Rust और Tauri से बना।' },
+            {
+              title: '7 दिन की हिस्ट्री',
+              text: 'पिछले 5 मिनट से 7 दिन तक के चार्ट, ऐप बंद होने पर भी रिकॉर्ड होते रहते हैं।',
+            },
+            {
+              title: 'हेल्थ चेक और अलर्ट',
+              text: 'किसी भी सेंसर की सीमा तय करें; रीडिंग उसे पार करे तो Windows नोटिफ़िकेशन मिलेगा।',
+            },
+            {
+              title: 'फ़ैन और पंप कंट्रोल',
+              text: 'सुरक्षा सीमाओं के साथ अपने फ़ैन कर्व। कुछ गड़बड़ हो तो BIOS सेटिंग अपने-आप वापस आ जाती है। अभी सिर्फ़ MSI B650M GAMING PLUS WIFI पर।',
+            },
+          ],
+        },
+        {
+          heading: 'गेमिंग के लिए',
+          items: [
+            {
+              title: 'फ़्रेम रेट और ओवरले',
+              text: 'FPS, 1% low और फ़्रेम टाइम, बॉर्डरलेस और विंडो मोड वाले गेम के ऊपर। गेम के अंदर कुछ नहीं डाला जाता।',
+            },
+            {
+              title: 'अपने-आप बदलने वाली गेम प्रोफ़ाइल',
+              text: 'गेम शुरू करते ही VYRO प्रोफ़ाइल, फ़ैन सेटिंग और ओवरले बदल देता है। गेम बंद करते ही सब पहले जैसा।',
+            },
+            {
+              title: 'सेशन रीप्ले',
+              text: 'अपने पिछले 100 गेम सेशन दोबारा देखें, फ़्रेम ड्रॉप, स्टटर और हीट या पावर लिमिट के मार्कर के साथ।',
+            },
+          ],
+        },
+        {
+          heading: 'सिस्टम की ज़रूरतें',
+          rows: [
+            {
+              label: 'Windows',
+              minimum: 'Windows 10 (21H2) या Windows 11, 64-bit (x64)',
+              recommended: 'Windows 11',
+            },
+            {
+              label: 'CPU सेंसर',
+              minimum: 'कोई भी 64-bit CPU: इस्तेमाल और क्लॉक',
+              recommended: 'AMD Ryzen: साथ में तापमान, पावर और वोल्टेज',
+            },
+            {
+              label: 'मदरबोर्ड सेंसर',
+              minimum: 'Nuvoton NCT6687 चिप वाला MSI बोर्ड',
+              recommended: 'MSI B650M GAMING PLUS WIFI: साथ में फ़ैन और पंप कंट्रोल',
+            },
+            { label: 'इंस्टॉल', minimum: 'एडमिनिस्ट्रेटर अनुमति' },
+            { label: 'डिस्क स्पेस', minimum: 'हिस्ट्री के लिए 200 MB तक' },
           ],
         },
         { heading: 'Free और Pro' },
-        { heading: 'VYRO डाउनलोड करें' },
+        {
+          heading: 'VYRO डाउनलोड करें',
+          note: 'इंस्टॉलर अभी कोड-साइन नहीं है, इसलिए चलाने से पहले Windows SmartScreen चेतावनी दिखा सकता है। सेटअप PawnIO ड्राइवर भी इंस्टॉल करता है, जिससे VYRO CPU, फ़ैन और मेमोरी के सेंसर पढ़ता है।',
+        },
       ],
     },
   },
@@ -463,13 +830,19 @@ export const founder: SeedDoc<'team'> = {
   en: {
     name: 'Tanishq Jain',
     role: 'Founder',
-    bio: 'Software engineer, previously at Bosch Global Software Technologies (DevOps); Google Summer of Code 2022 contributor.', // {{CONFIRM_WORDING}}
+    // From Tanishq's resume and the MenuMesh and VYRO repos (2026-10-16); written without pronouns.
+    bio: 'Tanishq Jain founded Jainav Infotech and builds its products. MenuMesh is a QR table-ordering platform for restaurants, built with Next.js and Supabase, that takes an order from the guest’s phone through the kitchen to a GST bill. VYRO is a light Windows hardware monitor written in Rust and Svelte, with live sensors, history, health alerts and in-game frame rates. Baby is a voice assistant for Windows that keeps speech recognition and memory on the PC. Before Jainav, Tanishq spent a year and a half as a software engineer at Bosch Global Software Technologies in Bangalore, building CI/CD pipelines and moving services to Docker and Kubernetes, then built a complete online counselling platform as a freelancer, from bookings to Razorpay payments. Tanishq was selected for Google Summer of Code 2022 (the PEcAn project) and studied Computer Science and Engineering at Bangalore Institute of Technology.',
+    // {{FOUNDER_PHOTO}}: upload in the admin (Team → Tanishq Jain → Photo).
+    links: [
+      { label: 'LinkedIn', url: 'https://www.linkedin.com/in/tanishqjain010' },
+      { label: 'Instagram', url: 'https://www.instagram.com/tan.ishq_1605/' },
+    ],
     founder: true,
     sortOrder: 1,
   },
   hi: {
     role: 'संस्थापक',
-    bio: 'सॉफ़्टवेयर इंजीनियर, पहले Bosch Global Software Technologies (DevOps) में; Google Summer of Code 2022 योगदानकर्ता।',
+    bio: 'तनिष्क जैन Jainav Infotech के संस्थापक हैं, और इसके प्रोडक्ट इन्हीं के बनाए हैं। MenuMesh रेस्टोरेंट के लिए QR टेबल-ऑर्डरिंग प्लैटफ़ॉर्म है, जो Next.js और Supabase पर बना है और ऑर्डर को ग्राहक के फ़ोन से किचन होते हुए GST बिल तक ले जाता है। VYRO, Rust और Svelte में लिखा एक हल्का Windows हार्डवेयर मॉनिटर है, जिसमें लाइव सेंसर, हिस्ट्री, हेल्थ अलर्ट और गेम के फ़्रेम रेट दिखते हैं। Baby, Windows के लिए वॉइस असिस्टेंट है, जो स्पीच रिकग्निशन और मेमोरी PC पर ही रखता है। Jainav से पहले तनिष्क ने बेंगलुरु में Bosch Global Software Technologies में डेढ़ साल सॉफ़्टवेयर इंजीनियर के रूप में काम किया: CI/CD पाइपलाइन बनाईं और सर्विसेज़ को Docker और Kubernetes पर चलाया। फिर फ़्रीलांसर के तौर पर एक पूरा ऑनलाइन काउंसलिंग प्लैटफ़ॉर्म बनाया, बुकिंग से लेकर Razorpay पेमेंट तक। Google Summer of Code 2022 (PEcAn प्रोजेक्ट) में तनिष्क का चयन हुआ था, और पढ़ाई Bangalore Institute of Technology से कंप्यूटर साइंस एंड इंजीनियरिंग में की।',
   },
 }
 
@@ -554,7 +927,7 @@ const contactCta = {
     blockType: 'cta' as const,
     heading: 'Have a project in mind?',
     text: 'Tell us what you need and we’ll take it from there.',
-    primary: { label: 'Start a project', href: '/contact' },
+    primary: { label: 'Start a project', href: '/services#start' },
     showNewsletter: true,
   },
   hi: {
@@ -659,7 +1032,7 @@ export const pages: SeedDoc<'pages'>[] = [
           blockType: 'hero',
           headline: 'We built these. We can build yours.',
           subheadline: 'Custom software from the team behind MenuMesh, VYRO and Baby.',
-          primary: { label: 'Start a project', href: '/contact' },
+          primary: { label: 'Start a project', href: '/services#start' },
         },
         { blockType: 'servicesOverview', heading: 'What we do' },
         { blockType: 'process', heading: 'How we work', steps: processSteps.en },
@@ -739,6 +1112,15 @@ export const siteSettings = {
         '8A Brejeshwary annex, near bangali square, Indore, Madhya Pradesh, 452016',
       phone: '+91 92441 17127',
       whatsapp: '919244117127',
+      // One inbox for now: every form's alerts and replies go to it.
+      emails: {
+        hello: 'support@jainavinfotech.in',
+        sales: 'support@jainavinfotech.in',
+        support: 'support@jainavinfotech.in',
+        careers: 'support@jainavinfotech.in',
+        privacy: 'support@jainavinfotech.in',
+      },
+      businessHours: '9:00 am – 6:00 pm IST', // {{BUSINESS_DAYS}}
     },
     storeEnabled: false,
     maintenanceMode: false,
@@ -748,6 +1130,7 @@ export const siteSettings = {
     },
   },
   hi: {
+    company: { businessHours: 'सुबह 9:00 बजे से शाम 6:00 बजे तक (IST)' },
     defaultSeo: {
       title: 'Jainav Infotech',
       description: 'इंदौर, भारत से सॉफ़्टवेयर प्रोडक्ट और कस्टम सॉफ़्टवेयर।',

@@ -42,19 +42,19 @@ Tasks from spec §20. Each phase ends with all checks green, a phase report, and
 - [x] Global layout: header + mega-menu, footer + legal block, announcement bar.
 - [x] Home; Products hub (filters deferred until there are more than six products); product pages in both modes with every product block; button logic (§8.5); `/go/` redirects + counters; vanity redirects via the not-found handler (§8.6).
 - [x] Live preview in both languages.
-- [x] Hosted sub-pages: pricing (display only; buying disabled until `storeEnabled`), download, changelog, docs, support (FAQ; the contact form arrives in Phase 4).
+- [x] Hosted sub-pages: pricing (display only; buying disabled until `storeEnabled`), download, changelog, docs, support (FAQ + contact form, wired in Phase 4).
 - [x] Download endpoints + counters and the Tauri update feed (§12.5).
 - [x] Services (+ pillar pages), About, Contact (layout), Careers (+ JobPosting), Blog (+ RSS feeds), Changelog, Legal pages, 404 / 500 / maintenance.
 - [x] SEO: metadata, canonical / hreflang / sitemap per §6, robots, JSON-LD; share images.
 
 ### Phase 4 — Forms, leads and notifications
 
-- [ ] `privateFiles` collection (private bucket, signed URLs).
-- [ ] All forms (§13) with Turnstile, rate limits, honeypot and consent records; newsletter double opt-in and one-click unsubscribe.
-- [ ] Resend + React Email templates (English / Hindi): auto-replies, internal notifications, newsletter confirmation.
-- [ ] Telegram alerts.
-- [ ] Leads admin views and CSV export; data-request handling.
-- [ ] WhatsApp button; scheduler link.
+- [x] `privateFiles` collection (private bucket, signed URLs).
+- [x] All forms (§13) with Turnstile, rate limits, honeypot and consent records; newsletter double opt-in and one-click unsubscribe. (The privacy request form goes live with the `privacy-requests` legal page.)
+- [x] Resend + React Email templates (English / Hindi): auto-replies, internal notifications, newsletter confirmation.
+- [x] Telegram alerts.
+- [x] Leads admin views and CSV export; data-request handling.
+- [x] WhatsApp button; scheduler link.
 
 ### Phase 5 — Signature animations and polish
 
@@ -71,6 +71,7 @@ Tasks from spec §20. Each phase ends with all checks green, a phase report, and
 - [ ] Security headers / CSP (§16).
 - [ ] SPF / DKIM / DMARC.
 - [ ] Final content check; Owner publishes the legal pages (§8.13).
+- [ ] VYRO downloads: import the latest release from GitHub `nanu1605/vyro-releases` (v0.3.0 on 2026-10-16: `Vyro_0.3.0_x64_en-US.msi`, its updater signature in `latest.json`, checksums in `SHA256SUMS.txt`) as an installer + release; check the SHA-256 matches.
 
 ## Milestone C — VYRO store live (Launch 2)
 
