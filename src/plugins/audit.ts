@@ -17,7 +17,7 @@ const SKIP = new Set(['audit-log', 'daily-stats'])
  * so it must not hold them, or erasure requests could never be completed (spec §3, §16).
  * The id is enough. Team names are public staff bios and stay.
  */
-const PERSONAL = new Set(['leads', 'data-requests', 'users', 'testimonials'])
+const PERSONAL = new Set(['leads', 'data-requests', 'private-files', 'users', 'testimonials'])
 
 type Entry = {
   action: 'create' | 'update' | 'delete'

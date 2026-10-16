@@ -96,6 +96,7 @@ export interface Config {
     changelog: Changelog;
     leads: Lead;
     'data-requests': DataRequest;
+    'private-files': PrivateFile;
     'short-links': ShortLink;
     users: User;
     'audit-log': AuditLog;
@@ -129,6 +130,7 @@ export interface Config {
     changelog: ChangelogSelect<false> | ChangelogSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
     'data-requests': DataRequestsSelect<false> | DataRequestsSelect<true>;
+    'private-files': PrivateFilesSelect<false> | PrivateFilesSelect<true>;
     'short-links': ShortLinksSelect<false> | ShortLinksSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'audit-log': AuditLogSelect<false> | AuditLogSelect<true>;
@@ -1508,6 +1510,7 @@ export interface Lead {
     | number
     | boolean
     | null;
+  attachments?: (number | PrivateFile)[] | null;
   locale?: ('en' | 'hi') | null;
   source?: {
     page?: string | null;
@@ -1564,6 +1567,31 @@ export interface User {
     | null;
   password?: string | null;
   collection: 'users';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "private-files".
+ */
+export interface PrivateFile {
+  id: number;
+  purpose: 'cv' | 'invoice' | 'attachment';
+  owner?: {
+    relationTo: 'leads';
+    value: number | Lead;
+  } | null;
+  prefix?: string | null;
+  _objectKey?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1755,6 +1783,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'data-requests';
         value: number | DataRequest;
+      } | null)
+    | ({
+        relationTo: 'private-files';
+        value: number | PrivateFile;
       } | null)
     | ({
         relationTo: 'short-links';
@@ -2820,6 +2852,7 @@ export interface LeadsSelect<T extends boolean = true> {
   company?: T;
   message?: T;
   details?: T;
+  attachments?: T;
   locale?: T;
   source?:
     | T
@@ -2870,6 +2903,27 @@ export interface DataRequestsSelect<T extends boolean = true> {
   handledAt?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "private-files_select".
+ */
+export interface PrivateFilesSelect<T extends boolean = true> {
+  purpose?: T;
+  owner?: T;
+  prefix?: T;
+  _objectKey?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
