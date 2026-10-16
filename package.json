@@ -26,7 +26,8 @@
     "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap",
     "seed": "cross-env NODE_OPTIONS=--no-deprecation payload run scripts/seed/run.ts",
     "seed:publish": "cross-env NODE_OPTIONS=--no-deprecation payload run scripts/seed/publish.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "lhci": "lhci autorun"
   },
   "dependencies": {
     "@hookform/resolvers": "5.9.1",
@@ -65,6 +66,7 @@
     "@axe-core/playwright": "4.13.0",
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
+    "@lhci/cli": "0.15.1",
     "@playwright/test": "1.58.2",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/culori": "^4.0.1",
