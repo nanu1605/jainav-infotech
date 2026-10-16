@@ -3,6 +3,7 @@ import { hasLocale, NextIntlClientProvider } from 'next-intl'
 import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server'
 import { ThemeProvider } from 'next-themes'
 import { notFound } from 'next/navigation'
+import Script from 'next/script'
 import type { ReactNode } from 'react'
 
 import { Toaster } from '@/components/feedback/Toast'
@@ -10,6 +11,10 @@ import { routing } from '@/i18n/routing'
 import { SITE_URL } from '@/lib/seo'
 import { fontVariables } from '@/styles/fonts'
 import '@/styles/globals.css'
+
+// Umami (spec §17): self-hosted and cookie-free. Public pages only; off until both are set.
+const UMAMI_URL = process.env.NEXT_PUBLIC_UMAMI_URL?.replace(/\/$/, '')
+const UMAMI_ID = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID
 
 type Props = { children: ReactNode; params: Promise<{ locale: string }> }
 
@@ -57,6 +62,9 @@ export default async function LocaleLayout({ children, params }: Props) {
             <Toaster />
           </ThemeProvider>
         </NextIntlClientProvider>
+        {UMAMI_URL && UMAMI_ID && (
+          <Script src={`${UMAMI_URL}/script.js`} data-website-id={UMAMI_ID} strategy="lazyOnload" />
+        )}
       </body>
     </html>
   )

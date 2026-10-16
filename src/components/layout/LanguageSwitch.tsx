@@ -6,6 +6,7 @@ import { Fragment } from 'react'
 
 import { getPathname, usePathname } from '@/i18n/navigation'
 import { routing, type Locale } from '@/i18n/routing'
+import { track } from '@/lib/analytics'
 import { cn } from '@/lib/cn'
 
 /** Stores the visitor's language choice (spec §6). Storage can be unavailable (private mode). */
@@ -39,7 +40,10 @@ export function LanguageSwitch({ className }: { className?: string }) {
             lang={locale}
             hrefLang={locale}
             aria-current={locale === current ? 'true' : undefined}
-            onClick={() => rememberLocale(locale)}
+            onClick={() => {
+              rememberLocale(locale)
+              if (locale !== current) track('language_switch', { to: locale })
+            }}
             className="inline-flex h-10 min-w-10 items-center justify-center rounded-md px-2 text-fg-muted transition-colors duration-(--duration-fast) hover:text-fg aria-[current=true]:font-semibold aria-[current=true]:text-fg"
           >
             {t(locale)}
