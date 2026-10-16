@@ -74,12 +74,15 @@ async function ensure<S extends CollectionSlug>(
   return doc.id
 }
 
-// Square head-and-shoulders crop of Tanishq's portrait (2026-10-16), 800 px.
+// Tanishq's portrait (2026-10-16), cropped to 4:5 at 1200 × 1500.
 const FOUNDER_PHOTO = fileURLToPath(new URL('./assets/tanishq-jain.jpg', import.meta.url))
 
-/** Uploads the photo once; links it only when the founder has none. */
-async function ensureFounderPhoto(payload: Payload, summary: SeedSummary, founderId: number) {
-  const label = 'media:tanishq-jain'
+/**
+ * The founder section's photo and quote, added once (the uploaded photo marks it done) and only
+ * where the founder has none, so databases seeded before them get them too.
+ */
+async function ensureFounderFeature(payload: Payload, summary: SeedSummary, founderId: number) {
+  const label = 'team:founder-feature'
   // `like`: Payload renames the file (tanishq-jain-1.jpg) when the name is taken on disk.
   const found = await payload.find({
     collection: 'media',
@@ -94,7 +97,8 @@ async function ensureFounderPhoto(payload: Payload, summary: SeedSummary, founde
   }
   const photo = await payload.create({
     collection: 'media',
-    data: { alt: 'Tanishq Jain' },
+    // Focal point on the face, for square and small crops.
+    data: { alt: 'Tanishq Jain', focalX: 50, focalY: 30 },
     filePath: FOUNDER_PHOTO,
     locale: 'en',
     depth: 0,
@@ -110,21 +114,31 @@ async function ensureFounderPhoto(payload: Payload, summary: SeedSummary, founde
     context,
     overrideAccess: true,
   })
-  const founder = await payload.findByID({
-    collection: 'team',
-    id: founderId,
-    depth: 0,
-    overrideAccess: true,
-  })
-  if (!founder.photo) {
-    await payload.update({
+  const quotes = { en: content.founder.en.quote, hi: content.founder.hi.quote as string }
+  for (const locale of ['en', 'hi'] as const) {
+    const founder = await payload.findByID({
       collection: 'team',
       id: founderId,
-      data: { photo: photo.id },
+      locale,
+      fallbackLocale: false,
       depth: 0,
-      context,
       overrideAccess: true,
     })
+    const data = {
+      ...(locale === 'en' && !founder.photo && { photo: photo.id }),
+      ...(!founder.quote && { quote: quotes[locale] }),
+    }
+    if (Object.keys(data).length) {
+      await payload.update({
+        collection: 'team',
+        id: founderId,
+        data,
+        locale,
+        depth: 0,
+        context,
+        overrideAccess: true,
+      })
+    }
   }
   summary.created.push(label)
 }
@@ -239,7 +253,7 @@ export async function seed(payload: Payload): Promise<SeedSummary> {
     draft: false,
     ...content.founder,
   })
-  await ensureFounderPhoto(payload, summary, founderId)
+  await ensureFounderFeature(payload, summary, founderId)
 
   for (const doc of content.faqs) {
     await ensure(payload, summary, {

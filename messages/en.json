@@ -328,6 +328,9 @@
     },
     "mesh": {
       "pause": "Pause background animation"
+    },
+    "team": {
+      "aboutFounder": "About our founder"
     }
   },
   "styleguide": {

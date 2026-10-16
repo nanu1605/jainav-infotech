@@ -1191,7 +1191,14 @@ export interface Team {
   id: number;
   name: string;
   role?: string | null;
+  /**
+   * A blank line starts a new paragraph.
+   */
   bio?: string | null;
+  /**
+   * Founder section: shown on the photo.
+   */
+  quote?: string | null;
   photo?: (number | null) | Media;
   links?:
     | {
@@ -2211,6 +2218,7 @@ export interface TeamSelect<T extends boolean = true> {
   name?: T;
   role?: T;
   bio?: T;
+  quote?: T;
   photo?: T;
   links?:
     | T

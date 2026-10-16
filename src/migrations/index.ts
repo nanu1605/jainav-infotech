@@ -3,6 +3,7 @@ import * as migration_20261016_041511_site_settings_business_hours from './20261
 import * as migration_20261016_064507_phase4_private_files from './20261016_064507_phase4_private_files';
 import * as migration_20261016_101604_phase5_voice_samples from './20261016_101604_phase5_voice_samples';
 import * as migration_20261016_112233_phase5_voice_sample_lang from './20261016_112233_phase5_voice_sample_lang';
+import * as migration_20261016_130245_phase5_team_quote from './20261016_130245_phase5_team_quote';
 
 export const migrations = [
   {
@@ -28,6 +29,11 @@ export const migrations = [
   {
     up: migration_20261016_112233_phase5_voice_sample_lang.up,
     down: migration_20261016_112233_phase5_voice_sample_lang.down,
-    name: '20261016_112233_phase5_voice_sample_lang'
+    name: '20261016_112233_phase5_voice_sample_lang',
+  },
+  {
+    up: migration_20261016_130245_phase5_team_quote.up,
+    down: migration_20261016_130245_phase5_team_quote.down,
+    name: '20261016_130245_phase5_team_quote'
   },
 ];
