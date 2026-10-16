@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { hasLocale, NextIntlClientProvider } from 'next-intl'
-import { getTranslations, setRequestLocale } from 'next-intl/server'
+import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server'
 import { ThemeProvider } from 'next-themes'
 import { notFound } from 'next/navigation'
 import type { ReactNode } from 'react'
@@ -12,6 +12,12 @@ import { fontVariables } from '@/styles/fonts'
 import '@/styles/globals.css'
 
 type Props = { children: ReactNode; params: Promise<{ locale: string }> }
+
+/**
+ * Namespaces client components read. Everything else stays on the server, so page text isn't
+ * shipped twice in every page's payload. A client component using another namespace needs it here.
+ */
+const CLIENT_MESSAGES = ['site', 'language', 'theme', 'ui', 'contact', 'system'] as const
 
 // CI builds images without a database: render on first request instead (spec §4.3).
 export function generateStaticParams() {
@@ -28,11 +34,14 @@ export default async function LocaleLayout({ children, params }: Props) {
   const { locale } = await params
   if (!hasLocale(routing.locales, locale)) notFound()
   setRequestLocale(locale)
+  const messages = await getMessages()
 
   return (
     <html lang={locale} className={fontVariables} suppressHydrationWarning>
       <body className="min-h-dvh bg-bg text-fg">
-        <NextIntlClientProvider>
+        <NextIntlClientProvider
+          messages={Object.fromEntries(CLIENT_MESSAGES.map((key) => [key, messages[key]]))}
+        >
           <ThemeProvider
             attribute="data-theme"
             defaultTheme="system"

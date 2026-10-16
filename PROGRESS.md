@@ -39,13 +39,13 @@ Tasks from spec §20. Each phase ends with all checks green, a phase report, and
 
 ### Phase 3 — Public pages
 
-- [ ] Global layout: header + mega-menu, footer + legal block, announcement bar.
-- [ ] Home; Products hub; product pages in both modes with every product block; button logic (§8.5); `/go/` redirects + counters; vanity redirects via the not-found handler (§8.6).
-- [ ] Live preview in both languages.
-- [ ] Hosted sub-pages: pricing (display only; buying disabled until `storeEnabled`), download, changelog, docs, support (FAQ + contact form).
-- [ ] Download endpoints + counters and the Tauri update feed (§12.5).
-- [ ] Services (+ pillar pages), About, Contact (layout), Careers (+ JobPosting), Blog (+ RSS feeds), Changelog, Legal pages, 404 / 500 / maintenance.
-- [ ] SEO: metadata, canonical / hreflang / sitemap per §6, robots, JSON-LD; share images.
+- [x] Global layout: header + mega-menu, footer + legal block, announcement bar.
+- [x] Home; Products hub (filters deferred until there are more than six products); product pages in both modes with every product block; button logic (§8.5); `/go/` redirects + counters; vanity redirects via the not-found handler (§8.6).
+- [x] Live preview in both languages.
+- [x] Hosted sub-pages: pricing (display only; buying disabled until `storeEnabled`), download, changelog, docs, support (FAQ; the contact form arrives in Phase 4).
+- [x] Download endpoints + counters and the Tauri update feed (§12.5).
+- [x] Services (+ pillar pages), About, Contact (layout), Careers (+ JobPosting), Blog (+ RSS feeds), Changelog, Legal pages, 404 / 500 / maintenance.
+- [x] SEO: metadata, canonical / hreflang / sitemap per §6, robots, JSON-LD; share images.
 
 ### Phase 4 — Forms, leads and notifications
 

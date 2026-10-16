@@ -9,6 +9,9 @@ import { getPostTags } from '@/lib/queries'
 type Props = { params: Promise<{ locale: string; tag: string }> }
 
 /** Posts with one tag. ponytail: all on one page; paginate once a tag has 100+ posts. */
+// Rendered on first request, then cached like the other pages (no params known at build).
+export const generateStaticParams = () => []
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, tag } = await params
   return blogMetadata(locale as Locale, { tag: decodeURIComponent(tag) })

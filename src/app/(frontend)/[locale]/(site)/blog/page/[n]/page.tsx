@@ -10,6 +10,9 @@ type Props = { params: Promise<{ locale: string; n: string }> }
 /** Page 2 and later; page 1 is /blog itself, so it has one URL. */
 const pageNumber = (n: string) => (/^[2-9]\d{0,3}$|^1\d{1,3}$/.test(n) ? Number(n) : null)
 
+// Rendered on first request, then cached like the other pages (no params known at build).
+export const generateStaticParams = () => []
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, n } = await params
   const page = pageNumber(n)

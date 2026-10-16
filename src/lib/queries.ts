@@ -400,7 +400,7 @@ export const getLegalPage = (locale: Locale, slug: string) =>
 export const getRoutable = () =>
   read(
     'en',
-    ['pages', 'products', 'services', 'posts', 'jobs', 'legal-pages'],
+    ['pages', 'products', 'services', 'posts', 'jobs', 'legal-pages', 'docs'],
     ['routable'],
     async (payload, v) => {
       const select = { slug: true, hiStatus: true, updatedAt: true } as const
@@ -408,7 +408,7 @@ export const getRoutable = () =>
         payload
           .find({ collection, depth: 0, pagination: false, select, ...as(v) })
           .then((r) => r.docs)
-      const [pages, services, posts, jobs, legal, products] = await Promise.all([
+      const [pages, services, posts, jobs, legal, products, docs] = await Promise.all([
         all('pages'),
         all('services'),
         all('posts'),
@@ -423,8 +423,17 @@ export const getRoutable = () =>
             ...as(v),
           })
           .then((r) => r.docs),
+        payload
+          .find({
+            collection: 'docs',
+            depth: 0,
+            pagination: false,
+            select: { ...select, parent: true, product: true },
+            ...as(v),
+          })
+          .then((r) => r.docs),
       ])
-      return { pages, services, posts, jobs, legal, products }
+      return { pages, services, posts, jobs, legal, products, docs }
     },
     { visitor: true },
   )

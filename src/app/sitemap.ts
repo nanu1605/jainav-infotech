@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 
 import { getRoutable } from '@/lib/queries'
-import { hostedProductSubpaths, publicPath } from '@/lib/routes'
+import { docPaths, hostedProductSubpaths, publicPath } from '@/lib/routes'
 import { sitemapEntries } from '@/lib/seo'
 
 // Built on request and cached with the content tags, so publishing updates it (and CI builds
@@ -13,7 +13,11 @@ const CODE_PAGES = ['/products', '/contact', '/careers', '/blog', '/changelog']
 
 /** sitemap.xml (spec §6, §15): every published page; Hindi only where it is ready. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const { pages, services, posts, jobs, legal, products } = await getRoutable()
+  const { pages, services, posts, jobs, legal, products, docs } = await getRoutable()
+  const docPath = docPaths(docs)
+  const hosted = new Map(
+    products.filter((p) => p.hostingMode === 'hosted').map((p) => [p.id, p.slug]),
+  )
   const home = pages.find((p) => p.slug === 'home')
   const servicesPage = pages.find((p) => p.slug === 'services')
 
@@ -63,5 +67,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: l.updatedAt,
       }),
     ),
+    ...docs.flatMap((d) => {
+      const product = hosted.get(typeof d.product === 'object' ? d.product.id : d.product)
+      const path = docPath.get(d.id)
+      if (!product || !path) return []
+      return sitemapEntries(`/products/${product}/docs/${path.join('/')}`, {
+        hiStatus: d.hiStatus,
+        lastModified: d.updatedAt,
+      })
+    }),
   ]
 }
