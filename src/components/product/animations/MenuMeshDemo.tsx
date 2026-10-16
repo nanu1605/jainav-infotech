@@ -65,7 +65,7 @@ function VegMark({ veg }: { veg: boolean }) {
  * scroll. Renders its own 4:3 panel (4:5 on phones) sized by container units, so it never shifts
  * layout. The server renders the still menu scene; scroll writes opacity/transform straight to
  * the parts (no React renders per frame). Reduced motion keeps the still, with the kitchen ticket
- * shown beside it. Expects the product accent vars (accentVars) on an ancestor.
+ * shown beside it (on phones, over the starters and without the QR card). Expects the product accent vars (accentVars) on an ancestor.
  */
 export function MenuMeshDemo() {
   const t = useTranslations('ui.demo.menumesh')
@@ -90,17 +90,19 @@ export function MenuMeshDemo() {
 
     let range = { start: 0, end: 1 }
     let last = -1
-    const update = () => {
-      const progress = localProgress(scrollY.get(), range)
+    const update = (y: number) => {
+      const progress = localProgress(y, range)
       if (progress !== last) paint((last = progress))
     }
-    // Layout is read only here, never per scroll frame.
+    // Layout is read only here, never per scroll frame. It uses the live window.scrollY: the
+    // motion value is still 0 until useScroll's first frame read, so a page already scrolled at
+    // hydration (reload, back/forward, slow chunk) would otherwise get a range off by that much.
     // ponytail: re-measured on resize only; a hero whose height changes later (late font swap)
     // plays slightly early or late until the next resize. Add a ResizeObserver if that shows.
     const measure = () => {
       const box = root.getBoundingClientRect()
-      range = playRange(box.top + scrollY.get(), box.height, innerHeight)
-      update()
+      range = playRange(box.top + window.scrollY, box.height, innerHeight)
+      update(window.scrollY)
     }
     measure()
     addEventListener('resize', measure)
@@ -126,8 +128,9 @@ export function MenuMeshDemo() {
       >
         <div className="absolute inset-0 bg-product-accent opacity-10" />
 
-        {/* Step captions, stacked in one cell so the largest sizes it. */}
-        <div className="absolute top-[3.5%] left-[4%] grid motion-reduce:hidden">
+        {/* Step captions, stacked in one cell so the largest sizes it. They sit at the bottom edge,
+            which stays below the sticky header for the whole range, and never go under 14px. */}
+        <div className="absolute bottom-[2.5%] left-[4%] grid text-[length:max(2.2cqh,0.875rem)] motion-reduce:hidden">
           {SCENES.map((scene, i) => (
             <p
               key={scene}
@@ -143,7 +146,7 @@ export function MenuMeshDemo() {
         </div>
 
         {/* Phone */}
-        <div className="absolute inset-x-0 bottom-[2.5em] mx-auto h-[38em] w-[18.5em] rounded-[2.6em] border border-border-strong bg-bg-subtle p-[0.4em] shadow-lg">
+        <div className="absolute inset-x-0 top-[2.5em] mx-auto h-[38em] w-[18.5em] rounded-[2.6em] border border-border-strong bg-bg-subtle p-[0.4em] shadow-lg">
           <div className="relative flex h-full flex-col overflow-hidden rounded-[2.2em] bg-surface ring-1 ring-border">
             <div className="flex h-[1.6em] shrink-0 items-center justify-center">
               <span className="h-[0.45em] w-[4em] rounded-full bg-border" />
@@ -196,7 +199,7 @@ export function MenuMeshDemo() {
                             <span className="truncate">{t(`dishes.${dish.key}.name`)}</span>
                           </p>
                           <p className="text-[0.85em] font-medium">{price(dish.paise)}</p>
-                          <p className="truncate text-[0.72em] text-fg-muted">
+                          <p className="line-clamp-2 text-[0.72em] text-fg-muted">
                             {t(`dishes.${dish.key}.description`)}
                           </p>
                         </div>
@@ -225,13 +228,13 @@ export function MenuMeshDemo() {
 
               <div
                 {...part('cart')}
-                className="absolute inset-x-[0.7em] bottom-[0.7em] flex h-[3.4em] items-center justify-between gap-[0.5em] rounded-[0.8em] bg-product-accent px-[0.9em] text-[0.85em] font-semibold whitespace-nowrap text-product-accent-fg shadow-md"
+                className="absolute inset-x-[0.7em] bottom-[0.7em] flex h-[3.4em] items-center justify-between gap-[0.5em] rounded-[0.8em] bg-product-accent px-[0.7em] text-[0.85em] font-semibold whitespace-nowrap text-product-accent-fg shadow-md"
               >
-                <span className="flex min-w-0 items-center gap-[0.4em]">
+                {/* Only the item count may truncate; the total always shows in full. */}
+                <span className="flex min-w-0 items-center gap-[0.3em]">
                   <ShoppingBag className="size-[1.1em] shrink-0" />
-                  <span className="truncate">
-                    {t('items')} · {price(TOTAL)}
-                  </span>
+                  <span className="truncate">{t('items')} ·</span>
+                  <span className="shrink-0">{price(TOTAL)}</span>
                 </span>
                 <span className="grid justify-items-end">
                   <span {...part('cart-order')} className="flex items-center [grid-area:1/1]">
@@ -254,7 +257,7 @@ export function MenuMeshDemo() {
         {/* The table's QR card (scene 1) */}
         <div
           {...part('qr')}
-          className="absolute bottom-[8%] left-[5%] w-[10.5em] -rotate-3 rounded-[0.9em] border border-border bg-surface-raised p-[0.9em] text-center shadow-lg"
+          className="absolute bottom-[12%] left-[5%] w-[10.5em] motion-reduce:max-sm:hidden -rotate-3 rounded-[0.9em] border border-border bg-surface-raised p-[0.9em] text-center shadow-lg"
         >
           <p className="text-[1.05em] font-bold">{t('table')}</p>
           <div className="relative mx-auto my-[0.5em] size-[7.4em] p-[0.4em]">
@@ -284,10 +287,11 @@ export function MenuMeshDemo() {
           <p className="text-[0.75em] text-fg-muted">{t('scanToOrder')}</p>
         </div>
 
-        {/* The kitchen screen's new ticket (scene 4); shown statically with reduced motion. */}
+        {/* The kitchen screen's new ticket (scene 4); shown statically with reduced motion, over
+            the starters on phones (no room beside the phone there) so the ordered dishes show. */}
         <div
           {...part('ticket')}
-          className="absolute right-[4%] bottom-[14%] w-[17em] overflow-hidden rounded-[0.9em] border border-border bg-surface-raised shadow-lg motion-reduce:opacity-100! motion-reduce:transform-none!"
+          className="absolute right-[4%] bottom-[14%] w-[17em] overflow-hidden rounded-[0.9em] border border-border bg-surface-raised shadow-lg motion-reduce:opacity-100! motion-reduce:transform-none! motion-reduce:max-sm:bottom-[42%]"
         >
           <div className="flex h-[2.4em] items-center gap-[0.4em] border-b border-border bg-bg-subtle px-[0.9em] text-[0.85em] font-semibold">
             <ChefHat className="size-[1.1em] text-product-accent-text" />

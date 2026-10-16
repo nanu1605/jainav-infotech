@@ -321,8 +321,13 @@
             "you": "Background mein top 3 EVs under 15 lakh research karo.",
             "baby": "Theek hai, shuru kar diya. Ho jaate hi bata dunga."
           }
-        }
+        },
+        "pause": "एनिमेशन रोकें",
+        "play": "एनिमेशन चलाएँ"
       }
+    },
+    "mesh": {
+      "pause": "बैकग्राउंड एनिमेशन रोकें"
     }
   },
   "styleguide": {

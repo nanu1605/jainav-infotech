@@ -6,7 +6,10 @@ import { FINE_POINTER } from '@/lib/motion'
 
 import { pointerRatio } from './Tilt'
 
-/** Extra blobs: soft radial fills built from tokens (no blur filter needed). */
+/**
+ * Extra blobs: soft radial fills built from tokens. Never put a blur filter on a drifting layer:
+ * it is redrawn every frame.
+ */
 const GLOW = 'radial-gradient(closest-side, var(--glow), transparent)'
 const ACCENT =
   'radial-gradient(closest-side, color-mix(in oklch, var(--brand-accent) 25%, transparent), transparent)'
@@ -18,7 +21,9 @@ const ACCENT =
  * The server HTML is the still frame (the base gradient and the original top glow at rest), so
  * first paint never waits for JS. Blobs drift with CSS keyframes on `transform` and lean toward a
  * fine mouse pointer on `translate` (custom properties set here; `.mesh-blob` in globals.css).
- * The drift pauses off-screen and in hidden tabs; with reduced motion nothing moves.
+ * The drift pauses off-screen, in hidden tabs and with the host's pause toggle (a
+ * `[data-mesh-pause]` checkbox label beside the mesh, see the page Hero); with reduced motion
+ * nothing moves.
  */
 export function GradientMesh() {
   const ref = useRef<HTMLDivElement>(null)
@@ -66,7 +71,10 @@ export function GradientMesh() {
       <div className="absolute inset-0 bg-(image:--gradient-3)" />
       {/* Blobs fade out toward the bottom, so the hero never ends on a cut-off tint. */}
       <div className="absolute inset-0 mask-b-from-50%">
-        <div className="mesh-blob absolute -top-40 left-1/2 h-[36rem] w-[64rem] max-w-none rounded-full bg-(image:--gradient-1) opacity-20 blur-3xl [--drift:26s] [--pull:3rem] [--tx:-50%] dark:opacity-25" />
+        {/* The blur sits on a still child, so it is drawn into the layer once; only the layer moves. */}
+        <div className="mesh-blob absolute -top-40 left-1/2 h-[36rem] w-[64rem] max-w-none opacity-20 [--drift:26s] [--pull:3rem] [--tx:-50%] dark:opacity-25">
+          <div className="size-full rounded-full bg-(image:--gradient-1) blur-3xl" />
+        </div>
         <div
           className="mesh-blob absolute top-0 -right-56 size-[40rem] rounded-full opacity-60 [--drift:34s] [--pull:-2rem] [animation-direction:reverse] dark:opacity-40"
           style={{ backgroundImage: GLOW }}

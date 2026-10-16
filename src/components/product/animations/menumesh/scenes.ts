@@ -16,6 +16,9 @@ const MIN_RANGE = 240
  * Page-scroll range (px) over which the demo plays, from the element's page offset and height.
  * It starts once the element is fully in view, or at the page top for a hero above the fold,
  * so the first frame is what loads; it ends as the element's top reaches the top of the viewport.
+ * By then the top is under the 4rem sticky header, so the step captions sit at the bottom edge,
+ * which stays in view for the whole range. A larger MIN_RANGE would push that edge under the
+ * header on short landscape phones, where the panel is taller than the viewport.
  */
 export function playRange(top: number, height: number, viewport: number) {
   const start = Math.max(0, top + height - viewport)

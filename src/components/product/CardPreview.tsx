@@ -4,7 +4,10 @@ import { useEffect, useRef } from 'react'
 
 import { FINE_POINTER } from '@/lib/motion'
 
-type Player = Pick<HTMLVideoElement, 'play' | 'pause' | 'currentTime'>
+type Player = Pick<HTMLVideoElement, 'play' | 'pause' | 'currentTime' | 'ended'>
+
+/** Touch previews start on their own, so they stop before 5 s (WCAG 2.2.2); timeupdate is ~4 Hz. */
+export const TOUCH_LIMIT_S = 4.75
 
 // One preview plays at a time across the page (spec §14). `inView` holds the touch-mode cards that
 // are at least 60% visible, newest last; the newest one plays.
@@ -43,6 +46,11 @@ export function viewPreview(video: Player, visible: boolean) {
   else if (current) stop(current)
 }
 
+/** Touch mode: stops the clip at its end or at TOUCH_LIMIT_S; scrolling it back in replays it. */
+export function limitPreview(video: Player) {
+  if (video.ended || video.currentTime >= TOUCH_LIMIT_S) stop(video)
+}
+
 function pauseWhenHidden() {
   if (listening) return
   listening = true
@@ -56,10 +64,11 @@ const saveData = () =>
   (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true
 
 /**
- * Muted preview loop over the product card's top area. Must be a direct child of the card (it
- * listens on its parent). Loads nothing until it first plays (`preload="none"`, invisible until
- * `playing`), so the logo underneath is the still frame. Never plays with reduced motion or
- * Save-Data. Absolutely positioned: no layout shift.
+ * Muted preview over the product card's top area. It loops while a mouse hovers the card; in touch
+ * mode it plays once, for at most TOUCH_LIMIT_S, whenever its card becomes the one in view. Must
+ * be a direct child of the card (it listens on its parent). Loads nothing until it first plays
+ * (`preload="none"`, invisible until `playing`), so the logo underneath is the still frame. Never
+ * plays with reduced motion or Save-Data. Absolutely positioned: no layout shift.
  */
 export function CardPreview({ src }: { src: string }) {
   const ref = useRef<HTMLVideoElement>(null)
@@ -86,13 +95,20 @@ export function CardPreview({ src }: { src: string }) {
       }
     }
 
+    video.loop = false
+    const limit = () => limitPreview(video)
+    video.addEventListener('timeupdate', limit)
+    video.addEventListener('ended', limit)
+    // A delayed callback can batch several changes: the last entry is the current one.
     const io = new IntersectionObserver(
-      ([entry]) => viewPreview(video, (entry?.intersectionRatio ?? 0) >= 0.6),
+      (entries) => viewPreview(video, (entries.at(-1)?.intersectionRatio ?? 0) >= 0.6),
       { threshold: [0, 0.6] },
     )
     io.observe(card)
     return () => {
       io.disconnect()
+      video.removeEventListener('timeupdate', limit)
+      video.removeEventListener('ended', limit)
       viewPreview(video, false)
     }
   }, [])

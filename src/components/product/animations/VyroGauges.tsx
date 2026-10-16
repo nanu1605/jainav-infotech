@@ -60,6 +60,14 @@ const PIVOT: CSSProperties = {
 }
 const SWING = 'transition-transform duration-[var(--duration-slow)] ease-in-out'
 const turnVar = (value: number) => ({ '--turn': `${turn(value)}deg` }) as CSSProperties
+// SVG type scales with the box: in a phone-width box (under 28rem) labels get larger CSS sizes,
+// which override the fontSize attributes, and the 0–100 scale labels hide (the ticks stay).
+const PHONE = {
+  scale: '@max-md:hidden',
+  title: '@max-md:text-[16px]',
+  label: '@max-md:text-[15px]',
+  temp: '@max-md:text-[20px]',
+}
 
 const subscribeVisibility = (onChange: () => void) => {
   document.addEventListener('visibilitychange', onChange)
@@ -138,7 +146,10 @@ export function VyroGauges({ className }: { className?: string }) {
   )
 
   return (
-    <div ref={root} className={cn('relative aspect-[4/3] w-full rounded-xl shadow-lg', className)}>
+    <div
+      ref={root}
+      className={cn('@container relative aspect-[4/3] w-full rounded-xl shadow-lg', className)}
+    >
       <div
         data-theme="dark"
         className="absolute inset-0 overflow-hidden rounded-[inherit] border border-border bg-bg text-fg"
@@ -247,7 +258,7 @@ export function VyroGauges({ className }: { className?: string }) {
                       textAnchor="middle"
                       dominantBaseline="central"
                       fontSize={9}
-                      className="fill-fg-muted"
+                      className={cn('fill-fg-muted', PHONE.scale)}
                     >
                       {nf.format(v)}
                     </text>
@@ -258,7 +269,7 @@ export function VyroGauges({ className }: { className?: string }) {
                     textAnchor="middle"
                     fontSize={11}
                     fontWeight={600}
-                    className="fill-fg-muted"
+                    className={cn('fill-fg-muted', PHONE.title)}
                   >
                     {t(g.key)}
                   </text>
@@ -272,7 +283,7 @@ export function VyroGauges({ className }: { className?: string }) {
                     <tspan data-key={g.key} fontSize={34}>
                       {nf.format(FIRST[g.key])}
                     </tspan>
-                    <tspan fontSize={14} className="fill-fg-muted">
+                    <tspan fontSize={14} className={cn('fill-fg-muted', PHONE.label)}>
                       {t('percent')}
                     </tspan>
                   </text>
@@ -282,7 +293,7 @@ export function VyroGauges({ className }: { className?: string }) {
                     textAnchor="middle"
                     fontSize={13}
                     fontWeight={600}
-                    className={g.fill}
+                    className={cn(g.fill, PHONE.title)}
                   >
                     <tspan data-key={g.mhz}>{nf.format(FIRST[g.mhz])}</tspan> {t('mhz')}
                   </text>
@@ -298,7 +309,13 @@ export function VyroGauges({ className }: { className?: string }) {
               rx={10}
               className="fill-surface stroke-border"
             />
-            <text x={GRAPH.x} y={224} fontSize={11} fontWeight={600} className="fill-fg-muted">
+            <text
+              x={GRAPH.x}
+              y={224}
+              fontSize={11}
+              fontWeight={600}
+              className={cn('fill-fg-muted', PHONE.label)}
+            >
               {t('temperature')}
             </text>
             <text
@@ -308,10 +325,10 @@ export function VyroGauges({ className }: { className?: string }) {
               fontWeight={600}
               className="fill-fg"
             >
-              <tspan data-key="temp" fontSize={15}>
+              <tspan data-key="temp" fontSize={15} className={PHONE.temp}>
                 {nf.format(FIRST.temp)}
               </tspan>
-              <tspan fontSize={11} className="fill-fg-muted">
+              <tspan fontSize={11} className={cn('fill-fg-muted', PHONE.label)}>
                 {` ${t('celsius')}`}
               </tspan>
             </text>

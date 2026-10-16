@@ -19,8 +19,9 @@ export function useReveal(ref: RefObject<Element | null>): RevealPhase {
     const el = ref.current
     if (!el || prefersReducedMotion() || el.getBoundingClientRect().top < window.innerHeight) return
     const io = new IntersectionObserver(
-      ([entry]) => {
-        const visible = !!entry?.isIntersecting
+      (entries) => {
+        // Entries can be batched: the last one is the current state.
+        const visible = !!entries.at(-1)?.isIntersecting
         setPhase(visible ? 'shown' : 'hidden')
         if (visible) io.disconnect()
       },

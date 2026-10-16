@@ -22,6 +22,20 @@ describe('MenuMesh demo scroll range', () => {
     expect(localProgress(range.start - 50, range)).toBe(0)
     expect(localProgress(range.end + 50, range)).toBe(1)
   })
+
+  it('keeps the bottom edge, where the captions sit, below the 4rem sticky header while playing', () => {
+    // Desktop hero above the fold, phone hero below it, landscape phone with a panel taller than
+    // the viewport. 40px is the caption strip (a 14px caption plus its offset).
+    for (const [top, height, viewport] of [
+      [160, 438, 800],
+      [600, 429, 812],
+      [100, 573, 375],
+    ] as const) {
+      const { start, end } = playRange(top, height, viewport)
+      expect(top + height - start).toBeLessThanOrEqual(viewport)
+      expect(top + height - end).toBeGreaterThan(64 + 40)
+    }
+  })
 })
 
 describe('MenuMesh demo frames', () => {

@@ -32,7 +32,7 @@ type Props = {
  * Product card for the products hub, mega-menu and home showcase (spec §8.3): logo, name, tagline,
  * status and platforms, with a glow in the product's accent color. The name's link covers the
  * whole card; the card shows the focus ring. Tilt and the cursor spotlight are mouse-only. A
- * preview video plays on hover (mouse) or in view (touch, one card at a time), see CardPreview.
+ * preview video plays on hover (mouse) or in view (touch: one card at a time, once, at most 5 s), see CardPreview.
  */
 export function ProductCard({ product, href, headingLevel: Heading = 'h3' }: Props) {
   const t = useTranslations('ui.productCard')

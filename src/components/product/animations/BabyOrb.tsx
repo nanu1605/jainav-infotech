@@ -1,15 +1,15 @@
 'use client'
 
-import { Play, Square } from 'lucide-react'
+import { Pause, Play } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Fragment, useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 
 import { revealPieces } from '@/components/motion/TextReveal'
-import { Button } from '@/components/ui/Button'
+import { IconButton } from '@/components/ui/IconButton'
 
 import { buildTimeline, restFrame, type OrbState } from './baby/script'
 
-export type BabySample = { label: string; src: string; transcript?: string }
+export type { BabySample } from './baby/Samples'
 
 /** One exchange per language Baby speaks; the lines are the same on both site languages. */
 const EXCHANGES = [
@@ -21,11 +21,12 @@ const EXCHANGES = [
 const STATES = ['listening', 'thinking', 'speaking'] as const
 
 /*
- * The orb is HTML layers (halo, gauge ring, ripples, thinking dots, SVG core, voice bars), so every
+ * The orb is HTML layers (halo, gauge ring, ripples, thinking dots, core, voice bars), so every
  * loop is a CSS animation of `scale`, `rotate` or `opacity` on its own compositor layer: smooth
- * with a busy main thread and no per-frame JavaScript. `data-orb` picks the loops, `data-paused`
- * freezes them (off screen, hidden tab, before hydration). Words only animate in (hiding is
- * instant); exchanges cross-fade. Reduced motion: no loops, and every exchange is shown in full.
+ * with a busy main thread and no per-frame JavaScript. The SVG core sits in a <span> for that:
+ * Chrome does not composite `scale` on an SVG element. `data-orb` picks the loops, `data-paused`
+ * freezes them (off screen, hidden tab, paused, before hydration). Words only animate in (hiding
+ * is instant); exchanges cross-fade. Reduced motion: no loops, the still frame (first exchange).
  * `--bo-a` resolves the accent here: `--color-product-accent` is resolved on :root, without it.
  * React hoists this <style> into <head> once.
  */
@@ -38,7 +39,7 @@ const CSS = `
 .bo-orbit{inset:8%;opacity:0;transition:opacity var(--duration-base) var(--ease-out)}
 .bo-orbit>i{position:absolute;inset:0;rotate:calc(var(--k)*120deg)}
 .bo-orbit>i::before{content:"";position:absolute;top:-3%;left:47%;width:6%;height:6%;border-radius:9999px;background:var(--bo-a)}
-.bo-core{inset:18%;width:64%;height:64%;animation:bo-breathe 4.8s var(--ease-in-out) infinite}
+.bo-core{inset:18%;animation:bo-breathe 4.8s var(--ease-in-out) infinite}
 .bo-bars{inset:18%;display:flex;align-items:center;justify-content:center;gap:7%}
 .bo-bars>i{width:7%;height:40%;border-radius:9999px;background:var(--neutral-0);opacity:.9;scale:1 .25}
 [data-orb=listening] .bo-ripple{animation:bo-ripple 2.4s var(--ease-out) infinite}
@@ -61,7 +62,6 @@ const CSS = `
 @keyframes bo-bar{to{scale:1 1}}
 @media (prefers-reduced-motion:reduce){
 .bo *{animation:none!important}
-.bo-ex{grid-area:auto;opacity:1}
 .bo-w{opacity:1;translate:none}
 }
 `
@@ -83,22 +83,21 @@ function Words({ text, shown }: { text: string; shown: number }) {
 }
 
 type Props = {
-  /** "Hear Baby speak" clips, played on click only; no control at all without them. */
-  samples?: BabySample[]
-  className?: string
+  /** A voice sample is playing: the orb speaks along, even while the script is paused. */
+  speaking?: boolean
 }
 
 /**
  * Baby's product hero animation (spec §14): a voice orb that listens, thinks and speaks through a
  * scripted English / Hindi / Hinglish conversation. The server renders the still frame (the
- * first exchange, orb at rest); the script runs only on screen, in a visible tab and without
- * reduced motion. Optional voice samples play through one shared audio element.
+ * first exchange, orb at rest); the script runs only on screen, in a visible tab, without
+ * reduced motion and until the visitor pauses it. The box keeps its aspect ratio whatever the
+ * text (size containment, text in container units), so its placeholder matches it exactly.
  */
-export function BabyOrb({ samples, className }: Props) {
+export function BabyOrb({ speaking = false }: Props) {
   const t = useTranslations('ui.demo.baby')
   const id = useId()
   const root = useRef<HTMLDivElement>(null)
-  const audio = useRef<HTMLAudioElement>(null)
 
   const lines = EXCHANGES.map(({ key }) => ({
     you: t(`script.${key}.you`),
@@ -109,8 +108,7 @@ export function BabyOrb({ samples, className }: Props) {
 
   const [tick, setTick] = useState(() => restFrame(timeline))
   const [live, setLive] = useState(false)
-  const [sample, setSample] = useState<number | null>(null)
-  const [playing, setPlaying] = useState(false)
+  const [paused, setPaused] = useState(false)
 
   // Live while on screen in a visible tab; never with reduced motion (the still frame stays).
   useEffect(() => {
@@ -118,8 +116,9 @@ export function BabyOrb({ samples, className }: Props) {
     if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return
     let onScreen = false
     const update = () => setLive(onScreen && !document.hidden)
-    const io = new IntersectionObserver(([entry]) => {
-      onScreen = !!entry?.isIntersecting
+    // Entries can be batched: the last one is the current state.
+    const io = new IntersectionObserver((entries) => {
+      onScreen = entries.at(-1)?.isIntersecting ?? onScreen
       update()
     })
     io.observe(el)
@@ -130,40 +129,19 @@ export function BabyOrb({ samples, className }: Props) {
     }
   }, [])
 
-  // A sample playing holds the script; a paused step restarts in full when it resumes.
+  // A sample playing or the pause button holds the script; a held step restarts in full.
   const frame = timeline[tick] ?? timeline[0]!
   const steps = timeline.length
   useEffect(() => {
-    if (!live || playing) return
+    if (!live || paused || speaking) return
     const timer = setTimeout(() => setTick((i) => (i + 1) % steps), frame.ms)
     return () => clearTimeout(timer)
-  }, [live, playing, tick, frame.ms, steps])
+  }, [live, paused, speaking, tick, frame.ms, steps])
 
-  const orb: OrbState = playing ? 'speaking' : frame.orb
-
-  const toggle = (i: number) => {
-    const el = audio.current
-    const next = samples?.[i]
-    if (!el || !next) return
-    if (playing && sample === i) {
-      el.pause()
-      el.currentTime = 0
-      setPlaying(false)
-      return
-    }
-    el.src = next.src // a new source stops the previous sample
-    setSample(i)
-    setPlaying(true)
-    el.play().catch((e: unknown) => {
-      // AbortError: interrupted by another click, whose state is already set.
-      if (!(e instanceof DOMException && e.name === 'AbortError')) setPlaying(false)
-    })
-  }
-
-  const transcript = sample === null ? undefined : samples?.[sample]?.transcript
+  const orb: OrbState = speaking ? 'speaking' : frame.orb
 
   return (
-    <div className={className}>
+    <div className="relative">
       <style href="baby-orb" precedence="default">
         {CSS}
       </style>
@@ -172,28 +150,30 @@ export function BabyOrb({ samples, className }: Props) {
         role="img"
         aria-label={t('label')}
         data-orb={orb}
-        data-paused={live ? undefined : ''}
-        // Height comes from the 4:3 ratio, so nothing shifts when the script runs; it grows only
-        // if its text needs more room (narrow screens, reduced motion), already in the first paint.
-        className="bo relative flex aspect-[4/3] flex-col overflow-clip rounded-xl border border-border bg-surface p-4 shadow-lg sm:p-8"
+        // A sample the visitor started keeps the orb moving while the script is paused.
+        data-paused={live && (!paused || speaking) ? undefined : ''}
+        className="bo relative aspect-[4/5] overflow-clip rounded-xl border border-border bg-surface shadow-lg [container-type:size] sm:aspect-[4/3]"
       >
         <div aria-hidden className="absolute inset-0 bg-product-accent/5" />
-        <div aria-hidden className="relative flex flex-1 flex-col gap-4">
-          <div className="absolute start-0 top-0 grid">
+        <div
+          aria-hidden
+          className="absolute inset-0 flex flex-col gap-[1em] p-[1.25em] text-[length:min(4.4cqw,1rem)] leading-normal sm:p-[1.75em] sm:text-[length:min(3cqw,1.125rem)]"
+        >
+          <div className="absolute start-[1.25em] top-[1.25em] grid sm:start-[1.75em] sm:top-[1.75em]">
             {STATES.map((s) => (
               <span
                 key={s}
-                className="bo-chip inline-flex items-center gap-1.5 justify-self-start rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-fg-muted"
+                className="bo-chip inline-flex items-center gap-[0.5em] justify-self-start rounded-full border border-border bg-surface px-[0.85em] py-[0.35em] text-[max(0.75em,0.6875rem)] text-fg-muted"
                 data-on={orb === s ? '' : undefined}
               >
-                <span className="size-1.5 rounded-full bg-product-accent" />
+                <span className="size-[0.5em] rounded-full bg-product-accent" />
                 {t(s)}
               </span>
             ))}
           </div>
 
-          <div className="flex flex-1 items-center justify-center py-2">
-            <div className="bo-orb relative aspect-square w-[36%] motion-reduce:w-[18%]">
+          <div className="flex min-h-0 flex-1 items-center justify-center py-[0.5em]">
+            <div className="bo-orb relative aspect-square w-[36%]">
               <span className="bo-halo" />
               <span className="bo-ring" />
               <span className="bo-ripple" />
@@ -203,26 +183,28 @@ export function BabyOrb({ samples, className }: Props) {
                   <i key={i} style={k(i)} />
                 ))}
               </span>
-              <svg viewBox="0 0 100 100" className="bo-core">
-                <defs>
-                  <radialGradient id={`${id}core`} cx="35%" cy="30%" r="75%">
-                    <stop
-                      offset="0"
-                      style={{
-                        stopColor: 'color-mix(in oklch, var(--bo-a) 40%, var(--neutral-0))',
-                      }}
-                    />
-                    <stop offset="0.55" style={{ stopColor: 'var(--bo-a)' }} />
-                    <stop
-                      offset="1"
-                      style={{
-                        stopColor: 'color-mix(in oklch, var(--bo-a) 60%, var(--neutral-1000))',
-                      }}
-                    />
-                  </radialGradient>
-                </defs>
-                <circle cx="50" cy="50" r="50" fill={`url(#${id}core)`} />
-              </svg>
+              <span className="bo-core">
+                <svg viewBox="0 0 100 100" className="size-full">
+                  <defs>
+                    <radialGradient id={`${id}core`} cx="35%" cy="30%" r="75%">
+                      <stop
+                        offset="0"
+                        style={{
+                          stopColor: 'color-mix(in oklch, var(--bo-a) 40%, var(--neutral-0))',
+                        }}
+                      />
+                      <stop offset="0.55" style={{ stopColor: 'var(--bo-a)' }} />
+                      <stop
+                        offset="1"
+                        style={{
+                          stopColor: 'color-mix(in oklch, var(--bo-a) 60%, var(--neutral-1000))',
+                        }}
+                      />
+                    </radialGradient>
+                  </defs>
+                  <circle cx="50" cy="50" r="50" fill={`url(#${id}core)`} />
+                </svg>
+              </span>
               <span className="bo-bars">
                 {[0, 1, 2, 3, 4].map((i) => (
                   <i key={i} style={k(i)} />
@@ -231,17 +213,17 @@ export function BabyOrb({ samples, className }: Props) {
             </div>
           </div>
 
-          <div className="grid motion-reduce:gap-3">
+          <div className="grid">
             {EXCHANGES.map(({ key, lang }, i) => {
               const active = i === frame.exchange
               // Other exchanges keep every word on, so one fading out stays whole.
               const shown = (n: number) => (active ? n : Infinity)
               return (
                 <div key={key} className="bo-ex" data-on={active ? '' : undefined}>
-                  <span className="inline-flex rounded-full border border-border px-2 text-xs text-fg-muted">
+                  <span className="inline-flex rounded-full border border-border px-[0.65em] text-[max(0.75em,0.6875rem)] text-fg-muted">
                     {t(`languages.${key}`)}
                   </span>
-                  <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 text-sm sm:text-base">
+                  <dl className="mt-[0.4em] grid grid-cols-[auto_1fr] gap-x-[0.75em]">
                     <dt className="text-fg-muted">{t('you')}</dt>
                     <dd lang={lang} className="text-fg-muted">
                       <Words text={lines[i]!.you} shown={shown(frame.you)} />
@@ -257,39 +239,15 @@ export function BabyOrb({ samples, className }: Props) {
           </div>
         </div>
       </div>
-
-      {!!samples?.length && (
-        <div role="group" aria-labelledby={`${id}hear`} className="mt-4">
-          <p id={`${id}hear`} className="text-sm font-medium text-fg">
-            {t('hear')}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {samples.map((s, i) => {
-              const on = playing && sample === i
-              return (
-                <Button
-                  key={`${i}-${s.src}`}
-                  variant="secondary"
-                  size="sm"
-                  aria-pressed={on}
-                  onClick={() => toggle(i)}
-                  className="aria-pressed:border-product-accent aria-pressed:bg-hover"
-                >
-                  {on ? <Square aria-hidden /> : <Play aria-hidden />}
-                  {s.label}
-                </Button>
-              )
-            })}
-          </div>
-          <audio
-            ref={audio}
-            preload="none"
-            onEnded={() => setPlaying(false)}
-            onError={() => setPlaying(false)}
-          />
-          {transcript && <p className="mt-3 max-w-prose text-sm text-fg-muted">{transcript}</p>}
-        </div>
-      )}
+      {/* Outside the image (its content is presentational) and over its corner: shifts nothing. */}
+      <IconButton
+        label={paused ? t('play') : t('pause')}
+        size="sm"
+        onClick={() => setPaused(!paused)}
+        className="absolute end-3 top-3 size-8 motion-reduce:hidden sm:end-4 sm:top-4"
+      >
+        {paused ? <Play aria-hidden /> : <Pause aria-hidden />}
+      </IconButton>
     </div>
   )
 }

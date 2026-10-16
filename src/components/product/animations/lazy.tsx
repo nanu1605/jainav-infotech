@@ -1,7 +1,11 @@
 'use client'
 
+import { useState } from 'react'
+
 import { deferred } from '@/components/deferred'
 import { cn } from '@/lib/cn'
+
+import { BabySamples, type BabySample } from './baby/Samples'
 
 /** The animation's box, empty: while it streams in, or if its code fails to download. */
 const box = (shape: string) =>
@@ -27,4 +31,18 @@ export const VyroGauges = deferred(
   wide,
   wide,
 )
-export const BabyOrb = deferred(() => import('./BabyOrb').then((m) => m.BabyOrb), wide, wide)
+
+const Orb = deferred(() => import('./BabyOrb').then((m) => m.BabyOrb), menu, menu)
+
+/** Baby's orb (its box has MenuMesh's shape), with the voice samples outside its chunk. */
+export function BabyOrb({ samples }: { samples?: BabySample[] }) {
+  const [playing, setPlaying] = useState(false)
+  return (
+    <>
+      <Orb speaking={playing} />
+      {!!samples?.length && (
+        <BabySamples samples={samples} playing={playing} onPlaying={setPlaying} />
+      )}
+    </>
+  )
+}
