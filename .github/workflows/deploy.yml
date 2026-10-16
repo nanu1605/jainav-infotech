@@ -3,7 +3,11 @@ name: Deploy
 # spec §18.3: a merge to main deploys staging; a release tag (v1.2.3) deploys production after
 # the "production" environment's required reviewer approves. Each environment gets its own image
 # because NEXT_PUBLIC_* values are baked in at build time: never promote staging to production.
-# Setup (secrets, variables, the VPS): docs/runbooks/deploy.md.
+# Setup (variables, secrets, the VPS and its Cloudflare Tunnel): docs/runbooks/server.md §4.
+#
+# Three jobs, so the server's SSH key never shares a runner with third-party code: `build`
+# (pinned actions, registry push only), `deploy` (shell only; the one job with the SSH key and
+# the environment's approval), `smoke` (installs dependencies, holds no deploy secret).
 
 on:
   push:
@@ -17,77 +21,133 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
+
+env:
+  # Prefix of the repository variables holding each environment's public build values
+  # (STAGING_SITE_URL, PRODUCTION_SITE_URL, …).
+  TARGET: ${{ startsWith(github.ref, 'refs/tags/') && 'PRODUCTION' || 'STAGING' }}
 
 jobs:
-  deploy:
+  build:
     # Off until the VPS exists: set the repository variable DEPLOY_ENABLED to "true".
     if: vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
-    environment:
-      name: ${{ startsWith(github.ref, 'refs/tags/') && 'production' || 'staging' }}
-      url: ${{ vars.NEXT_PUBLIC_SITE_URL }}
-    env:
-      SERVICE: ${{ startsWith(github.ref, 'refs/tags/') && 'app' || 'app-staging' }}
-      IMAGE: ghcr.io/${{ github.repository }}:${{ startsWith(github.ref, 'refs/tags/') && format('prod-{0}', github.ref_name) || format('staging-{0}', github.sha) }}
-
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      service: ${{ steps.names.outputs.service }}
+      image: ${{ steps.names.outputs.image }}
+      tools: ${{ steps.names.outputs.tools }}
     steps:
-      - uses: actions/checkout@v5
+      - name: Name the images
+        id: names
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          if [ "$IS_TAG" = true ]; then service=app tag="prod-$REF_NAME"; else service=app-staging tag="staging-$GITHUB_SHA"; fi
+          # The names reach a shell on the server: allow only plain image references.
+          [[ "$tag" =~ ^[A-Za-z0-9._-]{1,128}$ ]] || { echo "unexpected tag: $tag"; exit 1; }
+          { echo "service=$service"; echo "image=$repo:$tag"; echo "tools=$repo:tools-$GITHUB_SHA"; } >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push the image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: docker/Dockerfile
           target: runner
           push: true
-          tags: ${{ env.IMAGE }}
-          cache-from: type=gha,scope=${{ env.SERVICE }}
-          cache-to: type=gha,mode=max,scope=${{ env.SERVICE }}
+          tags: ${{ steps.names.outputs.image }}
+          # Tag runs can't read another tag's cache, only main's: reuse staging's, write none.
+          cache-from: |
+            type=gha,scope=app-staging
+          cache-to: ${{ !startsWith(github.ref, 'refs/tags/') && 'type=gha,mode=max,scope=app-staging' || '' }}
           build-args: |
-            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
-            NEXT_PUBLIC_CDN_URL=${{ vars.NEXT_PUBLIC_CDN_URL }}
-            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
-            NEXT_PUBLIC_UMAMI_URL=${{ vars.NEXT_PUBLIC_UMAMI_URL }}
-            NEXT_PUBLIC_UMAMI_WEBSITE_ID=${{ vars.NEXT_PUBLIC_UMAMI_WEBSITE_ID }}
-            NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+            NEXT_PUBLIC_SITE_URL=${{ vars[format('{0}_SITE_URL', env.TARGET)] }}
+            NEXT_PUBLIC_CDN_URL=${{ vars[format('{0}_CDN_URL', env.TARGET)] }}
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ vars[format('{0}_TURNSTILE_SITE_KEY', env.TARGET)] }}
+            NEXT_PUBLIC_UMAMI_URL=${{ vars[format('{0}_UMAMI_URL', env.TARGET)] }}
+            NEXT_PUBLIC_UMAMI_WEBSITE_ID=${{ vars[format('{0}_UMAMI_WEBSITE_ID', env.TARGET)] }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ vars[format('{0}_SENTRY_DSN', env.TARGET)] }}
 
       # Full source and dependencies for one-off commands on the server (seed, migrate, release
-      # import); see docs/runbooks/server.md.
+      # import); the deploy job pulls it onto the VPS. See docs/runbooks/server.md §8.
       - name: Build and push the tools image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: docker/Dockerfile
           target: tools
           push: true
-          tags: ghcr.io/${{ github.repository }}:tools-${{ github.sha }}
-          cache-from: type=gha,scope=${{ env.SERVICE }}
+          tags: ${{ steps.names.outputs.tools }}
+          cache-from: type=gha,scope=app-staging
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: ${{ startsWith(github.ref, 'refs/tags/') && 'production' || 'staging' }}
+      # The env context isn't available here.
+      url: ${{ vars[startsWith(github.ref, 'refs/tags/') && 'PRODUCTION_SITE_URL' || 'STAGING_SITE_URL'] }}
+    permissions:
+      packages: read
+    steps:
+      # The VPS's SSH port is closed to the internet: SSH goes through a Cloudflare Tunnel,
+      # authorized by an Access service token. Pinned binary, checked against its release digest.
+      - name: Install cloudflared
+        run: |
+          curl -fsSL -o /tmp/cloudflared https://github.com/cloudflare/cloudflared/releases/download/2026.9.3/cloudflared-linux-amd64
+          echo "77e26d8d900e0b8469f416239d14b5f296525fdf79fee6f511ef55609e3fbac2  /tmp/cloudflared" | sha256sum -c -
+          sudo install -m 755 /tmp/cloudflared /usr/local/bin/cloudflared
 
       - name: Deploy on the VPS
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-          TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+          SSH_TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          SERVICE: ${{ needs.build.outputs.service }}
+          IMAGE: ${{ needs.build.outputs.image }}
+          TOOLS: ${{ needs.build.outputs.tools }}
         run: |
+          trap 'rm -f ~/.ssh/id_ed25519' EXIT
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-          # The job's token lets the VPS pull this image; it expires when the job ends.
-          printf '%s' "$GHCR_TOKEN" | ssh "$TARGET" "docker login ghcr.io -u ${{ github.actor }} --password-stdin"
-          ssh "$TARGET" "/srv/jainav/deploy.sh $SERVICE $IMAGE"
+          # The job's token lets the VPS pull both images; the login is removed afterwards and
+          # the token expires with the job anyway.
+          printf '%s' "$GHCR_TOKEN" | ssh -o ProxyCommand='cloudflared access ssh --hostname %h' "$SSH_TARGET" \
+            "docker login ghcr.io -u '$GHCR_USER' --password-stdin >/dev/null &&
+             /srv/jainav/deploy.sh '$SERVICE' '$IMAGE' && docker pull -q '$TOOLS'
+             status=\$?; docker logout ghcr.io >/dev/null; exit \$status"
 
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v5
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 24
           cache: pnpm
@@ -96,8 +156,8 @@ jobs:
       - name: Smoke tests
         run: pnpm test:smoke
         env:
-          SMOKE_BASE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
-          # Staging only: basic auth in front of the site ("user:password").
-          SMOKE_BASIC_AUTH: ${{ secrets.SMOKE_BASIC_AUTH }}
+          SMOKE_BASE_URL: ${{ vars[format('{0}_SITE_URL', env.TARGET)] }}
+          # Staging only: its basic auth ("user:password").
+          SMOKE_BASIC_AUTH: ${{ env.TARGET == 'STAGING' && secrets.SMOKE_BASIC_AUTH || '' }}
           # "1" once Cloudflare Access protects /admin in this environment.
-          SMOKE_ADMIN_ACCESS: ${{ vars.SMOKE_ADMIN_ACCESS }}
+          SMOKE_ADMIN_ACCESS: ${{ vars[format('{0}_SMOKE_ADMIN_ACCESS', env.TARGET)] }}
