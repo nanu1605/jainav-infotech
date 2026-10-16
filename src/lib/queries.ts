@@ -351,3 +351,95 @@ export const getProductSlugs = () =>
     },
     { visitor: true },
   )
+
+export const getJobs = (locale: Locale) =>
+  read(locale, ['jobs'], ['jobs'], async (payload, v) => {
+    const { docs } = await payload.find({
+      collection: 'jobs',
+      depth: 0,
+      pagination: false,
+      sort: '-postedAt',
+      select: {
+        title: true,
+        slug: true,
+        type: true,
+        workMode: true,
+        location: true,
+        postedAt: true,
+      },
+      ...as(v),
+    })
+    return docs
+  })
+
+export const getJob = (locale: Locale, slug: string) =>
+  read(locale, ['jobs'], ['job', slug], async (payload, v) => {
+    const { docs } = await payload.find({
+      collection: 'jobs',
+      where: { slug: { equals: slug } },
+      limit: 1,
+      depth: 1,
+      ...as(v),
+    })
+    return docs[0] ?? null
+  })
+
+export const getLegalPage = (locale: Locale, slug: string) =>
+  read(locale, ['legal-pages'], ['legal', slug], async (payload, v) => {
+    const { docs } = await payload.find({
+      collection: 'legal-pages',
+      where: { slug: { equals: slug } },
+      limit: 1,
+      depth: 1,
+      ...as(v),
+    })
+    return docs[0] ?? null
+  })
+
+/** Every published document with its own URL, for the sitemap and static params. */
+export const getRoutable = () =>
+  read(
+    'en',
+    ['pages', 'products', 'services', 'posts', 'jobs', 'legal-pages'],
+    ['routable'],
+    async (payload, v) => {
+      const select = { slug: true, hiStatus: true, updatedAt: true } as const
+      const all = (collection: 'pages' | 'services' | 'posts' | 'jobs' | 'legal-pages') =>
+        payload
+          .find({ collection, depth: 0, pagination: false, select, ...as(v) })
+          .then((r) => r.docs)
+      const [pages, services, posts, jobs, legal, products] = await Promise.all([
+        all('pages'),
+        all('services'),
+        all('posts'),
+        all('jobs'),
+        all('legal-pages'),
+        payload
+          .find({
+            collection: 'products',
+            depth: 0,
+            pagination: false,
+            select: { ...select, hostingMode: true },
+            ...as(v),
+          })
+          .then((r) => r.docs),
+      ])
+      return { pages, services, posts, jobs, legal, products }
+    },
+    { visitor: true },
+  )
+
+/** Every tag used by a published post, most used first. */
+export const getPostTags = (locale: Locale) =>
+  read(locale, ['posts'], ['post-tags'], async (payload, v) => {
+    const { docs } = await payload.find({
+      collection: 'posts',
+      depth: 0,
+      pagination: false,
+      select: { tags: true },
+      ...as(v),
+    })
+    const counts = new Map<string, number>()
+    for (const tag of docs.flatMap((d) => d.tags ?? [])) counts.set(tag, (counts.get(tag) ?? 0) + 1)
+    return [...counts].sort((a, b) => b[1] - a[1]).map(([tag]) => tag)
+  })

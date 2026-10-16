@@ -279,5 +279,96 @@
   "products": {
     "title": "Products",
     "intro": "Software we design, build and run ourselves, for restaurants, PCs and everyday work."
+  },
+  "services": {
+    "title": "Services",
+    "intro": "Custom software, AI, cloud and e-commerce, built by the team that ships its own products.",
+    "capabilities": "What we do",
+    "deliverables": "What you get",
+    "proof": "Built by us",
+    "proofIntro": "Products we design, build and run ourselves with the same skills.",
+    "start": "Start a project"
+  },
+  "contact": {
+    "title": "Contact",
+    "intro": "Tell us what you need. A person reads every message.",
+    "email": "Email",
+    "emails": {
+      "hello": "General",
+      "sales": "Sales",
+      "support": "Support",
+      "careers": "Careers",
+      "privacy": "Privacy"
+    },
+    "phone": "Phone",
+    "whatsapp": "WhatsApp",
+    "whatsappCta": "Chat with us on WhatsApp",
+    "whatsappMessage": "Hello Jainav Infotech, I'd like to talk about…",
+    "newTab": "(opens in a new tab)",
+    "hours": "Business hours",
+    "office": "Registered office",
+    "showMap": "Show map",
+    "mapNote": "Loads Google Maps, which may set its own cookies.",
+    "mapTitle": "Map of our registered office"
+  },
+  "careers": {
+    "title": "Careers",
+    "intro": "Small team, real products, work you can point to.",
+    "openings": "Open roles",
+    "filter": "Filter roles",
+    "all": "All",
+    "none": "No open roles right now.",
+    "type": {
+      "full-time": "Full-time",
+      "part-time": "Part-time",
+      "internship": "Internship",
+      "contract": "Contract"
+    },
+    "mode": {
+      "onsite": "On-site",
+      "remote": "Remote",
+      "hybrid": "Hybrid"
+    },
+    "introduceTitle": "Introduce yourself",
+    "introduceText": "Don't see a role that fits? Tell us what you're good at and what you'd like to build.",
+    "introduceSubject": "Introducing myself",
+    "contact": "Contact us",
+    "internshipsTitle": "Internships",
+    "internshipsText": "Students can work with us on real projects. Write to us with what you've built so far.",
+    "posted": "Posted {date}",
+    "applyTitle": "Apply",
+    "applyText": "Send your CV (PDF) and a few lines about why this role interests you.",
+    "apply": "Apply by email"
+  },
+  "blog": {
+    "title": "Blog",
+    "intro": "Notes on building products, software and the tools we use.",
+    "tagTitle": "Posts tagged {tag}",
+    "pageTitle": "Blog, page {page}",
+    "tags": "Tags",
+    "all": "All posts",
+    "none": "No posts yet.",
+    "pagination": "Pages",
+    "newer": "Newer posts",
+    "older": "Older posts",
+    "page": "Page {page} of {total}",
+    "rss": "RSS feed",
+    "feedTitle": "Jainav Infotech blog",
+    "readingTime": "{minutes, plural, one {# min read} other {# min read}}",
+    "share": "Share",
+    "newTab": "(opens in a new tab)",
+    "related": "Related posts"
+  },
+  "changelog": {
+    "title": "Changelog",
+    "productTitle": "{name} changelog",
+    "intro": "New features, improvements and fixes across our products.",
+    "filter": "Filter by product",
+    "all": "All products",
+    "none": "No updates yet."
+  },
+  "legal": {
+    "version": "Version {version}, effective {date}",
+    "englishPrevails": "This is a translation. If the Hindi and English versions differ, the English version prevails."
   }
 }

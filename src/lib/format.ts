@@ -49,3 +49,21 @@ export function formatBytes(locale: Locale, bytes: number) {
 /** Today's date in IST as YYYY-MM-DD (daily-stats rows, spec §17). */
 export const istDate = (now = new Date()) =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now)
+
+type LexicalNode = { text?: unknown; children?: unknown[] }
+
+/** Plain text of a Lexical rich text value (reading time, structured data, feeds). */
+export function plainText(value: { root?: object } | null | undefined): string {
+  const out: string[] = []
+  const walk = (node: LexicalNode) => {
+    if (typeof node.text === 'string') out.push(node.text)
+    ;(node.children as LexicalNode[] | undefined)?.forEach(walk)
+    if (node.children) out.push(' ')
+  }
+  if (value?.root) walk(value.root as LexicalNode)
+  return out.join('').replace(/\s+/g, ' ').trim()
+}
+
+/** Minutes to read at ~200 words a minute, at least 1. */
+export const readingMinutes = (text: string) =>
+  Math.max(1, Math.round(text.split(/\s+/).filter(Boolean).length / 200))
