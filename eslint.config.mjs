@@ -20,6 +20,7 @@ export default defineConfig([
     },
   },
   globalIgnores([
+    '.claude/',
     '.next/',
     'node_modules/',
     'src/payload-types.ts',
