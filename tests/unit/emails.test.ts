@@ -1,7 +1,20 @@
+import { createHash } from 'node:crypto'
+import { readdir, readFile, rm } from 'node:fs/promises'
+import path from 'node:path'
+
+import type { Payload } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { autoReplyEmail, newsletterConfirmEmail, notificationEmail } from '@/emails'
+import {
+  autoReplyEmail,
+  newsletterConfirmEmail,
+  notificationEmail,
+  orderConfirmationEmail,
+  otpEmail,
+} from '@/emails'
 import type { AutoReplyKind } from '@/emails'
+import { sendEmail } from '@/lib/notify'
+import { OUTBOX_DIR, outboxAdapter } from '@/lib/outbox'
 
 import en from '../../messages/en.json'
 import hi from '../../messages/hi.json'
@@ -78,5 +91,83 @@ describe('notificationEmail', () => {
     expect(email.html).toContain('http://localhost:3000/admin/collections/leads/42')
     expect(email.text).toMatch(/Message +first line\r?\n +second line/)
     expect(email.text).toContain(en.email.openInAdmin)
+  })
+})
+
+// The text react-email hides in the preview block, before the visible body.
+const preview = (html: string) =>
+  html.match(/<div[^>]*display:none[^>]*>([^]*?)<\/div>/)?.[1]?.replace(/<[^>]+>/g, '') ?? ''
+
+describe('otpEmail', () => {
+  it.each(['en', 'hi'] as const)('shows the code only in the body in %s', async (locale) => {
+    const email = await otpEmail({ locale, code: '482913' })
+    const m = locales[locale].email.otp
+    expect(email.subject).toBe(m.subject)
+    expect(email.subject).not.toMatch(/\d{6}/)
+    expect(preview(email.html)).toContain(m.body)
+    expect(preview(email.html)).not.toContain('482913')
+    expect(email.html).toContain('>482913<')
+    expect(email.text).toContain('482913')
+    expect(email.text).toContain(m.expiry)
+    expect(email.text).toContain(m.ignore)
+  })
+})
+
+describe('orderConfirmationEmail', () => {
+  const order = {
+    orderNumber: 'JV-2026-00042',
+    productName: 'VYRO',
+    planName: 'Pro',
+    total: 99_900,
+    invoiceNumber: 'JI/26-27/00001',
+    accountUrl: 'https://jainavinfotech.com/account/orders',
+  }
+
+  it('reaches the outbox with the PDF as a fingerprint, its bytes intact', async () => {
+    // Bytes that aren't valid UTF-8 must survive the base64 round trip.
+    const pdf = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0xff, 0x00, 0xe2, 0x82])
+    const adapter = outboxAdapter({ payload: {} as Payload })
+    const payload = { sendEmail: adapter.sendEmail } as unknown as Payload
+    const before = new Set(await readdir(OUTBOX_DIR).catch(() => []))
+    await sendEmail(
+      payload,
+      'buyer@example.com',
+      await orderConfirmationEmail({ locale: 'en', ...order }),
+      {
+        attachments: [
+          { filename: 'JI-26-27-00001.pdf', content: pdf, contentType: 'application/pdf' },
+        ],
+      },
+    )
+    const file = (await readdir(OUTBOX_DIR)).find((f) => !before.has(f))!
+    const saved = JSON.parse(await readFile(path.join(OUTBOX_DIR, file), 'utf8'))
+    await rm(path.join(OUTBOX_DIR, file))
+    expect(saved.attachments).toEqual([
+      {
+        filename: 'JI-26-27-00001.pdf',
+        contentType: 'application/pdf',
+        size: pdf.length,
+        sha256: createHash('sha256').update(pdf).digest('hex'),
+      },
+    ])
+  })
+
+  it.each(['en', 'hi'] as const)('confirms the order in %s', async (locale) => {
+    const email = await orderConfirmationEmail({ locale, ...order })
+    const m = locales[locale].email.order
+    expect(email.subject).toBe(m.subject.replace('{orderNumber}', order.orderNumber))
+    expect(email.html).toContain(`lang="${locale}"`)
+    expect(email.html).toContain(order.accountUrl)
+    for (const part of [
+      m.thanks,
+      order.orderNumber,
+      'VYRO Pro',
+      '₹999',
+      m.invoice.replace('{invoiceNumber}', order.invoiceNumber),
+      m.button,
+      m.support,
+    ]) {
+      expect(email.text).toContain(part)
+    }
   })
 })

@@ -16,11 +16,17 @@ export async function inboxAddress(payload: Payload, inbox: Inbox): Promise<stri
   return company?.emails?.[inbox] || company?.emails?.hello || process.env.EMAIL_REPLY_TO || null
 }
 
+export type EmailAttachment = { filename: string; content: Buffer; contentType?: string }
+
 export async function sendEmail(
   payload: Payload,
   to: string,
   email: RenderedEmail,
-  opts: { replyTo?: string | null; headers?: Record<string, string> } = {},
+  opts: {
+    replyTo?: string | null
+    headers?: Record<string, string>
+    attachments?: EmailAttachment[]
+  } = {},
 ) {
   await payload.sendEmail({
     to,
@@ -29,6 +35,15 @@ export async function sendEmail(
     text: email.text,
     replyTo: opts.replyTo || process.env.EMAIL_REPLY_TO || undefined,
     headers: opts.headers,
+    // Base64 strings: the Resend adapter JSON-encodes the message, which would turn a Buffer into
+    // a list of numbers. `encoding` tells nodemailer-style adapters (and the outbox) to decode it;
+    // Resend ignores it and contentType, and types the file by its extension.
+    attachments: opts.attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content.toString('base64'),
+      encoding: 'base64',
+      contentType: a.contentType,
+    })),
   })
 }
 
