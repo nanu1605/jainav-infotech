@@ -1,12 +1,11 @@
 'use client'
 
-import { useSpring } from 'motion/react'
-import * as m from 'motion/react-m'
-import type { PointerEvent } from 'react'
+import { useRef, type PointerEvent } from 'react'
 
 import { Button, type ButtonProps } from '@/components/ui/Button'
+import { cn } from '@/lib/cn'
 
-import { POINTER_SPRING, pointerRatio, usePointerEffect } from './Tilt'
+import { pointerRatio, usePointerEffect } from './Tilt'
 
 /** Furthest the button moves toward the cursor, in pixels. */
 const PULL = 8
@@ -17,47 +16,49 @@ export const magneticPull = ({ x, y }: { x: number; y: number }) => {
   return { x: x * scale, y: y * scale }
 }
 
-const MotionButton = m.create(Button)
-
-// Motion uses these event names for its own callbacks, so a motion component can't take React's.
-type Props = Omit<ButtonProps, 'onAnimationStart' | 'onDrag' | 'onDragStart' | 'onDragEnd'>
-
 /**
- * Primary call-to-action that leans toward the cursor (spec §14) and springs back on leave.
- * Takes Button's props. Mouse on a fine pointer only; with reduced motion it stays put.
+ * Primary call-to-action that leans toward the cursor (spec §14) and eases back on leave. Takes
+ * Button's props (asChild included). Mouse on a fine pointer only; with reduced motion it stays
+ * put. A CSS `translate` transition on the motion tokens: no animation library on the page.
  */
 export function MagneticButton({
-  style,
+  className,
   onPointerEnter,
   onPointerMove,
   onPointerLeave,
   ...props
-}: Props) {
+}: ButtonProps) {
   const { active, enter } = usePointerEffect()
-  const x = useSpring(0, POINTER_SPRING)
-  const y = useSpring(0, POINTER_SPRING)
+  const pull = useRef({ x: 0, y: 0 })
+
+  const set = (el: HTMLElement, x: number, y: number) => {
+    pull.current = { x, y }
+    el.style.translate = x || y ? `${x}px ${y}px` : ''
+  }
 
   const move = (e: PointerEvent<HTMLButtonElement>) => {
     onPointerMove?.(e)
     if (!active.current || props.disabled) return
     const box = e.currentTarget.getBoundingClientRect()
     // Measure from the resting position, not the already-pulled one, so the pull doesn't feed back.
-    const pull = magneticPull(
+    const next = magneticPull(
       pointerRatio(e.clientX, e.clientY, {
-        left: box.left - x.get(),
-        top: box.top - y.get(),
+        left: box.left - pull.current.x,
+        top: box.top - pull.current.y,
         width: box.width,
         height: box.height,
       }),
     )
-    x.set(pull.x)
-    y.set(pull.y)
+    set(e.currentTarget, next.x, next.y)
   }
 
   return (
-    <MotionButton
+    <Button
       {...props}
-      style={{ ...style, x, y }}
+      className={cn(
+        'transition-[background-color,color,border-color,box-shadow,opacity,translate] duration-(--duration-base)',
+        className,
+      )}
       onPointerEnter={(e: PointerEvent<HTMLButtonElement>) => {
         onPointerEnter?.(e)
         enter(e)
@@ -65,8 +66,7 @@ export function MagneticButton({
       onPointerMove={move}
       onPointerLeave={(e: PointerEvent<HTMLButtonElement>) => {
         onPointerLeave?.(e)
-        x.set(0)
-        y.set(0)
+        set(e.currentTarget, 0, 0)
       }}
     />
   )

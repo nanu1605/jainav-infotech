@@ -6,9 +6,9 @@ import type { ReactNode } from 'react'
 const loadFeatures = () => import('./features').then((mod) => mod.default)
 
 /**
- * Loads Motion's DOM animation features after hydration (use `m.*` from 'motion/react-m', not
- * `motion.*`, to keep the initial bundle small; spec §15) and honours `prefers-reduced-motion`
- * for every animation. Content renders in its final state until then, so nothing waits on it.
+ * Wrap a component that animates with Motion (`m.*` from 'motion/react-m', never `motion.*`):
+ * loads Motion's DOM features lazily and honours `prefers-reduced-motion`. Used per component,
+ * not in the layout, so pages without Motion animations ship none of it (spec §15).
  */
 export function MotionProvider({ children }: { children: ReactNode }) {
   return (

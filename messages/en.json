@@ -1,7 +1,8 @@
 {
   "metadata": {
     "title": "Jainav Infotech: software products and custom software",
-    "description": "Jainav Infotech builds its own software products, MenuMesh, VYRO and Baby, and custom software for businesses. Based in Indore, India."
+    "description": "Jainav Infotech builds its own software products, MenuMesh, VYRO and Baby, and custom software for businesses. Based in Indore, India.",
+    "titleTemplate": "%s | Jainav Infotech"
   },
   "site": {
     "name": "Jainav",
@@ -38,10 +39,12 @@
     },
     "announcement": {
       "label": "Announcement",
-      "dismiss": "Dismiss announcement"
+      "dismiss": "Dismiss announcement",
+      "more": "Learn more"
     },
     "breadcrumbs": {
-      "label": "Breadcrumb"
+      "label": "Breadcrumb",
+      "home": "Home"
     },
     "dialog": {
       "close": "Close"
@@ -110,13 +113,133 @@
     "video": {
       "captions": "English",
       "play": "Play video",
-      "pause": "Pause video"
+      "pause": "Pause video",
+      "captionsEnglish": "English"
     },
     "callout": {
       "info": "Note",
       "success": "Success",
       "warning": "Warning",
       "danger": "Important"
+    },
+    "preview": {
+      "label": "Preview: you are seeing unpublished drafts",
+      "exit": "Exit preview"
+    },
+    "company": {
+      "legalName": "Legal name",
+      "cin": "CIN",
+      "gstin": "GSTIN",
+      "incorporated": "Incorporated",
+      "office": "Registered office"
+    },
+    "latest": {
+      "posts": "From the blog",
+      "changelog": "What's new",
+      "allPosts": "All posts",
+      "allChanges": "Full changelog",
+      "release": "Version {version}"
+    },
+    "productButton": {
+      "visit": "Visit {name}",
+      "demo": "Book a demo",
+      "download": "Download for Windows",
+      "version": "Version {version}",
+      "buy": "Buy {plan}",
+      "soon": "Available soon",
+      "waitlist": "Join the waitlist",
+      "contact": "Talk to us",
+      "newTab": "(opens in a new tab)"
+    },
+    "productHero": {
+      "newTab": "(opens in a new tab)",
+      "links": {
+        "docs": "Docs",
+        "microsoft-store": "Microsoft Store",
+        "play-store": "Google Play",
+        "app-store": "App Store",
+        "github": "GitHub",
+        "status": "Status",
+        "other": "More"
+      }
+    },
+    "pricing": {
+      "recommended": "Recommended",
+      "free": "Free",
+      "oneTime": "one-time",
+      "perYear": "per year",
+      "perMonth": "per month",
+      "downloadFree": "Download free",
+      "waitlist": "Join the waitlist",
+      "buy": "Buy {plan}",
+      "soon": "Available soon",
+      "fullPricing": "See full pricing"
+    },
+    "release": {
+      "version": "Version {version}",
+      "versionCol": "Version",
+      "beta": "Beta",
+      "released": "Released",
+      "size": "Size",
+      "minOs": "Requires",
+      "sha256": "SHA-256",
+      "download": "Download",
+      "allDownloads": "All versions and checksums",
+      "notes": "What's new",
+      "verifyTitle": "Check your download",
+      "verifyText": "In PowerShell, run this in the folder with the installer and compare the result with the SHA-256 above. If they differ, delete the file and download it again.",
+      "previous": "All versions",
+      "verifyFile": "file name"
+    },
+    "changelog": {
+      "new": "New",
+      "improved": "Improved",
+      "fixed": "Fixed",
+      "release": "Release",
+      "beta": "Beta release",
+      "version": "Version {version}"
+    },
+    "problemSolution": {
+      "problem": "The problem",
+      "solution": "Our answer"
+    },
+    "privacy": {
+      "local": "Stays on your device",
+      "cloud": "Goes to the cloud"
+    },
+    "requirements": {
+      "caption": "System requirements",
+      "item": "Component",
+      "minimum": "Minimum",
+      "recommended": "Recommended"
+    },
+    "comparison": {
+      "caption": "Comparison",
+      "feature": "Feature"
+    },
+    "waitlist": {
+      "title": "Be first to try {name}",
+      "text": "Leave your email and we'll tell you when {name} is ready.",
+      "subject": "Waitlist: {name}",
+      "email": "Email us to join",
+      "contact": "Contact us to join"
+    },
+    "productPages": {
+      "pricingTitle": "{name} pricing",
+      "downloadTitle": "Download {name}",
+      "changelogTitle": "{name} changelog",
+      "docsTitle": "{name} docs",
+      "supportTitle": "{name} support",
+      "noPlans": "Plans will be announced soon.",
+      "pricingFaq": "Licences, devices, refunds and updates",
+      "noChanges": "No release notes yet.",
+      "faq": "Common questions",
+      "stillStuck": "Still stuck?",
+      "stillStuckText": "Write to us and a person will get back to you, usually within one working day.",
+      "contactForm": "Contact form",
+      "docsNav": "Docs",
+      "docsIntro": "Guides and answers for {name}. Pick a topic.",
+      "noDocs": "Docs are on their way."
     }
   },
   "styleguide": {
@@ -136,5 +259,120 @@
       "motion": "Motion",
       "product": "Product"
     }
+  },
+  "system": {
+    "maintenance": {
+      "title": "We'll be right back",
+      "text": "The site is down for a short update. Please check again in a few minutes."
+    },
+    "notFound": {
+      "title": "We couldn't find that page",
+      "text": "The link may be old, or the page has moved.",
+      "home": "Go to the home page",
+      "contact": "Contact us",
+      "products": "Our products"
+    },
+    "error": {
+      "title": "Something went wrong",
+      "text": "This page couldn't load. Please try again.",
+      "retry": "Try again",
+      "home": "Go to the home page"
+    }
+  },
+  "products": {
+    "title": "Products",
+    "intro": "Software we design, build and run ourselves, for restaurants, PCs and everyday work."
+  },
+  "services": {
+    "title": "Services",
+    "intro": "Custom software, AI, cloud and e-commerce, built by the team that ships its own products.",
+    "capabilities": "What we do",
+    "deliverables": "What you get",
+    "proof": "Built by us",
+    "proofIntro": "Products we design, build and run ourselves with the same skills.",
+    "start": "Start a project"
+  },
+  "contact": {
+    "title": "Contact",
+    "intro": "Tell us what you need. A person reads every message.",
+    "email": "Email",
+    "emails": {
+      "hello": "General",
+      "sales": "Sales",
+      "support": "Support",
+      "careers": "Careers",
+      "privacy": "Privacy"
+    },
+    "phone": "Phone",
+    "whatsapp": "WhatsApp",
+    "whatsappCta": "Chat with us on WhatsApp",
+    "whatsappMessage": "Hello Jainav Infotech, I'd like to talk about…",
+    "newTab": "(opens in a new tab)",
+    "hours": "Business hours",
+    "office": "Registered office",
+    "showMap": "Show map",
+    "mapNote": "Loads Google Maps, which may set its own cookies.",
+    "mapTitle": "Map of our registered office"
+  },
+  "careers": {
+    "title": "Careers",
+    "intro": "Small team, real products, work you can point to.",
+    "openings": "Open roles",
+    "filter": "Filter roles",
+    "all": "All",
+    "none": "No open roles right now.",
+    "type": {
+      "full-time": "Full-time",
+      "part-time": "Part-time",
+      "internship": "Internship",
+      "contract": "Contract"
+    },
+    "mode": {
+      "onsite": "On-site",
+      "remote": "Remote",
+      "hybrid": "Hybrid"
+    },
+    "introduceTitle": "Introduce yourself",
+    "introduceText": "Don't see a role that fits? Tell us what you're good at and what you'd like to build.",
+    "introduceSubject": "Introducing myself",
+    "contact": "Contact us",
+    "internshipsTitle": "Internships",
+    "internshipsText": "Students can work with us on real projects. Write to us with what you've built so far.",
+    "posted": "Posted {date}",
+    "applyTitle": "Apply",
+    "applyText": "Send your CV (PDF) and a few lines about why this role interests you.",
+    "apply": "Apply by email"
+  },
+  "blog": {
+    "title": "Blog",
+    "intro": "Notes on building products, software and the tools we use.",
+    "tagTitle": "Posts tagged {tag}",
+    "pageTitle": "Blog, page {page}",
+    "tags": "Tags",
+    "all": "All posts",
+    "none": "No posts yet.",
+    "pagination": "Pages",
+    "newer": "Newer posts",
+    "older": "Older posts",
+    "page": "Page {page} of {total}",
+    "rss": "RSS feed",
+    "feedTitle": "Jainav Infotech blog",
+    "readingTime": "{minutes, plural, one {# min read} other {# min read}}",
+    "share": "Share",
+    "newTab": "(opens in a new tab)",
+    "related": "Related posts"
+  },
+  "changelog": {
+    "title": "Changelog",
+    "productTitle": "{name} changelog",
+    "intro": "New features, improvements and fixes across our products.",
+    "filter": "Filter by product",
+    "all": "All products",
+    "none": "No updates yet."
+  },
+  "legal": {
+    "version": "Version {version}, effective {date}",
+    "englishPrevails": "This is a translation. If the Hindi and English versions differ, the English version prevails.",
+    "englishOnly": "This page is available in English only."
   }
 }

@@ -8,7 +8,7 @@ import { seoPlugin } from '@payloadcms/plugin-seo'
 import type { GenerateTitle, GenerateURL } from '@payloadcms/plugin-seo/types'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { s3Storage } from '@payloadcms/storage-s3'
-import { buildConfig } from 'payload'
+import { buildConfig, type RootLivePreviewConfig } from 'payload'
 import sharp from 'sharp'
 
 import { contentEditors, staff } from './access/roles'
@@ -36,7 +36,7 @@ import { Users } from './collections/Users'
 import { Navigation } from './globals/Navigation'
 import { SiteSettings } from './globals/SiteSettings'
 import { revalidateCollection } from './hooks/revalidate'
-import { publicPath, type RoutedCollection } from './lib/routes'
+import { docPaths, publicPath, type RoutedCollection } from './lib/routes'
 import { migrations } from './migrations'
 import { auditPlugin } from './plugins/audit'
 import { defaultLocaleRequiredPlugin } from './plugins/defaultLocaleRequired'
@@ -55,6 +55,49 @@ const SEO_COLLECTIONS = [
 const generateTitle: GenerateTitle = ({ doc }) => {
   const name = doc?.title ?? doc?.name
   return name ? `${name} | Jainav Infotech` : 'Jainav Infotech'
+}
+
+/**
+ * Live preview (spec §20 Phase 3) in the admin's current language: the iframe enters draft mode
+ * through /api/v1/preview, which checks the admin session, then shows the page.
+ */
+const livePreviewURL: NonNullable<RootLivePreviewConfig['url']> = async ({
+  collectionConfig,
+  data,
+  locale,
+  req,
+}) => {
+  const slug = collectionConfig?.slug
+  let pagePath: string | null = null
+  if (slug === 'docs' && data.product && data.slug) {
+    const productId = typeof data.product === 'object' ? data.product.id : data.product
+    const [product, docs] = await Promise.all([
+      req.payload.findByID({
+        collection: 'products',
+        id: productId,
+        depth: 0,
+        req,
+        overrideAccess: true,
+      }),
+      req.payload.find({
+        collection: 'docs',
+        where: { product: { equals: productId } },
+        draft: true,
+        pagination: false,
+        depth: 0,
+        req,
+        overrideAccess: true,
+      }),
+    ])
+    const path = docPaths(docs.docs).get(data.id)
+    pagePath = path ? `/products/${product.slug}/docs/${path.join('/')}` : null
+  } else if (slug && slug in publicPath && data.slug) {
+    pagePath = publicPath[slug as RoutedCollection](String(data.slug))
+  }
+  if (!pagePath) return null
+  const localized =
+    locale.code === 'en' ? pagePath : `/${locale.code}${pagePath === '/' ? '' : pagePath}`
+  return `${SITE_URL}/api/v1/preview?path=${encodeURIComponent(localized)}`
 }
 
 const generateURL: GenerateURL = ({ doc, collectionConfig, locale }) => {
@@ -85,6 +128,15 @@ export default buildConfig({
     meta: {
       titleSuffix: '- Jainav Admin',
       defaultOGImageType: 'off',
+    },
+    livePreview: {
+      url: livePreviewURL,
+      collections: ['pages', 'products', 'services', 'posts', 'jobs', 'legal-pages', 'docs'],
+      breakpoints: [
+        { label: 'Mobile', name: 'mobile', width: 375, height: 812 },
+        { label: 'Tablet', name: 'tablet', width: 768, height: 1024 },
+        { label: 'Desktop', name: 'desktop', width: 1440, height: 900 },
+      ],
     },
     components: {
       graphics: {

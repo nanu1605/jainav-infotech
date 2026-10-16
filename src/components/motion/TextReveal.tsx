@@ -1,12 +1,8 @@
 'use client'
 
-import { stagger, type Variants } from 'motion/react'
-import * as m from 'motion/react-m'
-import { Fragment, useRef } from 'react'
+import { Fragment, useRef, type CSSProperties } from 'react'
 
-import { REVEAL } from '@/lib/motion'
-
-import { revealTarget, revealTransition, revealVariants, useReveal } from './Reveal'
+import { useReveal } from './Reveal'
 
 /**
  * Words and the collapsible spaces between them, in order (joined, they are the text again).
@@ -18,10 +14,6 @@ import { revealTarget, revealTransition, revealVariants, useReveal } from './Rev
 export const revealPieces = (text: string) => text.split(/([ \t\n\r\f]+)/).filter(Boolean)
 
 const isSpace = (piece: string) => /^[ \t\n\r\f]+$/.test(piece)
-
-const parentVariants: Variants = {
-  shown: { transition: { delayChildren: stagger(REVEAL.stagger) } },
-}
 
 type Props = {
   text: string
@@ -40,29 +32,23 @@ export function TextReveal({ text, as: Tag = 'h2', className }: Props) {
   return (
     <Tag className={className}>
       <span className="sr-only">{text}</span>
-      <m.span
-        ref={ref}
-        aria-hidden
-        initial={false}
-        animate={revealTarget(phase)}
-        variants={parentVariants}
-      >
+      <span ref={ref} aria-hidden data-stagger={phase}>
         {revealPieces(text).map((piece, i) =>
           isSpace(piece) ? (
             <Fragment key={i}>{piece}</Fragment>
           ) : (
-            <m.span
+            // Word i of the sentence: its delay is --i stagger steps (globals.css).
+            <span
               key={i}
+              data-reveal=""
               className="inline-block"
-              variants={revealVariants}
-              transition={revealTransition}
-              data-reveal
+              style={{ '--i': Math.floor(i / 2) } as CSSProperties}
             >
               {piece}
-            </m.span>
+            </span>
           ),
         )}
-      </m.span>
+      </span>
     </Tag>
   )
 }

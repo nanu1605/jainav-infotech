@@ -31,6 +31,14 @@ export const SiteSettings: GlobalConfig = {
                 { name: 'incorporationDate', type: 'date' },
                 { name: 'registeredAddress', type: 'textarea' },
                 {
+                  name: 'businessHours',
+                  type: 'textarea',
+                  localized: true,
+                  admin: {
+                    description: 'Shown on the Contact page, e.g. Mon–Sat, 10:00–19:00 IST.',
+                  },
+                },
+                {
                   name: 'phone',
                   type: 'text',
                   admin: { description: 'As shown on the site, e.g. +91 98765 43210.' },

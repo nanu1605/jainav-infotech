@@ -11,6 +11,8 @@ import { revalidateCollection } from '@/hooks/revalidate'
 // Listing mimeTypes disables Payload's built-in block-list, and unsniffable files fall back to
 // text/plain (needed for .vtt captions), so the extension is checked explicitly. No SVG: it can
 // carry scripts, and media is served from the site origin in development.
+const revalidateMedia = revalidateCollection({ tag: 'media' })
+
 const ALLOWED_EXT = /\.(avif|gif|jpe?g|png|webp|mp4|webm|vtt)$/i
 
 const UNSUPPORTED = 'Upload an image, an MP4/WebM video or a .vtt caption file.'
@@ -49,8 +51,13 @@ export const Media: CollectionConfig = {
   hooks: {
     beforeOperation: [checkFileName],
     beforeChange: [checkDetectedType],
-    // Pages that render media (alt text, replaced files) tag their fetches with 'media'.
-    ...revalidateCollection({ tag: 'media' }),
+    // Pages that render media (alt text, replaced files) tag their fetches with 'media'. A new
+    // upload isn't on any page yet (the document that starts using it expires its own tag), so
+    // only updates and deletes expire every page.
+    afterChange: [
+      (args) => (args.operation === 'create' ? args.doc : revalidateMedia.afterChange[0]!(args)),
+    ],
+    afterDelete: revalidateMedia.afterDelete,
   },
   fields: [
     { name: 'alt', type: 'text', localized: true, required: true },

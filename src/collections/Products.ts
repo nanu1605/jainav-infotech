@@ -6,7 +6,19 @@ import { hiStatusField } from '@/fields/hiStatus'
 import { productButtonField } from '@/fields/productButton'
 import { hexColor, httpUrl, integer } from '@/fields/validators'
 import { revalidateCollection } from '@/hooks/revalidate'
+import { syncShortLink } from '@/hooks/syncShortLink'
 import { hostedProductSubpaths, publicPath } from '@/lib/routes'
+
+const revalidateProducts = revalidateCollection({
+  tag: 'products',
+  paths: ({ slug, hostingMode }) => {
+    if (!slug) return []
+    const page = publicPath.products(slug)
+    return hostingMode === 'hosted'
+      ? [page, ...hostedProductSubpaths.map((sub) => `${page}/${sub}`)]
+      : [page]
+  },
+})
 
 export const Products: CollectionConfig = {
   slug: 'products',
@@ -34,16 +46,8 @@ export const Products: CollectionConfig = {
     delete: contentEditors,
   },
   hooks: {
-    ...revalidateCollection({
-      tag: 'products',
-      paths: ({ slug, hostingMode }) => {
-        if (!slug) return []
-        const page = publicPath.products(slug)
-        return hostingMode === 'hosted'
-          ? [page, ...hostedProductSubpaths.map((sub) => `${page}/${sub}`)]
-          : [page]
-      },
-    }),
+    afterChange: [...revalidateProducts.afterChange, syncShortLink],
+    afterDelete: revalidateProducts.afterDelete,
   },
   fields: [
     // The SEO plugin appends its tab here, so tabs must stay the first field.

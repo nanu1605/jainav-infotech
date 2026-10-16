@@ -3011,6 +3011,10 @@ export interface SiteSetting {
     incorporationDate?: string | null;
     registeredAddress?: string | null;
     /**
+     * Shown on the Contact page, e.g. Mon–Sat, 10:00–19:00 IST.
+     */
+    businessHours?: string | null;
+    /**
      * As shown on the site, e.g. +91 98765 43210.
      */
     phone?: string | null;
@@ -3098,6 +3102,7 @@ export interface SiteSettingsSelect<T extends boolean = true> {
         gstin?: T;
         incorporationDate?: T;
         registeredAddress?: T;
+        businessHours?: T;
         phone?: T;
         emails?:
           | T

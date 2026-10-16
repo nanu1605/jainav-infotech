@@ -3,6 +3,8 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 
 export default defineConfig({
   plugins: [tsconfigPaths()],
+  // Next resolves server-only itself; under Vitest it is the empty server build.
+  resolve: { alias: { 'server-only': 'next/dist/compiled/server-only/empty.js' } },
   test: {
     environment: 'node',
     projects: [

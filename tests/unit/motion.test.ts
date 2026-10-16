@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { countFrame, numberFormat } from '@/components/motion/CountUp'
+import { countFrame } from '@/components/motion/CountUp'
+import { numberFormat } from '@/lib/format'
 import { magneticPull } from '@/components/motion/MagneticButton'
 import { revealPieces } from '@/components/motion/TextReveal'
 import { pointerRatio } from '@/components/motion/Tilt'
