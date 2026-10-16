@@ -1,15 +1,9 @@
 import type { TextFieldSingleValidation } from 'payload'
 import { text as validateText } from 'payload/shared'
 
-/** Hosts the Embed block may frame. The CSP frame-src (Phase 6) is built from this list. */
-export const EMBED_ALLOWED_HOSTS: readonly string[] = [
-  'www.youtube-nocookie.com',
-  'www.youtube.com',
-  'player.vimeo.com',
-  'www.loom.com',
-  'cal.com',
-  'calendly.com',
-]
+import { EMBED_ALLOWED_HOSTS } from './embedHosts'
+
+export { EMBED_ALLOWED_HOSTS }
 
 /** https only, exact host: no subdomains, no non-default port. */
 export function isAllowedEmbedUrl(url: string): boolean {
