@@ -34,6 +34,13 @@ docker pull "$image" || docker image inspect "$image" >/dev/null
 point_to "$image"
 if healthy; then
   echo "$(date -u +%FT%TZ) $service $previous -> $image" >>deploys.log
+  # Old images of this environment (staging-* or prod-*), except the new one and the rollback
+  # target; images in use by a container are skipped by docker rmi.
+  tag_prefix=${image##*:}
+  tag_prefix=${tag_prefix%%-*}-
+  docker images --format '{{.Repository}}:{{.Tag}}' "${image%:*}" |
+    grep -F ":$tag_prefix" | grep -vxF -e "$image" -e "$previous" |
+    xargs -r docker rmi >/dev/null 2>&1 || true
   docker image prune -f >/dev/null
   echo "$service is running $image"
 else
