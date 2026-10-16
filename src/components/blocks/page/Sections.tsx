@@ -186,7 +186,11 @@ export function Testimonials({ items, className }: { items: Testimonial[]; class
 export async function ProductShowcase({ block, locale }: BlockProps<PageProductShowcaseBlock>) {
   const products =
     block.mode === 'selected'
-      ? docs<Product>(block.products).map((p) => ({ ...p, logo: media(p.logo) }))
+      ? docs<Product>(block.products).map((p) => ({
+          ...p,
+          logo: media(p.logo),
+          preview: media(p.cardPreview),
+        }))
       : (await getProducts(locale, { retired: false })).filter((p) => p.featured)
   if (!products.length) return null
   return (
