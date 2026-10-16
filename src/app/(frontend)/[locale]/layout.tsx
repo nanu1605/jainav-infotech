@@ -21,7 +21,17 @@ type Props = { children: ReactNode; params: Promise<{ locale: string }> }
  * Namespaces client components read. Everything else stays on the server, so page text isn't
  * shipped twice in every page's payload. A client component using another namespace needs it here.
  */
-const CLIENT_MESSAGES = ['site', 'language', 'theme', 'ui', 'contact', 'system', 'forms'] as const
+const CLIENT_MESSAGES = [
+  'site',
+  'language',
+  'theme',
+  'ui',
+  'contact',
+  'system',
+  'forms',
+  'account',
+  'checkout',
+] as const
 
 // CI builds images without a database: render on first request instead (spec §4.3).
 export function generateStaticParams() {

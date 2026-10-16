@@ -94,6 +94,10 @@ export interface Config {
     installers: Installer;
     docs: Doc;
     changelog: Changelog;
+    orders: Order;
+    invoices: Invoice;
+    customers: Customer;
+    coupons: Coupon;
     leads: Lead;
     'data-requests': DataRequest;
     'private-files': PrivateFile;
@@ -101,8 +105,13 @@ export interface Config {
     users: User;
     'audit-log': AuditLog;
     'daily-stats': DailyStat;
+    'webhook-events': WebhookEvent;
+    'invoice-counters': InvoiceCounter;
+    'otp-challenges': OtpChallenge;
+    'customer-sessions': CustomerSession;
     redirects: Redirect;
     'payload-kv': PayloadKv;
+    'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -128,6 +137,10 @@ export interface Config {
     installers: InstallersSelect<false> | InstallersSelect<true>;
     docs: DocsSelect<false> | DocsSelect<true>;
     changelog: ChangelogSelect<false> | ChangelogSelect<true>;
+    orders: OrdersSelect<false> | OrdersSelect<true>;
+    invoices: InvoicesSelect<false> | InvoicesSelect<true>;
+    customers: CustomersSelect<false> | CustomersSelect<true>;
+    coupons: CouponsSelect<false> | CouponsSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
     'data-requests': DataRequestsSelect<false> | DataRequestsSelect<true>;
     'private-files': PrivateFilesSelect<false> | PrivateFilesSelect<true>;
@@ -135,8 +148,13 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     'audit-log': AuditLogSelect<false> | AuditLogSelect<true>;
     'daily-stats': DailyStatsSelect<false> | DailyStatsSelect<true>;
+    'webhook-events': WebhookEventsSelect<false> | WebhookEventsSelect<true>;
+    'invoice-counters': InvoiceCountersSelect<false> | InvoiceCountersSelect<true>;
+    'otp-challenges': OtpChallengesSelect<false> | OtpChallengesSelect<true>;
+    'customer-sessions': CustomerSessionsSelect<false> | CustomerSessionsSelect<true>;
     redirects: RedirectsSelect<false> | RedirectsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
+    'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -147,11 +165,15 @@ export interface Config {
   fallbackLocale: ('false' | 'none' | 'null') | false | null | ('en' | 'hi') | ('en' | 'hi')[];
   globals: {
     'site-settings': SiteSetting;
+    'commerce-settings': CommerceSetting;
     navigation: Navigation;
+    'payload-jobs-stats': PayloadJobsStat;
   };
   globalsSelect: {
     'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
+    'commerce-settings': CommerceSettingsSelect<false> | CommerceSettingsSelect<true>;
     navigation: NavigationSelect<false> | NavigationSelect<true>;
+    'payload-jobs-stats': PayloadJobsStatsSelect<false> | PayloadJobsStatsSelect<true>;
   };
   locale: 'en' | 'hi';
   widgets: {
@@ -159,7 +181,17 @@ export interface Config {
   };
   user: User;
   jobs: {
-    tasks: unknown;
+    tasks: {
+      processWebhook: TaskProcessWebhook;
+      renderInvoicePdf: TaskRenderInvoicePdf;
+      sendOrderEmail: TaskSendOrderEmail;
+      reconcileOrders: TaskReconcileOrders;
+      cleanupSignIns: TaskCleanupSignIns;
+      inline: {
+        input: unknown;
+        output: unknown;
+      };
+    };
     workflows: unknown;
   };
 }
@@ -1505,6 +1537,296 @@ export interface Changelog {
   createdAt: string;
 }
 /**
+ * Amounts are in paise: 99900 = ₹999.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "orders".
+ */
+export interface Order {
+  id: number;
+  orderNumber: string;
+  customer: number | Customer;
+  status: 'created' | 'paid' | 'refunded' | 'partially-refunded' | 'disputed' | 'expired';
+  flags?: 'paid-twice'[] | null;
+  paidAt?: string | null;
+  emailedAt?: string | null;
+  /**
+   * Language of the order emails.
+   */
+  locale: 'en' | 'hi';
+  items: {
+    product: number | Product;
+    plan: number | Plan;
+    qty: number;
+    unitPrice: number;
+    /**
+     * As printed on the invoice.
+     */
+    description: string;
+    id?: string | null;
+  }[];
+  currency: 'INR';
+  subtotal: number;
+  discount: number;
+  total: number;
+  coupon?: (number | null) | Coupon;
+  tax: {
+    mode: 'cgst_sgst' | 'igst' | 'none';
+    ratePercent: number;
+    taxable: number;
+    cgst: number;
+    sgst: number;
+    igst: number;
+  };
+  /**
+   * As entered at checkout; printed on the invoice.
+   */
+  billing: {
+    name: string;
+    email: string;
+    phone?: string | null;
+    country: string;
+    stateCode: string;
+    stateName: string;
+    businessName?: string | null;
+    gstin?: string | null;
+  };
+  /**
+   * The Terms and EULA versions the customer accepted at checkout.
+   */
+  acceptance: {
+    termsVersion: string;
+    eulaVersion: string;
+    at: string;
+    ipHash?: string | null;
+  };
+  razorpayOrderId?: string | null;
+  razorpayPaymentId?: string | null;
+  invoice?: (number | null) | Invoice;
+  creditNotes?: (number | Invoice)[] | null;
+  /**
+   * What happened to this order, oldest first.
+   */
+  events?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "customers".
+ */
+export interface Customer {
+  id: number;
+  email: string;
+  name?: string | null;
+  phone?: string | null;
+  /**
+   * ISO code. India only while international sales are off.
+   */
+  country?: string | null;
+  /**
+   * Place of supply. A GSTIN sets it.
+   */
+  state?:
+    | (
+        | '10'
+        | '11'
+        | '12'
+        | '13'
+        | '14'
+        | '15'
+        | '16'
+        | '17'
+        | '18'
+        | '19'
+        | '20'
+        | '21'
+        | '22'
+        | '23'
+        | '24'
+        | '26'
+        | '27'
+        | '29'
+        | '30'
+        | '31'
+        | '32'
+        | '33'
+        | '34'
+        | '35'
+        | '36'
+        | '37'
+        | '38'
+        | '97'
+        | '01'
+        | '02'
+        | '03'
+        | '04'
+        | '05'
+        | '06'
+        | '07'
+        | '08'
+        | '09'
+      )
+    | null;
+  businessName?: string | null;
+  gstin?: string | null;
+  /**
+   * Emails are sent in this language.
+   */
+  preferredLocale: 'en' | 'hi';
+  status: 'active' | 'deleted';
+  deletedAt?: string | null;
+  /**
+   * Changed by the customer on their account page.
+   */
+  marketingConsent?: {
+    given?: boolean | null;
+    at?: string | null;
+    textVersion?: string | null;
+    withdrawnAt?: string | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "coupons".
+ */
+export interface Coupon {
+  id: number;
+  code: string;
+  kind: 'percent' | 'fixed';
+  /**
+   * Percent, or paise for a fixed amount.
+   */
+  value: number;
+  currency?: 'INR' | null;
+  /**
+   * Empty: every product.
+   */
+  products?: (number | Product)[] | null;
+  /**
+   * Empty: every plan.
+   */
+  plans?: (number | Plan)[] | null;
+  validFrom?: string | null;
+  validTo?: string | null;
+  /**
+   * Empty: unlimited.
+   */
+  maxRedemptions?: number | null;
+  /**
+   * Empty: unlimited.
+   */
+  perCustomerLimit?: number | null;
+  redemptions?: number | null;
+  active?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Amounts are in paise. Issued invoices are read-only: correct them with a credit note.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "invoices".
+ */
+export interface Invoice {
+  id: number;
+  number: string;
+  kind: 'invoice' | 'credit-note';
+  financialYear: string;
+  order: number | Order;
+  issuedAt: string;
+  /**
+   * Credit notes: the invoice they correct.
+   */
+  originalInvoice?: (number | null) | Invoice;
+  pdf?: (number | null) | PrivateFile;
+  seller: {
+    stateName: string;
+    stateCode: string;
+    gstin?: string | null;
+    legalName: string;
+    cin?: string | null;
+    address?: string | null;
+  };
+  buyer: {
+    stateName: string;
+    stateCode: string;
+    gstin?: string | null;
+    name: string;
+    businessName?: string | null;
+    email?: string | null;
+    country: string;
+  };
+  taxMode: 'cgst_sgst' | 'igst' | 'none';
+  sacCode?: string | null;
+  reverseCharge?: boolean | null;
+  currency: string;
+  lines: {
+    description: string;
+    qty: number;
+    unitPrice: number;
+    discount: number;
+    taxable: number;
+    ratePercent: number;
+    cgst: number;
+    sgst: number;
+    igst: number;
+    total: number;
+    id?: string | null;
+  }[];
+  totals: {
+    subtotal: number;
+    discount: number;
+    taxable: number;
+    cgst: number;
+    sgst: number;
+    igst: number;
+    total: number;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "private-files".
+ */
+export interface PrivateFile {
+  id: number;
+  purpose: 'cv' | 'invoice' | 'attachment';
+  owner?:
+    | ({
+        relationTo: 'leads';
+        value: number | Lead;
+      } | null)
+    | ({
+        relationTo: 'invoices';
+        value: number | Invoice;
+      } | null);
+  prefix?: string | null;
+  _objectKey?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "leads".
  */
@@ -1589,31 +1911,6 @@ export interface User {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "private-files".
- */
-export interface PrivateFile {
-  id: number;
-  purpose: 'cv' | 'invoice' | 'attachment';
-  owner?: {
-    relationTo: 'leads';
-    value: number | Lead;
-  } | null;
-  prefix?: string | null;
-  _objectKey?: string | null;
-  updatedAt: string;
-  createdAt: string;
-  url?: string | null;
-  thumbnailURL?: string | null;
-  filename?: string | null;
-  mimeType?: string | null;
-  filesize?: number | null;
-  width?: number | null;
-  height?: number | null;
-  focalX?: number | null;
-  focalY?: number | null;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "data-requests".
  */
 export interface DataRequest {
@@ -1624,6 +1921,10 @@ export interface DataRequest {
   status: 'new' | 'in-progress' | 'completed' | 'rejected';
   handledBy?: (number | null) | User;
   handledAt?: string | null;
+  /**
+   * Set when the request was sent while signed in to a store account.
+   */
+  customer?: (number | null) | Customer;
   updatedAt: string;
   createdAt: string;
 }
@@ -1681,6 +1982,71 @@ export interface DailyStat {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "webhook-events".
+ */
+export interface WebhookEvent {
+  id: number;
+  provider: 'razorpay';
+  eventId: string;
+  event: string;
+  status: 'received' | 'processed' | 'ignored' | 'failed';
+  receivedAt: string;
+  processedAt?: string | null;
+  error?: string | null;
+  payload:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "invoice-counters".
+ */
+export interface InvoiceCounter {
+  id: number;
+  series: string;
+  financialYear: string;
+  next: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "otp-challenges".
+ */
+export interface OtpChallenge {
+  id: number;
+  emailHash: string;
+  codeHmac: string;
+  expiresAt: string;
+  attempts: number;
+  ipHash?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "customer-sessions".
+ */
+export interface CustomerSession {
+  id: number;
+  tokenHash: string;
+  customer: number | Customer;
+  expiresAt: string;
+  lastSeenAt?: string | null;
+  userAgent?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "redirects".
  */
 export interface Redirect {
@@ -1727,6 +2093,109 @@ export interface PayloadKv {
     | number
     | boolean
     | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs".
+ */
+export interface PayloadJob {
+  id: number;
+  /**
+   * Input data provided to the job
+   */
+  input?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  taskStatus?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  completedAt?: string | null;
+  totalTried?: number | null;
+  /**
+   * If hasError is true this job will not be retried
+   */
+  hasError?: boolean | null;
+  /**
+   * If hasError is true, this is the error that caused it
+   */
+  error?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Task execution log
+   */
+  log?:
+    | {
+        executedAt: string;
+        completedAt: string;
+        taskSlug:
+          'inline' | 'processWebhook' | 'renderInvoicePdf' | 'sendOrderEmail' | 'reconcileOrders' | 'cleanupSignIns';
+        taskID: string;
+        input?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        output?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        state: 'failed' | 'succeeded';
+        error?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  taskSlug?:
+    ('inline' | 'processWebhook' | 'renderInvoicePdf' | 'sendOrderEmail' | 'reconcileOrders' | 'cleanupSignIns') | null;
+  queue?: string | null;
+  waitUntil?: string | null;
+  processing?: boolean | null;
+  meta?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1796,6 +2265,22 @@ export interface PayloadLockedDocument {
         value: number | Changelog;
       } | null)
     | ({
+        relationTo: 'orders';
+        value: number | Order;
+      } | null)
+    | ({
+        relationTo: 'invoices';
+        value: number | Invoice;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: number | Customer;
+      } | null)
+    | ({
+        relationTo: 'coupons';
+        value: number | Coupon;
+      } | null)
+    | ({
         relationTo: 'leads';
         value: number | Lead;
       } | null)
@@ -1822,6 +2307,22 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'daily-stats';
         value: number | DailyStat;
+      } | null)
+    | ({
+        relationTo: 'webhook-events';
+        value: number | WebhookEvent;
+      } | null)
+    | ({
+        relationTo: 'invoice-counters';
+        value: number | InvoiceCounter;
+      } | null)
+    | ({
+        relationTo: 'otp-challenges';
+        value: number | OtpChallenge;
+      } | null)
+    | ({
+        relationTo: 'customer-sessions';
+        value: number | CustomerSession;
       } | null)
     | ({
         relationTo: 'redirects';
@@ -2867,6 +3368,183 @@ export interface ChangelogSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "orders_select".
+ */
+export interface OrdersSelect<T extends boolean = true> {
+  orderNumber?: T;
+  customer?: T;
+  status?: T;
+  flags?: T;
+  paidAt?: T;
+  emailedAt?: T;
+  locale?: T;
+  items?:
+    | T
+    | {
+        product?: T;
+        plan?: T;
+        qty?: T;
+        unitPrice?: T;
+        description?: T;
+        id?: T;
+      };
+  currency?: T;
+  subtotal?: T;
+  discount?: T;
+  total?: T;
+  coupon?: T;
+  tax?:
+    | T
+    | {
+        mode?: T;
+        ratePercent?: T;
+        taxable?: T;
+        cgst?: T;
+        sgst?: T;
+        igst?: T;
+      };
+  billing?:
+    | T
+    | {
+        name?: T;
+        email?: T;
+        phone?: T;
+        country?: T;
+        stateCode?: T;
+        stateName?: T;
+        businessName?: T;
+        gstin?: T;
+      };
+  acceptance?:
+    | T
+    | {
+        termsVersion?: T;
+        eulaVersion?: T;
+        at?: T;
+        ipHash?: T;
+      };
+  razorpayOrderId?: T;
+  razorpayPaymentId?: T;
+  invoice?: T;
+  creditNotes?: T;
+  events?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "invoices_select".
+ */
+export interface InvoicesSelect<T extends boolean = true> {
+  number?: T;
+  kind?: T;
+  financialYear?: T;
+  order?: T;
+  issuedAt?: T;
+  originalInvoice?: T;
+  pdf?: T;
+  seller?:
+    | T
+    | {
+        stateName?: T;
+        stateCode?: T;
+        gstin?: T;
+        legalName?: T;
+        cin?: T;
+        address?: T;
+      };
+  buyer?:
+    | T
+    | {
+        stateName?: T;
+        stateCode?: T;
+        gstin?: T;
+        name?: T;
+        businessName?: T;
+        email?: T;
+        country?: T;
+      };
+  taxMode?: T;
+  sacCode?: T;
+  reverseCharge?: T;
+  currency?: T;
+  lines?:
+    | T
+    | {
+        description?: T;
+        qty?: T;
+        unitPrice?: T;
+        discount?: T;
+        taxable?: T;
+        ratePercent?: T;
+        cgst?: T;
+        sgst?: T;
+        igst?: T;
+        total?: T;
+        id?: T;
+      };
+  totals?:
+    | T
+    | {
+        subtotal?: T;
+        discount?: T;
+        taxable?: T;
+        cgst?: T;
+        sgst?: T;
+        igst?: T;
+        total?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "customers_select".
+ */
+export interface CustomersSelect<T extends boolean = true> {
+  email?: T;
+  name?: T;
+  phone?: T;
+  country?: T;
+  state?: T;
+  businessName?: T;
+  gstin?: T;
+  preferredLocale?: T;
+  status?: T;
+  deletedAt?: T;
+  marketingConsent?:
+    | T
+    | {
+        given?: T;
+        at?: T;
+        textVersion?: T;
+        withdrawnAt?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "coupons_select".
+ */
+export interface CouponsSelect<T extends boolean = true> {
+  code?: T;
+  kind?: T;
+  value?: T;
+  currency?: T;
+  products?: T;
+  plans?: T;
+  validFrom?: T;
+  validTo?: T;
+  maxRedemptions?: T;
+  perCustomerLimit?: T;
+  redemptions?: T;
+  active?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "leads_select".
  */
 export interface LeadsSelect<T extends boolean = true> {
@@ -2930,6 +3608,7 @@ export interface DataRequestsSelect<T extends boolean = true> {
   status?: T;
   handledBy?: T;
   handledAt?: T;
+  customer?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3026,6 +3705,59 @@ export interface DailyStatsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "webhook-events_select".
+ */
+export interface WebhookEventsSelect<T extends boolean = true> {
+  provider?: T;
+  eventId?: T;
+  event?: T;
+  status?: T;
+  receivedAt?: T;
+  processedAt?: T;
+  error?: T;
+  payload?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "invoice-counters_select".
+ */
+export interface InvoiceCountersSelect<T extends boolean = true> {
+  series?: T;
+  financialYear?: T;
+  next?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "otp-challenges_select".
+ */
+export interface OtpChallengesSelect<T extends boolean = true> {
+  emailHash?: T;
+  codeHmac?: T;
+  expiresAt?: T;
+  attempts?: T;
+  ipHash?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "customer-sessions_select".
+ */
+export interface CustomerSessionsSelect<T extends boolean = true> {
+  tokenHash?: T;
+  customer?: T;
+  expiresAt?: T;
+  lastSeenAt?: T;
+  userAgent?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "redirects_select".
  */
 export interface RedirectsSelect<T extends boolean = true> {
@@ -3048,6 +3780,38 @@ export interface RedirectsSelect<T extends boolean = true> {
 export interface PayloadKvSelect<T extends boolean = true> {
   key?: T;
   data?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs_select".
+ */
+export interface PayloadJobsSelect<T extends boolean = true> {
+  input?: T;
+  taskStatus?: T;
+  completedAt?: T;
+  totalTried?: T;
+  hasError?: T;
+  error?: T;
+  log?:
+    | T
+    | {
+        executedAt?: T;
+        completedAt?: T;
+        taskSlug?: T;
+        taskID?: T;
+        input?: T;
+        output?: T;
+        state?: T;
+        error?: T;
+        id?: T;
+      };
+  taskSlug?: T;
+  queue?: T;
+  waitUntil?: T;
+  processing?: T;
+  meta?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -3143,6 +3907,102 @@ export interface SiteSetting {
   createdAt?: string | null;
 }
 /**
+ * Confirm every tax setting with the CA before going live.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "commerce-settings".
+ */
+export interface CommerceSetting {
+  id: number;
+  /**
+   * Off: invoices carry no tax lines and no "incl. GST" anywhere.
+   */
+  gstEnabled?: boolean | null;
+  gstRatePercent: number;
+  /**
+   * From the CA: {{SAC_CODE}}.
+   */
+  sacCode?: string | null;
+  /**
+   * Buyers here pay CGST + SGST; others IGST.
+   */
+  homeStateCode:
+    | '10'
+    | '11'
+    | '12'
+    | '13'
+    | '14'
+    | '15'
+    | '16'
+    | '17'
+    | '18'
+    | '19'
+    | '20'
+    | '21'
+    | '22'
+    | '23'
+    | '24'
+    | '26'
+    | '27'
+    | '29'
+    | '30'
+    | '31'
+    | '32'
+    | '33'
+    | '34'
+    | '35'
+    | '36'
+    | '37'
+    | '38'
+    | '97'
+    | '01'
+    | '02'
+    | '03'
+    | '04'
+    | '05'
+    | '06'
+    | '07'
+    | '08'
+    | '09';
+  pricesIncludeGst?: boolean | null;
+  /**
+   * India only for now (spec §22); USD pricing comes later.
+   */
+  internationalEnabled?: boolean | null;
+  /**
+   * From the CA: {{CONFIRM_WITH_CA}}.
+   */
+  exportTreatment?: ('lut' | 'igst') | null;
+  /**
+   * e.g. JI → JI/26-27/00001
+   */
+  invoicePrefix: string;
+  /**
+   * e.g. JC → JC/26-27/00001
+   */
+  creditNotePrefix: string;
+  /**
+   * Recorded with each order. Checkout needs it.
+   */
+  currentTermsVersion?: string | null;
+  /**
+   * Recorded with each order. Checkout needs it.
+   */
+  currentEulaVersion?: string | null;
+  /**
+   * From the refunds policy: {{REFUND_WINDOW_DAYS}}.
+   */
+  refundWindowDays?: number | null;
+  defaultMaxActivations: number;
+  deactivationsPerMonth: number;
+  trialDays: number;
+  licenseTokenDays: number;
+  refreshAfterDays: number;
+  tokenGraceDays: number;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "navigation".
  */
@@ -3168,6 +4028,24 @@ export interface Navigation {
           | null;
         id?: string | null;
       }[]
+    | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs-stats".
+ */
+export interface PayloadJobsStat {
+  id: number;
+  stats?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
     | null;
   updatedAt?: string | null;
   createdAt?: string | null;
@@ -3228,6 +4106,33 @@ export interface SiteSettingsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "commerce-settings_select".
+ */
+export interface CommerceSettingsSelect<T extends boolean = true> {
+  gstEnabled?: T;
+  gstRatePercent?: T;
+  sacCode?: T;
+  homeStateCode?: T;
+  pricesIncludeGst?: T;
+  internationalEnabled?: T;
+  exportTreatment?: T;
+  invoicePrefix?: T;
+  creditNotePrefix?: T;
+  currentTermsVersion?: T;
+  currentEulaVersion?: T;
+  refundWindowDays?: T;
+  defaultMaxActivations?: T;
+  deactivationsPerMonth?: T;
+  trialDays?: T;
+  licenseTokenDays?: T;
+  refreshAfterDays?: T;
+  tokenGraceDays?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "navigation_select".
  */
 export interface NavigationSelect<T extends boolean = true> {
@@ -3258,6 +4163,16 @@ export interface NavigationSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs-stats_select".
+ */
+export interface PayloadJobsStatsSelect<T extends boolean = true> {
+  stats?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "collections_widget".
  */
 export interface CollectionsWidget {
@@ -3265,6 +4180,52 @@ export interface CollectionsWidget {
     [k: string]: unknown;
   };
   width: 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskProcessWebhook".
+ */
+export interface TaskProcessWebhook {
+  input: {
+    id: number;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskRenderInvoicePdf".
+ */
+export interface TaskRenderInvoicePdf {
+  input: {
+    id: number;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskSendOrderEmail".
+ */
+export interface TaskSendOrderEmail {
+  input: {
+    id: number;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskReconcileOrders".
+ */
+export interface TaskReconcileOrders {
+  input?: unknown;
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskCleanupSignIns".
+ */
+export interface TaskCleanupSignIns {
+  input?: unknown;
+  output?: unknown;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

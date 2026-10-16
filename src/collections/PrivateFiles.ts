@@ -40,10 +40,10 @@ export const PrivateFiles: CollectionConfig = {
       index: true,
     },
     {
-      // Polymorphic so Phase 7 can add invoices (orders) without a schema rewrite.
+      // A lead (CVs) or an invoice (its PDF).
       name: 'owner',
       type: 'relationship',
-      relationTo: ['leads'],
+      relationTo: ['leads', 'invoices'],
       admin: { readOnly: true },
     },
   ],

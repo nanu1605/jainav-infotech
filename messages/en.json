@@ -383,6 +383,7 @@
     "proofIntro": "Products we design, build and run ourselves with the same skills.",
     "start": "Start a project"
   },
+  "checkout": {},
   "contact": {
     "title": "Contact",
     "intro": "Tell us what you need. A person reads every message.",
@@ -450,6 +451,7 @@
     "newTab": "(opens in a new tab)",
     "related": "Related posts"
   },
+  "account": {},
   "changelog": {
     "title": "Changelog",
     "productTitle": "{name} changelog",

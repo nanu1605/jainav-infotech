@@ -15,15 +15,20 @@ import sharp from 'sharp'
 import { contentEditors, staff } from './access/roles'
 import { AuditLog } from './collections/AuditLog'
 import { Changelog } from './collections/Changelog'
+import { Coupons } from './collections/Coupons'
+import { CustomerSessions, OtpChallenges } from './collections/CustomerAuth'
+import { Customers } from './collections/Customers'
 import { DailyStats } from './collections/DailyStats'
 import { DataRequests } from './collections/DataRequests'
 import { Docs } from './collections/Docs'
 import { Faqs } from './collections/Faqs'
 import { Installers } from './collections/Installers'
+import { InvoiceCounters, Invoices } from './collections/Invoices'
 import { Jobs } from './collections/Jobs'
 import { Leads } from './collections/Leads'
 import { LegalPages } from './collections/LegalPages'
 import { Media } from './collections/Media'
+import { Orders } from './collections/Orders'
 import { Pages } from './collections/Pages'
 import { Plans } from './collections/Plans'
 import { Posts } from './collections/Posts'
@@ -35,9 +40,12 @@ import { ShortLinks } from './collections/ShortLinks'
 import { Team } from './collections/Team'
 import { Testimonials } from './collections/Testimonials'
 import { Users } from './collections/Users'
+import { WebhookEvents } from './collections/WebhookEvents'
+import { CommerceSettings } from './globals/CommerceSettings'
 import { Navigation } from './globals/Navigation'
 import { SiteSettings } from './globals/SiteSettings'
 import { revalidateCollection } from './hooks/revalidate'
+import { jobs } from './jobs'
 import { outboxAdapter } from './lib/outbox'
 import { docPaths, publicPath, type RoutedCollection } from './lib/routes'
 import { migrations } from './migrations'
@@ -157,7 +165,7 @@ export default buildConfig({
       },
     },
   },
-  // Order sets the admin sidebar: Content · Products · (Store, Phase 7) · Leads · Settings · System.
+  // Order sets the admin sidebar: Content · Products · Store · Leads · Settings · System.
   collections: [
     Pages,
     Posts,
@@ -174,6 +182,10 @@ export default buildConfig({
     Installers,
     Docs,
     Changelog,
+    Orders,
+    Invoices,
+    Customers,
+    Coupons,
     Leads,
     DataRequests,
     PrivateFiles,
@@ -181,8 +193,13 @@ export default buildConfig({
     Users,
     AuditLog,
     DailyStats,
+    WebhookEvents,
+    InvoiceCounters,
+    OtpChallenges,
+    CustomerSessions,
   ],
-  globals: [SiteSettings, Navigation],
+  globals: [SiteSettings, CommerceSettings, Navigation],
+  jobs,
   // Spec §6: field-level localization, English default, fallback on.
   localization: {
     locales: [

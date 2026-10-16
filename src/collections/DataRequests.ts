@@ -67,5 +67,16 @@ export const DataRequests: CollectionConfig = {
       admin: { position: 'sidebar' },
     },
     { name: 'handledAt', type: 'date', admin: { position: 'sidebar' } },
+    {
+      name: 'customer',
+      type: 'relationship',
+      relationTo: 'customers',
+      access: record,
+      admin: {
+        position: 'sidebar',
+        readOnly: true,
+        description: 'Set when the request was sent while signed in to a store account.',
+      },
+    },
   ],
 }
