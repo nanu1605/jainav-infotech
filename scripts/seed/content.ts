@@ -832,7 +832,6 @@ export const founder: SeedDoc<'team'> = {
     role: 'Founder',
     // From Tanishq's resume and the MenuMesh and VYRO repos (2026-10-16); written without pronouns.
     bio: 'Tanishq Jain founded Jainav Infotech and builds its products. MenuMesh is a QR table-ordering platform for restaurants, built with Next.js and Supabase, that takes an order from the guest’s phone through the kitchen to a GST bill. VYRO is a light Windows hardware monitor written in Rust and Svelte, with live sensors, history, health alerts and in-game frame rates. Baby is a voice assistant for Windows that keeps speech recognition and memory on the PC. Before Jainav, Tanishq spent a year and a half as a software engineer at Bosch Global Software Technologies in Bangalore, building CI/CD pipelines and moving services to Docker and Kubernetes, then built a complete online counselling platform as a freelancer, from bookings to Razorpay payments. Tanishq was selected for Google Summer of Code 2022 (the PEcAn project) and studied Computer Science and Engineering at Bangalore Institute of Technology.',
-    // {{FOUNDER_PHOTO}}: upload in the admin (Team → Tanishq Jain → Photo).
     links: [
       { label: 'LinkedIn', url: 'https://www.linkedin.com/in/tanishqjain010' },
       { label: 'Instagram', url: 'https://www.instagram.com/tan.ishq_1605/' },

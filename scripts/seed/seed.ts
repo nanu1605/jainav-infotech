@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url'
+
 import type { CollectionSlug, Payload, RequiredDataFromCollectionSlug, Where } from 'payload'
 
 import * as content from './content'
@@ -70,6 +72,61 @@ async function ensure<S extends CollectionSlug>(
   })
   summary.created.push(label)
   return doc.id
+}
+
+// Square head-and-shoulders crop of Tanishq's portrait (2026-10-16), 800 px.
+const FOUNDER_PHOTO = fileURLToPath(new URL('./assets/tanishq-jain.jpg', import.meta.url))
+
+/** Uploads the photo once; links it only when the founder has none. */
+async function ensureFounderPhoto(payload: Payload, summary: SeedSummary, founderId: number) {
+  const label = 'media:tanishq-jain'
+  // `like`: Payload renames the file (tanishq-jain-1.jpg) when the name is taken on disk.
+  const found = await payload.find({
+    collection: 'media',
+    where: { filename: { like: 'tanishq-jain' } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+  if (found.docs.length) {
+    summary.skipped.push(label)
+    return
+  }
+  const photo = await payload.create({
+    collection: 'media',
+    data: { alt: 'Tanishq Jain' },
+    filePath: FOUNDER_PHOTO,
+    locale: 'en',
+    depth: 0,
+    context,
+    overrideAccess: true,
+  })
+  await payload.update({
+    collection: 'media',
+    id: photo.id,
+    data: { alt: 'तनिष्क जैन' },
+    locale: 'hi',
+    depth: 0,
+    context,
+    overrideAccess: true,
+  })
+  const founder = await payload.findByID({
+    collection: 'team',
+    id: founderId,
+    depth: 0,
+    overrideAccess: true,
+  })
+  if (!founder.photo) {
+    await payload.update({
+      collection: 'team',
+      id: founderId,
+      data: { photo: photo.id },
+      depth: 0,
+      context,
+      overrideAccess: true,
+    })
+  }
+  summary.created.push(label)
 }
 
 export async function seed(payload: Payload): Promise<SeedSummary> {
@@ -175,13 +232,14 @@ export async function seed(payload: Payload): Promise<SeedSummary> {
     })
   }
 
-  await ensure(payload, summary, {
+  const founderId = await ensure(payload, summary, {
     collection: 'team',
     label: 'team:founder',
     where: { founder: { equals: true } },
     draft: false,
     ...content.founder,
   })
+  await ensureFounderPhoto(payload, summary, founderId)
 
   for (const doc of content.faqs) {
     await ensure(payload, summary, {
