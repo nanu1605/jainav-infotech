@@ -219,10 +219,7 @@
     },
     "waitlist": {
       "title": "Be first to try {name}",
-      "text": "Leave your email and we'll tell you when {name} is ready.",
-      "subject": "Waitlist: {name}",
-      "email": "Email us to join",
-      "contact": "Contact us to join"
+      "text": "Leave your email and we'll tell you when {name} is ready."
     },
     "productPages": {
       "pricingTitle": "{name} pricing",
@@ -236,7 +233,6 @@
       "faq": "Common questions",
       "stillStuck": "Still stuck?",
       "stillStuckText": "Write to us and a person will get back to you, usually within one working day.",
-      "contactForm": "Contact form",
       "docsNav": "Docs",
       "docsIntro": "Guides and answers for {name}. Pick a topic.",
       "noDocs": "Docs are on their way."
@@ -334,14 +330,11 @@
     },
     "introduceTitle": "Introduce yourself",
     "introduceText": "Don't see a role that fits? Tell us what you're good at and what you'd like to build.",
-    "introduceSubject": "Introducing myself",
-    "contact": "Contact us",
     "internshipsTitle": "Internships",
     "internshipsText": "Students can work with us on real projects. Write to us with what you've built so far.",
     "posted": "Posted {date}",
     "applyTitle": "Apply",
-    "applyText": "Send your CV (PDF) and a few lines about why this role interests you.",
-    "apply": "Apply by email"
+    "applyText": "Send your CV (PDF) and a few lines about why this role interests you."
   },
   "blog": {
     "title": "Blog",
@@ -374,5 +367,192 @@
     "version": "Version {version}, effective {date}",
     "englishPrevails": "This is a translation. If the Hindi and English versions differ, the English version prevails.",
     "englishOnly": "This page is available in English only."
+  },
+  "forms": {
+    "errors": {
+      "required": "This field is required.",
+      "email": "Enter a valid email address.",
+      "phone": "Enter a valid phone number.",
+      "tooLong": "This is too long.",
+      "tooShort": "Please tell us a little more (at least 20 characters).",
+      "choose": "Choose an option.",
+      "cvRequired": "Attach your CV as a PDF.",
+      "pdf": "The CV must be a PDF file.",
+      "fileSize": "The CV must be 5 MB or smaller."
+    },
+    "consent": {
+      "notice": "By sending this form you agree that we use these details to reply to you, as described in our <privacy>privacy policy</privacy>.",
+      "marketing": "Also email me occasional news about Jainav products (optional).",
+      "newsletter": "We'll email you a link to confirm. You can unsubscribe at any time; see our <privacy>privacy policy</privacy>."
+    },
+    "status": {
+      "sending": "Sending…",
+      "invalid": "Please check the highlighted fields.",
+      "verification": "The spam check didn't pass. Please try again.",
+      "verificationPending": "Please wait a moment for the spam check to finish.",
+      "rateLimited": "Too many attempts. Please try again in a few minutes.",
+      "server": "Something went wrong on our side. Please try again, or email us."
+    },
+    "honeypot": "Leave this field empty",
+    "fields": {
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "company": "Company",
+      "optional": "(optional)",
+      "message": "Message",
+      "topic": "Topic",
+      "chooseTopic": "Choose a topic",
+      "product": "Product",
+      "noProduct": "Not about a specific product"
+    },
+    "topics": {
+      "sales": "Sales",
+      "support": "Support",
+      "partnership": "Partnership",
+      "careers": "Careers",
+      "press": "Press",
+      "other": "Something else"
+    },
+    "contact": {
+      "title": "Send us a message",
+      "submit": "Send message",
+      "successTitle": "Thanks, your message is on its way to us",
+      "successText": "We've emailed you a confirmation. A person will reply soon.",
+      "planning": "Planning a new project? <link>Send us a project brief</link>.",
+      "bookCall": "Book a call",
+      "bookCallText": "Prefer to talk? Pick a time that suits you."
+    },
+    "project": {
+      "title": "Start a project",
+      "intro": "Five short steps. We reply with questions or a first plan, not a sales pitch.",
+      "steps": {
+        "service": "Service",
+        "project": "Project",
+        "budget": "Budget",
+        "timeline": "Timeline",
+        "contact": "Contact"
+      },
+      "serviceQuestion": "What can we help with?",
+      "unsure": "Not sure yet",
+      "unsureText": "Tell us the problem and we'll suggest the approach.",
+      "description": "Describe your project",
+      "descriptionHint": "What should it do, who will use it, and what exists today?",
+      "budgetQuestion": "Budget range",
+      "budgets": {
+        "under-2l": "Under ₹2 lakh",
+        "2-5l": "₹2–5 lakh",
+        "5-15l": "₹5–15 lakh",
+        "over-15l": "Over ₹15 lakh",
+        "unsure": "Not sure yet"
+      },
+      "timelineQuestion": "When would you like to start?",
+      "timelines": {
+        "asap": "As soon as possible",
+        "1-3m": "In 1–3 months",
+        "3-6m": "In 3–6 months",
+        "flexible": "I'm flexible"
+      },
+      "submit": "Send project brief",
+      "successTitle": "Thanks, we have your project brief",
+      "successText": "We've emailed you a confirmation and will reply with next steps."
+    },
+    "waitlist": {
+      "submit": "Join the waitlist",
+      "successTitle": "You're on the list",
+      "successText": "We'll email you when {name} is ready."
+    },
+    "newsletter": {
+      "title": "Newsletter",
+      "text": "New releases from MenuMesh, VYRO and Baby. A few emails a year.",
+      "submit": "Subscribe",
+      "successTitle": "Check your inbox",
+      "successText": "We've sent you a link to confirm your subscription."
+    },
+    "newsletterStatus": {
+      "confirmed": {
+        "title": "You're subscribed",
+        "text": "Thanks for confirming. We'll email you when there's something worth sharing."
+      },
+      "invalid": {
+        "title": "This link has expired or was already used",
+        "text": "If you already confirmed, you're subscribed. Otherwise, sign up again from any page."
+      },
+      "unsubscribed": {
+        "title": "You're unsubscribed",
+        "text": "We won't send you marketing emails any more. Replies to your own messages still reach you."
+      },
+      "home": "Go to the home page"
+    },
+    "careers": {
+      "applyTitle": "Apply for this role",
+      "introduceTitle": "Introduce yourself",
+      "links": "Portfolio, GitHub or LinkedIn",
+      "message": "Why does this role interest you?",
+      "messageIntroduce": "What are you good at, and what would you like to build?",
+      "cv": "CV",
+      "cvHint": "PDF, up to 5 MB.",
+      "submit": "Send application",
+      "successTitle": "Application received",
+      "successText": "Thanks for applying. We've emailed you a confirmation and will get back to you."
+    },
+    "dataRequest": {
+      "title": "Make a privacy request",
+      "intro": "Ask for a copy of your data, a correction or deletion, withdraw your consent, or raise a grievance.",
+      "type": "Request type",
+      "types": {
+        "access": "Get a copy of my data",
+        "correction": "Correct my data",
+        "erasure": "Delete my data",
+        "withdraw-consent": "Withdraw my consent",
+        "grievance": "Raise a grievance"
+      },
+      "email": "Email address you used with us",
+      "details": "Details",
+      "detailsHint": "Tell us what you'd like us to do. We may ask you to confirm it's you.",
+      "submit": "Send request",
+      "successTitle": "Request received",
+      "successText": "We've emailed you a confirmation and will respond by email."
+    },
+    "whatsapp": {
+      "label": "Chat with us on WhatsApp",
+      "prefill": "Hello Jainav Infotech, I have a question about this page: {url}"
+    }
+  },
+  "email": {
+    "brand": "Jainav Infotech",
+    "openInAdmin": "Open in admin",
+    "greeting": "Hello,",
+    "signoff": "Team Jainav Infotech",
+    "note": "You're receiving this because this address was entered in a form on our website. If that wasn't you, you can ignore this email.",
+    "autoReply": {
+      "contact": {
+        "subject": "We've received your message",
+        "body": "Thanks for writing to us. A person reads every message, and we'll reply to this address soon."
+      },
+      "project": {
+        "subject": "We've received your project brief",
+        "body": "Thanks for telling us about your project. We'll read it carefully and reply with questions or a first plan."
+      },
+      "waitlist": {
+        "subject": "You're on the {product} waitlist",
+        "body": "Thanks for your interest in {product}. We'll email you as soon as it's ready."
+      },
+      "careers": {
+        "subject": "We've received your application",
+        "body": "Thanks for your interest in working with us. We'll review your application and get back to you."
+      },
+      "data-request": {
+        "subject": "We've received your privacy request",
+        "body": "We'll look into your request and reply to this address. We may ask you to confirm that the request is yours before we act on it."
+      }
+    },
+    "newsletter": {
+      "subject": "Confirm your subscription",
+      "body": "Please confirm that you'd like to receive news from Jainav Infotech: new releases from MenuMesh, VYRO and Baby, a few times a year.",
+      "button": "Confirm subscription",
+      "expiry": "This link works for 7 days. If you didn't sign up, ignore this email and you won't be subscribed.",
+      "unsubscribe": "Unsubscribe"
+    }
   }
 }
