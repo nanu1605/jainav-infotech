@@ -3,10 +3,12 @@ import type { Breadcrumb, ErrorEvent } from '@sentry/nextjs'
 // A URL (scheme://…) or a path ("/…") followed by its query string or fragment. Newsletter confirm
 // and unsubscribe links carry their token in the query (spec §13), so no query ever leaves.
 const URL_TAIL = /((?:\b[a-z][\w+.-]*:\/\/|(?<![\w./])\/)[^\s?#"'<>]*)[?#][^\s"'<>]*/gi
+// A query string on its own, e.g. an error message quoting "?token=…" without its URL.
+const BARE_QUERY = /\?[\w%.-]+=[^\s"'<>]*/g
 
 /** A copy of `value` with the query string and fragment cut from every URL in every string. */
 function stripUrlTails<T>(value: T): T {
-  if (typeof value === 'string') return value.replace(URL_TAIL, '$1') as T
+  if (typeof value === 'string') return value.replace(URL_TAIL, '$1').replace(BARE_QUERY, '') as T
   if (Array.isArray(value)) return value.map(stripUrlTails) as T
   if (value && typeof value === 'object') {
     return Object.fromEntries(

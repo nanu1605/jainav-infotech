@@ -50,6 +50,11 @@ describe('Sentry scrubbing (spec §16)', () => {
     ).toEqual({ url: 'https://api.test/v1', method: 'GET', status_code: 200 })
   })
 
+  it('strips a query string quoted without its URL', () => {
+    const event = { exception: { values: [{ value: 'bad link ?token=SECRET&x=1 here' }] } }
+    expect(JSON.stringify(scrubEvent(event as never))).not.toContain('SECRET')
+  })
+
   it('leaves text that is not a URL alone', () => {
     expect(scrubBreadcrumb({ message: 'Is 1/2 enough? Yes.' }).message).toBe('Is 1/2 enough? Yes.')
   })
