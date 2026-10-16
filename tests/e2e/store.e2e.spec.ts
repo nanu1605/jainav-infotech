@@ -11,6 +11,9 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Browser, type Page } from '@playwright/test'
 
 test.skip(!!process.env.E2E_BASE_URL, 'The stand-in gateway exists only in development')
+// Each test signs in through an email (Turnstile, the outbox) and some pay: more than the default
+// 30 seconds when pages compile for the first time under parallel workers.
+test.describe.configure({ timeout: 120_000 })
 
 const OUTBOX = path.resolve('.outbox')
 const run = Date.now()
