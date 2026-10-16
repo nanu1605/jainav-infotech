@@ -62,8 +62,10 @@ export function SignInForm({ next }: { next: string }) {
         if (reply.ok) setAnnouncement(t('resent', { email: address }))
         return
       }
-      flushSync(() => setEmail(address))
+      // Reset before the code step mounts: reset() drops registered fields, so a setFocus
+      // after it would find nothing to focus.
       codeForm.reset()
+      flushSync(() => setEmail(address))
       codeForm.setFocus('code')
       setAnnouncement(t('sent', { email: address }))
       return

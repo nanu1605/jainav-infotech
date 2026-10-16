@@ -132,7 +132,7 @@ const CHECKOUT_JS = `(() => {
     on(event, callback) { (this.listeners[event] = this.listeners[event] || []).push(callback) }
     open() {
       const o = this.options
-      const dialog = el('dialog', '', 'max-width:24rem;padding:1.5rem;border:1px solid var(--border);border-radius:0.75rem;background:var(--surface);color:var(--fg);font:inherit')
+      const dialog = el('dialog', '', 'margin:auto;max-width:24rem;padding:1.5rem;border:1px solid var(--border);border-radius:0.75rem;background:var(--surface);color:var(--fg);font:inherit')
       dialog.setAttribute('aria-labelledby', 'dev-gateway-title')
       const title = el('h2', 'Test payment', 'margin:0 0 0.5rem;font-size:1.25rem;font-weight:600')
       title.id = 'dev-gateway-title'
