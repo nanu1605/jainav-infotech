@@ -6,13 +6,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Locale } from '@/i18n/routing'
 import { cn } from '@/lib/cn'
+import { numberFormat } from '@/lib/format'
 import { EASE_OUT } from '@/lib/motion'
 
 import { useReveal } from './Reveal'
-
-/** Indian formats in both languages, always with Latin digits: ₹1,00,000 (spec §6). */
-export const numberFormat = (locale: Locale, options?: Intl.NumberFormatOptions) =>
-  new Intl.NumberFormat(`${locale}-IN-u-nu-latn`, options)
 
 /** A frame's value, rounded to the target's decimals so the digits don't flicker mid-count. */
 export const countFrame = (target: number, progress: number) => {
