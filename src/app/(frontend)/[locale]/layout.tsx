@@ -5,6 +5,8 @@ import { ThemeProvider } from 'next-themes'
 import { notFound } from 'next/navigation'
 import type { ReactNode } from 'react'
 
+import { Toaster } from '@/components/feedback/Toast'
+import { MotionProvider } from '@/components/motion/MotionProvider'
 import { routing } from '@/i18n/routing'
 import { fontVariables } from '@/styles/fonts'
 import '@/styles/globals.css'
@@ -37,7 +39,8 @@ export default async function LocaleLayout({ children, params }: Props) {
             enableSystem
             disableTransitionOnChange
           >
-            {children}
+            <MotionProvider>{children}</MotionProvider>
+            <Toaster />
           </ThemeProvider>
         </NextIntlClientProvider>
       </body>

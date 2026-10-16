@@ -11,7 +11,13 @@ export default defineConfig({
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // PLAYWRIGHT_CHANNEL=chrome uses an installed Chrome instead of the downloaded Chromium.
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'], channel: process.env.PLAYWRIGHT_CHANNEL || undefined },
+    },
+  ],
   webServer: {
     command: 'pnpm dev',
     reuseExistingServer: true,

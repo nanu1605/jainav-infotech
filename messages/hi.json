@@ -20,5 +20,121 @@
     "label": "भाषा",
     "en": "EN",
     "hi": "हिंदी"
+  },
+  "ui": {
+    "status": {
+      "live": "उपलब्ध",
+      "beta": "बीटा",
+      "coming-soon": "जल्द आ रहा है",
+      "retired": "बंद"
+    },
+    "platform": {
+      "windows": "Windows",
+      "macos": "macOS",
+      "linux": "Linux",
+      "web": "वेब",
+      "android": "Android",
+      "ios": "iOS"
+    },
+    "announcement": {
+      "label": "सूचना",
+      "dismiss": "सूचना हटाएँ"
+    },
+    "breadcrumbs": {
+      "label": "पेज का रास्ता"
+    },
+    "dialog": {
+      "close": "बंद करें"
+    },
+    "footer": {
+      "label": "फ़ुटर",
+      "cin": "CIN: {cin}",
+      "registeredOffice": "रजिस्टर्ड ऑफ़िस: {address}",
+      "social": "{platform} पर Jainav Infotech"
+    },
+    "gallery": {
+      "open": "बड़ा करके देखें: {alt}"
+    },
+    "header": {
+      "mainNav": "मुख्य",
+      "menu": "मेन्यू",
+      "openMenu": "मेन्यू खोलें",
+      "closeMenu": "मेन्यू बंद करें",
+      "allProducts": "सभी प्रोडक्ट",
+      "account": "अकाउंट",
+      "cta": "प्रोजेक्ट शुरू करें"
+    },
+    "languageSuggestion": {
+      "label": "भाषा का सुझाव",
+      "prompt": "हिंदी में देखें?",
+      "dismiss": "अंग्रेज़ी में ही रहें"
+    },
+    "lightbox": {
+      "title": "इमेज व्यूअर",
+      "close": "बंद करें",
+      "previous": "पिछली इमेज",
+      "next": "अगली इमेज",
+      "counter": "{total} में से {current}"
+    },
+    "marquee": {
+      "pause": "स्क्रॉलिंग रोकें"
+    },
+    "multiStep": {
+      "back": "पीछे",
+      "next": "आगे",
+      "submit": "भेजें",
+      "completed": "पूरा हुआ",
+      "progress": "चरण {current} / {total}",
+      "sending": "भेजा जा रहा है…"
+    },
+    "productCard": {
+      "waitlist": "वेटलिस्ट में जुड़ें"
+    },
+    "productSubNav": {
+      "label": "{name} के सेक्शन",
+      "overview": "परिचय",
+      "pricing": "कीमत",
+      "download": "डाउनलोड",
+      "changelog": "बदलाव",
+      "docs": "डॉक्स",
+      "support": "सपोर्ट"
+    },
+    "spinner": {
+      "loading": "लोड हो रहा है…"
+    },
+    "toast": {
+      "label": "सूचना",
+      "close": "बंद करें",
+      "viewport": "सूचनाएँ ({hotkey})"
+    },
+    "video": {
+      "captions": "हिंदी",
+      "play": "वीडियो चलाएँ",
+      "pause": "वीडियो रोकें"
+    },
+    "callout": {
+      "info": "ध्यान दें",
+      "success": "सफल",
+      "warning": "चेतावनी",
+      "danger": "ज़रूरी"
+    }
+  },
+  "styleguide": {
+    "title": "स्टाइलगाइड",
+    "intro": "हर कंपोनेंट लाइट और डार्क थीम में। हिंदी देखने के लिए भाषा बदलें।",
+    "light": "लाइट",
+    "dark": "डार्क",
+    "sections": "सेक्शन",
+    "areas": {
+      "actions": "एक्शन",
+      "content": "कंटेंट",
+      "media": "मीडिया",
+      "forms": "फ़ॉर्म",
+      "feedback": "फ़ीडबैक",
+      "layout": "लेआउट",
+      "navigation": "नेविगेशन",
+      "motion": "मोशन",
+      "product": "प्रोडक्ट"
+    }
   }
 }
