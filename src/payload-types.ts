@@ -498,7 +498,8 @@ export interface ProductHeroBlock {
     | {
         label?: string | null;
         audio: number | Media;
-        transcript?: string | null;
+        lang: 'en' | 'hi' | 'hi-Latn';
+        transcript: string;
         id?: string | null;
       }[]
     | null;
@@ -2454,6 +2455,7 @@ export interface ProductHeroBlockSelect<T extends boolean = true> {
     | {
         label?: T;
         audio?: T;
+        lang?: T;
         transcript?: T;
         id?: T;
       };

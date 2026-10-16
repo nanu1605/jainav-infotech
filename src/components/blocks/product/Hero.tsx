@@ -36,7 +36,9 @@ export async function ProductHero({
   const animation = block.animation && block.animation !== 'none' ? block.animation : null
   const samples = block.samples?.flatMap((s) => {
     const src = media(s.audio)?.url
-    return src && s.label ? [{ label: s.label, src, transcript: s.transcript ?? undefined }] : []
+    return src && s.label
+      ? [{ label: s.label, src, lang: s.lang ?? undefined, transcript: s.transcript ?? undefined }]
+      : []
   })
 
   return (

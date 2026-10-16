@@ -75,6 +75,8 @@ export const Media: CollectionConfig = {
       'video/webm',
       'audio/mpeg',
       'audio/mp4',
+      // How file sniffing reports most .m4a files (the standard 'M4A ' brand).
+      'audio/x-m4a',
       'audio/ogg',
       'audio/webm',
       'text/vtt',

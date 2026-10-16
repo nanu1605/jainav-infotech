@@ -35,7 +35,21 @@ export const ProductHero: Block = {
       fields: [
         { name: 'label', type: 'text', localized: true, required: true },
         { name: 'audio', type: 'upload', relationTo: 'media', required: true },
-        { name: 'transcript', type: 'textarea', localized: true },
+        {
+          // Sets the transcript's lang, so screen readers pronounce it right.
+          name: 'lang',
+          label: 'Spoken language',
+          type: 'select',
+          required: true,
+          defaultValue: 'en',
+          options: [
+            { label: 'English', value: 'en' },
+            { label: 'Hindi', value: 'hi' },
+            { label: 'Hinglish', value: 'hi-Latn' },
+          ],
+        },
+        // What the clip says, word for word (WCAG 1.2.1), whatever the page's language.
+        { name: 'transcript', type: 'textarea', required: true },
       ],
     },
   ],
