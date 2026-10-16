@@ -33,7 +33,13 @@ export default async function AccountPage({ params }: Props) {
   setRequestLocale(locale)
   const customer = await requireCustomer(locale, '/account')
   const [orders, t] = await Promise.all([
-    customerOrders(await getClient(), customer, [{ status: { in: [...PAID_STATUSES] } }], 3),
+    customerOrders(
+      await getClient(),
+      customer,
+      [{ status: { in: [...PAID_STATUSES] } }],
+      3,
+      locale,
+    ),
     getTranslations('account'),
   ])
 

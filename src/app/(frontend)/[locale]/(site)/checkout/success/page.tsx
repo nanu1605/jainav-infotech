@@ -46,7 +46,7 @@ export default async function CheckoutSuccessPage({ params, searchParams }: Prop
       locale,
     })
   }
-  const order = await customerOrder(payload, customer, number)
+  const order = await customerOrder(payload, customer, number, locale)
   if (!order) notFound()
 
   const t = await getTranslations('checkout.success')
@@ -71,7 +71,7 @@ export default async function CheckoutSuccessPage({ params, searchParams }: Prop
         locale={locale}
       />
       <Container size="prose" className="grid gap-8 py-12 sm:py-16">
-        {view === 'pending' && <OrderPoller order={order.orderNumber} waitFor="payment" />}
+        {view === 'pending' && <OrderPoller order={order.orderNumber} />}
         <dl className="grid gap-4 rounded-xl border border-border bg-surface p-6 shadow-sm sm:grid-cols-2">
           <div>
             <dt className="text-sm text-fg-muted">{t('order')}</dt>
@@ -87,8 +87,8 @@ export default async function CheckoutSuccessPage({ params, searchParams }: Prop
         {view === 'paid' && (
           <div className="grid gap-3 text-fg">
             <p>{t('receipt', { email: order.billing.email })}</p>
-            {/* The PDF is rendered by a job just after payment (spec §11.3 step 8). */}
-            {invoice?.pdf ? (
+            {/* Fulfilment writes the invoice with the payment; the PDF is drawn on request. */}
+            {invoice && (
               <p>
                 <a
                   href={`/api/v1/account/invoices/${invoice.id}`}
@@ -97,11 +97,6 @@ export default async function CheckoutSuccessPage({ params, searchParams }: Prop
                   {t('invoice', { number: invoice.number })}
                 </a>
               </p>
-            ) : (
-              <>
-                <p className="text-fg-muted">{t('invoicePreparing')}</p>
-                <OrderPoller order={order.orderNumber} waitFor="invoice" />
-              </>
             )}
           </div>
         )}

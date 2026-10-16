@@ -7,8 +7,8 @@ import { Spinner } from '@/components/ui/Spinner'
 import { useRouter } from '@/i18n/navigation'
 import type { Order } from '@/payload-types'
 
-// [interval, time limit] in milliseconds.
-const TIMING = { payment: [3_000, 180_000], invoice: [5_000, 60_000] } as const
+const EVERY = 3_000
+const LIMIT = 180_000
 
 /** Whether the order has left `created` (paid, or expired meanwhile). */
 async function settled(order: string) {
@@ -24,35 +24,31 @@ async function settled(order: string) {
 }
 
 /**
- * Waits on the success page (spec §11.3 step 11). `payment`: polls the order's status and
- * re-renders the page once it settles. `invoice`: re-renders until the invoice PDF is ready, when
- * the page stops rendering this.
+ * Waits on the success page (spec §11.3 step 11): polls the order's status and re-renders the
+ * page once it settles (a late capture comes through the webhook or reconciliation).
  */
-export function OrderPoller({ order, waitFor }: { order: string; waitFor: 'payment' | 'invoice' }) {
+export function OrderPoller({ order }: { order: string }) {
   const t = useTranslations('checkout.success')
   const router = useRouter()
   const [gaveUp, setGaveUp] = useState(false)
 
   useEffect(() => {
-    const [every, limit] = TIMING[waitFor]
-    const until = Date.now() + limit
+    const until = Date.now() + LIMIT
     let active = true
     let timer: ReturnType<typeof setTimeout> | undefined
     const tick = async () => {
-      if (waitFor === 'invoice') router.refresh()
-      else if (await settled(order)) return router.refresh()
+      if (await settled(order)) return router.refresh()
       if (!active) return
       if (Date.now() >= until) setGaveUp(true)
-      else timer = setTimeout(() => void tick(), every)
+      else timer = setTimeout(() => void tick(), EVERY)
     }
-    timer = setTimeout(() => void tick(), every)
+    timer = setTimeout(() => void tick(), EVERY)
     return () => {
       active = false
       clearTimeout(timer)
     }
-  }, [order, waitFor, router])
+  }, [order, router])
 
-  if (waitFor === 'invoice') return null
   return (
     <p role="status" className="flex items-start gap-3 text-lg text-fg">
       {gaveUp ? (

@@ -32,7 +32,13 @@ export default async function OrdersPage({ params }: Props) {
   const customer = await requireCustomer(locale, '/account/orders')
   // ponytail: the latest 50 only (customerOrders' default); add paging if anyone buys more.
   const [orders, t] = await Promise.all([
-    customerOrders(await getClient(), customer, [{ status: { in: [...PAID_STATUSES] } }]),
+    customerOrders(
+      await getClient(),
+      customer,
+      [{ status: { in: [...PAID_STATUSES] } }],
+      50,
+      locale,
+    ),
     getTranslations('account'),
   ])
 

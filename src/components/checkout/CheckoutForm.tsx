@@ -18,6 +18,7 @@ import { Callout } from '@/components/ui/Callout'
 import { Spinner } from '@/components/ui/Spinner'
 import { Link, useRouter } from '@/i18n/navigation'
 import type { Locale } from '@/i18n/routing'
+import { track } from '@/lib/analytics'
 import type { CouponProblem } from '@/lib/commerce/pricing'
 import {
   billingSchema,
@@ -226,12 +227,7 @@ export function CheckoutForm({
     if (paying) return
     setProblem(null)
     setPaying(true)
-    // ponytail: lib/analytics track() doesn't list checkout_start yet; switch once it does.
-    try {
-      window.umami?.track('checkout_start', { product: product.slug, plan: plan.code })
-    } catch {
-      // Analytics never breaks the page.
-    }
+    track('checkout_start', { product: product.slug, plan: plan.code })
     const res = await post<CreateResponse>('/api/v1/checkout/create', {
       product: product.slug,
       plan: plan.code,

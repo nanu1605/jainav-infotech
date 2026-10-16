@@ -36,7 +36,7 @@ export default async function CheckoutFailedPage({ params, searchParams }: Props
   const [customer, t] = await Promise.all([getCustomer(), getTranslations('checkout.failed')])
   const order =
     customer && typeof param === 'string' && param
-      ? await customerOrder(payload, customer, param)
+      ? await customerOrder(payload, customer, param, locale)
       : null
   const item = order?.items[0]
   const retry =

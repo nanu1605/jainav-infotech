@@ -455,7 +455,6 @@
       "total": "Total",
       "receipt": "Your receipt and invoice go to {email}.",
       "invoice": "Download invoice {number} (PDF)",
-      "invoicePreparing": "Your invoice is being prepared. It will also be emailed to you.",
       "download": "Download {product}",
       "orders": "View your orders",
       "confirming": "Confirming your payment…",

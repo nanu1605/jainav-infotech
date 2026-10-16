@@ -83,6 +83,8 @@ export async function customerOrders(
   customer: Customer,
   where: Where[] = [],
   limit = 50,
+  /** Product and plan names in this language. */
+  locale: Locale = 'en',
 ): Promise<Order[]> {
   const { docs } = await payload.find({
     collection: 'orders',
@@ -90,18 +92,25 @@ export async function customerOrders(
     sort: '-createdAt',
     limit,
     depth: 1,
+    locale,
     overrideAccess: true,
   })
   return docs
 }
 
 /** One of the customer's orders by number, or null (also when it belongs to someone else). */
-export async function customerOrder(payload: Payload, customer: Customer, orderNumber: string) {
+export async function customerOrder(
+  payload: Payload,
+  customer: Customer,
+  orderNumber: string,
+  locale: Locale = 'en',
+) {
   const [order] = await customerOrders(
     payload,
     customer,
     [{ orderNumber: { equals: orderNumber } }],
     1,
+    locale,
   )
   return order ?? null
 }
