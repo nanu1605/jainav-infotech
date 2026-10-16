@@ -383,7 +383,109 @@
     "proofIntro": "Products we design, build and run ourselves with the same skills.",
     "start": "Start a project"
   },
-  "checkout": {},
+  "checkout": {
+    "title": "Checkout",
+    "intro": "You're buying {product} {plan}.",
+    "summary": {
+      "title": "Order summary",
+      "item": "{product} {plan}",
+      "quantity": "Quantity: 1",
+      "inclGst": "incl. GST"
+    },
+    "coupon": {
+      "label": "Coupon code",
+      "apply": "Apply",
+      "applied": "Coupon {code} applied.",
+      "errors": {
+        "invalid": "This coupon code isn't valid.",
+        "expired": "This coupon has expired.",
+        "not_applicable": "This coupon can't be used for this plan.",
+        "used_up": "This coupon can't be used any more.",
+        "too_large": "This coupon would bring the total below ₹1, so it can't be used here."
+      }
+    },
+    "breakdown": {
+      "title": "Price breakdown",
+      "price": "Price",
+      "discount": "Coupon {code}",
+      "taxable": "Taxable value",
+      "cgst": "CGST ({rate}%)",
+      "sgst": "SGST ({rate}%)",
+      "igst": "IGST ({rate}%)",
+      "total": "Total",
+      "totalInclGst": "Total (incl. GST)"
+    },
+    "billing": {
+      "title": "Billing details",
+      "email": "Your receipt and invoice go to {email}.",
+      "latinHint": "Please use English (Latin) letters: invoices are printed in a Latin font.",
+      "name": "Full name",
+      "phone": "Phone",
+      "state": "State",
+      "chooseState": "Choose your state",
+      "stateLocked": "Set by your GSTIN: the place of supply is the state it's registered in.",
+      "businessName": "Business name",
+      "gstin": "GSTIN",
+      "gstinHint": "For a GST invoice in your business's name."
+    },
+    "accept": "I accept the <terms>Terms</terms> and the <eula>{product} EULA</eula>.",
+    "newTab": "(opens in a new tab)",
+    "pay": "Pay {total}",
+    "paying": "Processing your payment…",
+    "errors": {
+      "latinOnly": "Use English (Latin) letters only.",
+      "gstin": "Enter a valid 15-character GSTIN.",
+      "accept": "Accept the Terms and the EULA to continue.",
+      "invalid": "Please check this field."
+    },
+    "problems": {
+      "cancelled": "Payment cancelled. You can try again.",
+      "failed": "The payment didn't go through. You can try again, or choose another payment method.",
+      "mismatch": "We couldn't confirm this payment. If money was taken from your account, please contact support.",
+      "unavailable": "This plan can't be bought right now. Please try again later.",
+      "rateLimited": "Too many attempts. Please wait a few minutes and try again.",
+      "invalid": "Some details were not accepted. Please check the form and try again.",
+      "coupon": "Your coupon can't be used any more, so the price has been updated. Check the total and pay again.",
+      "server": "Something went wrong on our side. Please try again."
+    },
+    "success": {
+      "title": "Order confirmation",
+      "order": "Order number",
+      "total": "Total",
+      "receipt": "Your receipt and invoice go to {email}.",
+      "invoice": "Download invoice {number} (PDF)",
+      "invoicePreparing": "Your invoice is being prepared. It will also be emailed to you.",
+      "download": "Download {product}",
+      "orders": "View your orders",
+      "confirming": "Confirming your payment…",
+      "stillConfirming": "Your payment is still being confirmed. You'll get an email as soon as it's done; you can close this page.",
+      "paid": {
+        "title": "Thank you for your purchase",
+        "intro": "Your payment was successful."
+      },
+      "pending": {
+        "title": "Confirming your payment",
+        "intro": "This usually takes a few seconds. Please keep this page open."
+      },
+      "expired": {
+        "title": "This order has expired",
+        "intro": "The payment wasn't completed in time.",
+        "next": "What to do next"
+      },
+      "other": {
+        "title": "Order {number}",
+        "intro": "See this order's details in your account."
+      }
+    },
+    "failed": {
+      "title": "Payment not completed",
+      "intro": "Your payment didn't go through.",
+      "order": "Order {number}",
+      "noCharge": "No money was taken. If an amount was deducted from your account, your bank or Razorpay refunds it automatically.",
+      "retry": "Try again",
+      "support": "Contact support"
+    }
+  },
   "contact": {
     "title": "Contact",
     "intro": "Tell us what you need. A person reads every message.",
