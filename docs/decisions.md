@@ -154,3 +154,47 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
 - **Baby voice samples** are a hero field (label, audio, spoken language, transcript), played on click only with one shared audio element; Media now accepts MP3, M4A and Ogg audio. The scripted conversation (English, Hindi, Hinglish) is illustrative and uses Baby's real tools; Tanishq should approve the lines.
 - **Lighthouse CI** (`pnpm lhci`, `lighthouserc.cjs`) checks the §15 scores against a running production build. Locally (2026-10-16, simulated mobile): performance 0.89–0.95, accessibility 1, best practices 0.96, SEO 1, CLS 0, TBT ≤ 60 ms; simulated LCP 2.9–3.6 s. Lighthouse's simulation on localhost puts all JS on the LCP path because the scripts arrive before first paint; with applied (DevTools) throttling LCP equals FCP. The spec measures production URLs, so Phase 6 runs it there. Next's experimental `inlineCss` would save the CSS round trip but would also inline the admin's CSS; not used.
 - **Not done:** the hero animations use illustrations, not product recordings, and the card previews and feature scroller need media; none exists yet (Phase 5 inputs: screen recordings, Baby voice samples).
+
+## Phase 6
+
+- **One VPS, one Compose file** (`docker/compose.prod.yml`): production and staging apps, one Postgres server with a role and database per app (`jainav`, `jainav_staging`, `umami`; `docker/postgres/roles.sh`), Umami, Caddy and the backup job. One Postgres server instead of one per environment saves memory on the 4 GB VPS; the roles keep the databases apart. Setup and operations: `docs/runbooks/`.
+- **The image is Next's standalone output** (`docker/Dockerfile`, target `runner`, about 360 MB), built in CI with `SKIP_DB_AT_BUILD=1` and no database. Only 6 pages prerender; the rest render on first request and are cached. `output: 'standalone'` is switched on by `NEXT_OUTPUT=standalone` in the Dockerfile only, because standalone output turns off `next start`, which local runs and Lighthouse use. The build-only `PAYLOAD_SECRET` exists for that one `RUN` command, never in an image's environment. A second target, `tools` (full source and dependencies), runs one-off commands on the server: seed, migrations, release import.
+- **`/api/v1/health`** (database `select 1`) is the container healthcheck, the deploy gate and an uptime-monitor target. Its first call initializes Payload, which applies pending migrations, so migrations run on container start as spec §18.3 asks.
+- **Caddy, not the app, does staging's basic auth.** It covers every path, the admin and `/_next` included, except `/api/v1/(webhooks|licensing|updates|downloads)/*` (spec §18.1), and adds `X-Robots-Tag: noindex`. Caddy needs a bcrypt hash, so the server's `.env` holds `STAGING_AUTH_USER` / `STAGING_AUTH_HASH`. `STAGING_BASIC_AUTH=1` in the staging app's environment now just marks staging, so `robots.txt` disallows everything there. Only port 443 is published; the VPS provider's firewall admits Cloudflare's ranges only, because Docker's published ports bypass ufw.
+- **Security headers come from `next.config.ts`** (`src/lib/csp.ts`), production builds only: Next's dev tooling needs `eval`. The CSP is static as spec §16 asks. It is built from:
+  - the embed allow-list (`src/lib/embedHosts.ts`, dependency-free so `next.config` can import it);
+  - Turnstile, the Google Maps iframe and Gravatar (admin avatars);
+  - the CDN, Umami and Sentry-ingest origins from the build's `NEXT_PUBLIC_*` values.
+
+  It was checked on a production build across 16 public pages and the signed-in admin with no violations. **Razorpay's origins are left out until Phase 7** builds checkout and can test them. HSTS is one year with `includeSubDomains`, without `preload` (a commitment for every subdomain).
+
+- **Deploys** (`.github/workflows/deploy.yml`): a merge to `main` builds `staging-<sha>` and deploys staging; a `v*` tag builds `prod-<tag>` and deploys production after the `production` environment's required reviewer approves. `NEXT_PUBLIC_*` come from each environment's variables, so images are never promoted. The VPS pulls with the job's short-lived token; no long-lived registry credential is stored there. `docker/deploy.sh` waits for the healthcheck and rolls back to the previous image if the new one never turns healthy, then smoke tests run (`tests/smoke`, read-only; `playwright.smoke.config.ts`). Deploys are skipped until the repository variable `DEPLOY_ENABLED` is `true`. Pull requests also build the image.
+- **Backups** (`docker/backup`): nightly at 02:30 IST, `pg_dump` of `jainav` and `umami`, encrypted with age to a public key (the private key stays offline with the Owner), uploaded with rclone to an R2 bucket; 30 daily and 12 monthly copies; Telegram alert on failure. The restore test restores the newest dumps into a throwaway Postgres whose data lives only in memory, and checks the tables, the migrations and the site's content. The real restore test needs the server; locally the full path (backup → R2 stand-in → decrypt → restore → checks) passed on 2026-10-16. The test caught a bug on the way: on a first run, pruning a missing `monthly/` folder failed the whole backup.
+- **Rehearsal:** the whole stack ran locally on 2026-10-16 (port 8443, self-signed certificates, a local folder for the bucket). Checked:
+  - both apps healthy, with migrations under their own roles;
+  - production smoke tests 8/8;
+  - staging basic auth with the machine-API exemption, and `X-Robots-Tag`;
+  - the www → apex 308 and Umami;
+  - backup and restore;
+  - `deploy.sh` both ways: a good image went live, and a broken one rolled back.
+- **Sentry (`@sentry/nextjs` 11.2.0, pinned; newer releases were inside the cool-off).**
+  - **Server:** `src/instrumentation.ts` starts it on the Node.js runtime only when `SENTRY_DSN` is set; `onRequestError` uses `captureRequestError`.
+  - **Browser:** `src/instrumentation-client.ts` imports the SDK only when `NEXT_PUBLIC_SENTRY_DSN` is set, after the load event and once the page is idle. The SDK (about 77 KB gzipped) is an async chunk, never initial JS; errors thrown before it arrives are not reported. `error.tsx` hands browser render errors (no `digest`) to `reportError()`.
+  - **Environment:** `staging` or `production`, from the baked-in site URL.
+- **Deviation: Sentry SDK 11 has no `sendDefaultPii`.** It was replaced by `dataCollection`, whose defaults collect everything. `src/lib/sentry.ts` turns off:
+  - user info (so no inferred IP), cookies, response headers and bodies;
+  - every request header except user-agent;
+  - URL query params, stack-frame variables and DB query data.
+
+  `src/lib/scrub.ts` (beforeSend / beforeBreadcrumb) is the second layer: it cuts query strings and fragments from every URL or path in the event, which carry newsletter tokens. It also drops `user` and keeps only url, method and user-agent on `request`. No session replay; `tracesSampleRate: 0`. No `withSentryConfig` yet: no source-map upload until a `SENTRY_AUTH_TOKEN` exists.
+
+- **Umami** loads from the `[locale]` layout with a plain `<script async>` (React hoists it), only when `NEXT_PUBLIC_UMAMI_URL` and `NEXT_PUBLIC_UMAMI_WEBSITE_ID` are set; the admin has its own root layout. `next/script` would have added about 1.4 KB to every page. Code events go through `track()` (`src/lib/analytics.ts`): `form_submit {type}`, `language_switch {to}`, `theme_switch {to}`.
+- **Tracked links use a wrapper.** Umami 3.4.0's tracker (read in its source) handles clicks on a tracked `<a>` in the capture phase: it calls `preventDefault()`, waits for its request, then sets `location.href`. Every tracked internal link would become a slow full page load. `cta_click`, `chip_click` and `download` attributes therefore sit on a `display: contents` wrapper (`src/components/Tracked.tsx`), where the tracker only records the click. An e2e test fails if an `<a>` carries `data-umami-event`.
+- **Dependencies:** sharp 0.35.5 (released 2026-09-27) and an `undici` 7.29.1 override clear the high advisories (Payload 3.90.2 pins undici 7.29.0). CI runs `pnpm audit --prod --audit-level high`. `braces` (via Sass and chokidar, admin styles at build time) has an advisory with no fixed release and is ignored in `pnpm-workspace.yaml` until one ships. Dependabot proposes updates with a 14-day cooldown, matching the cool-off rule.
+- **VYRO releases are imported from GitHub** with `pnpm import:release [tag]` (`scripts/import-release.ts`; default: the latest release).
+  - **Safety:** downloads go to a temp directory, are never run, and are deleted afterwards.
+  - **Which file:** the installer is the file `latest.json`'s `windows-x86_64` entry points to. It must match `SHA256SUMS.txt` and GitHub's asset digest. That entry's signature becomes `updaterSignature`.
+  - **What is saved:** GitHub pre-releases go on the beta channel; `releasedAt` is `latest.json`'s `pub_date`.
+  - **Re-runs:** a re-run is a no-op, and an existing release with a different file or signature aborts.
+  - **Publishing:** imports are drafts unless run with `-- --publish`. The Owner should publish in the admin, because a script can't refresh the running site's cache.
+- **The repository is public** on GitHub (it was planned as private in Phase 0). Nothing secret is committed. The founder photo and bio, the company address and phone, and the code are visible. Tanishq to confirm or switch it to private.

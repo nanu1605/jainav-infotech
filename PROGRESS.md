@@ -64,15 +64,27 @@ Tasks from spec §20. Each phase ends with all checks green, a phase report, and
 
 ### Phase 6 — Deploy and launch the company website
 
-- [ ] Provision the VPS; Docker images; `compose.prod.yml` (app, postgres, umami, caddy, backup).
-- [ ] Cloudflare: DNS, SSL Full (strict), Origin CA certificate, origin firewall, WAF skip rule, Bot Fight Mode off, Access on `/admin*` and `/api/users/*`; R2 buckets + custom domains.
-- [ ] Staging and production; per-environment image builds; deploy workflows; `prodMigrations`.
-- [ ] Sentry, Umami, external uptime monitor + status page; Telegram alerts.
-- [ ] Backups + restore runbook (run a real restore test).
-- [ ] Security headers / CSP (§16).
-- [ ] SPF / DKIM / DMARC.
+In the repository (done; rehearsed locally, see docs/runbooks/server.md#rehearsal):
+
+- [x] Docker images (runner + tools); `compose.prod.yml` (app, app-staging, postgres, umami, caddy, backup).
+- [x] Per-environment image builds; deploy workflow (staging on `main`, production on `v*` tags after approval, automatic rollback, smoke tests); `prodMigrations` on container start via `/api/v1/health`.
+- [x] Sentry and Umami wired in (off until configured); Telegram alerts from the backup job.
+- [x] Backups + restore runbook; restore test passed locally.
+- [x] Security headers / CSP (§16); `pnpm audit` in CI; Dependabot.
+- [x] VYRO release import (`pnpm import:release`); v0.3.0 verified (SHA-256 `0dacbbaa…25dd3`) and imported into dev as a draft.
+- [x] Runbooks: `docs/runbooks/` (launch, server, cloudflare, backups, monitoring).
+
+On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/launch.md):
+
+- [ ] Provision the VPS; firewall to Cloudflare's ranges.
+- [ ] Cloudflare: DNS, SSL Full (strict), Origin CA certificate, WAF skip rule, Bot Fight Mode off, Access on `/admin*` and `/api/users/*`; R2 buckets + custom domains.
+- [ ] GitHub environments, secrets, production reviewer, `DEPLOY_ENABLED`; staging and production live.
+- [ ] Sentry project, Umami website, external uptime monitor + status page; an uptime alert reaches Telegram.
+- [ ] A real restore test on the server.
+- [ ] SPF / DKIM / DMARC; mail-tester ≥ 9/10.
 - [ ] Final content check; Owner publishes the legal pages (§8.13).
-- [ ] VYRO downloads: import the latest release from GitHub `nanu1605/vyro-releases` (v0.3.0 on 2026-10-16: `Vyro_0.3.0_x64_en-US.msi`, its updater signature in `latest.json`, checksums in `SHA256SUMS.txt`) as an installer + release; check the SHA-256 matches.
+- [ ] VYRO download in production: `pnpm import:release <tag>` (v1.0.0 and v1.0.1 shipped on 2026-10-16: which one?), then the Owner publishes it.
+- [ ] Lighthouse on the production URLs (§15).
 
 ## Milestone C — VYRO store live (Launch 2)
 
