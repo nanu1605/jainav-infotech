@@ -486,7 +486,7 @@ export function CtaBand({ block, locale, loaded }: ProductBlockProps<ProductCtaB
   return (
     <section className="py-16 sm:py-24">
       <Container>
-        <div className="relative isolate overflow-hidden rounded-2xl border border-border bg-surface px-6 py-14 text-center shadow-md sm:px-16">
+        <div className="relative isolate overflow-hidden rounded-xl border border-border bg-surface px-6 py-14 text-center shadow-md sm:px-16">
           <div aria-hidden className="absolute inset-0 -z-10 bg-product-accent opacity-10" />
           {block.heading && (
             <h2 className="font-display text-3xl font-bold text-balance text-fg sm:text-4xl">
