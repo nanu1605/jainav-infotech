@@ -38,10 +38,12 @@
     },
     "announcement": {
       "label": "सूचना",
-      "dismiss": "सूचना हटाएँ"
+      "dismiss": "सूचना हटाएँ",
+      "more": "और जानें"
     },
     "breadcrumbs": {
-      "label": "पेज का रास्ता"
+      "label": "पेज का रास्ता",
+      "home": "होम"
     },
     "dialog": {
       "close": "बंद करें"
@@ -117,6 +119,124 @@
       "success": "सफल",
       "warning": "चेतावनी",
       "danger": "ज़रूरी"
+    },
+    "preview": {
+      "label": "प्रीव्यू: आप अप्रकाशित ड्राफ़्ट देख रहे हैं",
+      "exit": "प्रीव्यू बंद करें"
+    },
+    "company": {
+      "legalName": "कानूनी नाम",
+      "cin": "CIN",
+      "gstin": "GSTIN",
+      "incorporated": "निगमन की तारीख",
+      "office": "पंजीकृत कार्यालय"
+    },
+    "latest": {
+      "posts": "ब्लॉग से",
+      "changelog": "नया क्या है",
+      "allPosts": "सभी पोस्ट",
+      "allChanges": "पूरा चेंजलॉग",
+      "release": "वर्ज़न {version}"
+    },
+    "productButton": {
+      "visit": "{name} पर जाएं",
+      "demo": "डेमो बुक करें",
+      "download": "Windows के लिए डाउनलोड करें",
+      "version": "वर्ज़न {version}",
+      "buy": "{plan} ख़रीदें",
+      "soon": "जल्द उपलब्ध",
+      "waitlist": "वेटलिस्ट में जुड़ें",
+      "contact": "हमसे बात करें",
+      "newTab": "(नए टैब में खुलेगा)"
+    },
+    "productHero": {
+      "newTab": "(नए टैब में खुलेगा)",
+      "links": {
+        "docs": "डॉक्स",
+        "microsoft-store": "Microsoft Store",
+        "play-store": "Google Play",
+        "app-store": "App Store",
+        "github": "GitHub",
+        "status": "स्टेटस",
+        "other": "और"
+      }
+    },
+    "pricing": {
+      "recommended": "सुझाया गया",
+      "free": "मुफ़्त",
+      "oneTime": "एक बार",
+      "perYear": "प्रति वर्ष",
+      "perMonth": "प्रति माह",
+      "downloadFree": "मुफ़्त डाउनलोड करें",
+      "waitlist": "वेटलिस्ट में जुड़ें",
+      "buy": "{plan} ख़रीदें",
+      "soon": "जल्द उपलब्ध",
+      "fullPricing": "पूरी क़ीमतें देखें"
+    },
+    "release": {
+      "version": "वर्ज़न {version}",
+      "versionCol": "वर्ज़न",
+      "beta": "बीटा",
+      "released": "रिलीज़",
+      "size": "साइज़",
+      "minOs": "ज़रूरी",
+      "sha256": "SHA-256",
+      "download": "डाउनलोड करें",
+      "allDownloads": "सभी वर्ज़न और चेकसम",
+      "notes": "नया क्या है",
+      "verifyTitle": "अपना डाउनलोड जांचें",
+      "verifyText": "इंस्टॉलर वाले फ़ोल्डर में PowerShell में यह चलाएं और नतीजे को ऊपर दिए SHA-256 से मिलाएं। अलग हो तो फ़ाइल हटाकर दोबारा डाउनलोड करें।",
+      "previous": "सभी वर्ज़न"
+    },
+    "changelog": {
+      "new": "नया",
+      "improved": "बेहतर",
+      "fixed": "ठीक किया",
+      "release": "रिलीज़",
+      "beta": "बीटा रिलीज़",
+      "version": "वर्ज़न {version}"
+    },
+    "problemSolution": {
+      "problem": "समस्या",
+      "solution": "हमारा हल"
+    },
+    "privacy": {
+      "local": "आपके डिवाइस पर रहता है",
+      "cloud": "क्लाउड पर जाता है"
+    },
+    "requirements": {
+      "caption": "सिस्टम ज़रूरतें",
+      "item": "हिस्सा",
+      "minimum": "न्यूनतम",
+      "recommended": "सुझाया गया"
+    },
+    "comparison": {
+      "caption": "तुलना",
+      "feature": "फ़ीचर"
+    },
+    "waitlist": {
+      "title": "{name} सबसे पहले आज़माएं",
+      "text": "अपना ईमेल दें, {name} तैयार होते ही हम आपको बताएंगे।",
+      "subject": "वेटलिस्ट: {name}",
+      "email": "जुड़ने के लिए ईमेल करें",
+      "contact": "जुड़ने के लिए संपर्क करें"
+    },
+    "productPages": {
+      "pricingTitle": "{name} की क़ीमतें",
+      "downloadTitle": "{name} डाउनलोड करें",
+      "changelogTitle": "{name} चेंजलॉग",
+      "docsTitle": "{name} डॉक्स",
+      "supportTitle": "{name} सपोर्ट",
+      "noPlans": "प्लान जल्द घोषित होंगे।",
+      "pricingFaq": "लाइसेंस, डिवाइस, रिफ़ंड और अपडेट",
+      "noChanges": "अभी कोई रिलीज़ नोट नहीं।",
+      "faq": "आम सवाल",
+      "stillStuck": "अब भी अटके हैं?",
+      "stillStuckText": "हमें लिखें, कोई व्यक्ति आमतौर पर एक कार्यदिवस में जवाब देगा।",
+      "contactForm": "संपर्क फ़ॉर्म",
+      "docsNav": "डॉक्स",
+      "docsIntro": "{name} के लिए गाइड और जवाब। कोई विषय चुनें।",
+      "noDocs": "डॉक्स जल्द आ रहे हैं।"
     }
   },
   "styleguide": {
@@ -136,5 +256,28 @@
       "motion": "मोशन",
       "product": "प्रोडक्ट"
     }
+  },
+  "system": {
+    "maintenance": {
+      "title": "हम जल्द लौटेंगे",
+      "text": "साइट पर एक छोटा अपडेट चल रहा है। कृपया कुछ मिनट बाद फिर देखें।"
+    },
+    "notFound": {
+      "title": "यह पेज नहीं मिला",
+      "text": "हो सकता है लिंक पुराना हो या पेज कहीं और चला गया हो।",
+      "home": "होम पेज पर जाएं",
+      "contact": "हमसे संपर्क करें",
+      "products": "हमारे प्रोडक्ट"
+    },
+    "error": {
+      "title": "कुछ गड़बड़ हो गई",
+      "text": "यह पेज लोड नहीं हो सका। कृपया फिर से कोशिश करें।",
+      "retry": "फिर से कोशिश करें",
+      "home": "होम पेज पर जाएं"
+    }
+  },
+  "products": {
+    "title": "प्रोडक्ट",
+    "intro": "सॉफ़्टवेयर जिसे हम ख़ुद डिज़ाइन करते हैं, बनाते हैं और चलाते हैं: रेस्टोरेंट, पीसी और रोज़ के काम के लिए।"
   }
 }
