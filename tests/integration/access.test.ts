@@ -342,6 +342,21 @@ describe('private data', () => {
     }
   })
 
+  it('keeps invoice PDFs from editors, who still read CVs', async () => {
+    const files = await payload.find({
+      collection: 'private-files',
+      where: { purpose: { equals: 'invoice' } },
+      ...as('editor'),
+    })
+    expect(files.totalDocs).toBe(0)
+    const access = (await import('@/collections/PrivateFiles')).PrivateFiles.access!.read!
+    const read = (role: 'owner' | 'editor' | 'support') =>
+      access({ req: { user: { ...users[role], collection: 'users' } } } as never)
+    expect(read('owner')).toBe(true)
+    expect(read('support')).toBe(true)
+    expect(read('editor')).toEqual({ purpose: { not_equals: 'invoice' } })
+  })
+
   it('never lets the API create or change orders, invoices or customers, even for the owner', async () => {
     for (const collection of ['orders', 'invoices', 'customers'] as const) {
       await expect(

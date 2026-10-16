@@ -14,7 +14,7 @@ How to switch on accounts and checkout on staging with Razorpay's test mode. Pro
    - `RAZORPAY_WEBHOOK_SECRET`: a new random value, also entered in step 2 (`openssl rand -hex 32`);
    - `OTP_PEPPER`: a new random value (`openssl rand -hex 32`). Changing it later invalidates codes in flight only.
 
-   Restart the staging app (`deploy.sh` or `docker compose up -d app-staging`).
+   Restart the staging app so it reads them: in `/srv/jainav`, `docker compose -f compose.prod.yml up -d --force-recreate app-staging`.
 
 2. **Webhook** (Razorpay Dashboard, test mode → Webhooks → Add): URL `https://staging.{{DOMAIN}}/api/v1/webhooks/razorpay` (Caddy lets it past basic auth), the secret from step 1, events `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid`, `refund.created`, `refund.processed`, `refund.failed`, `payment.dispute.created`.
 3. **Capture:** Dashboard → Account & Settings → Payment capture: automatic.
@@ -22,7 +22,7 @@ How to switch on accounts and checkout on staging with Razorpay's test mode. Pro
    - Settings → Commerce settings: the SAC code, invoice prefixes and, once the CA confirms, "Charge GST" (needs the company GSTIN in Site settings first); the current Terms and EULA versions (they are recorded with every order).
    - Products → Plans: VYRO Pro's price (paise, GST-inclusive) and "Active".
    - Settings → Site settings → Site: "Store enabled".
-5. **Content security policy:** open `https://staging.{{DOMAIN}}/checkout/vyro/pro` with the browser console open and pay once (step 6). Any `Content-Security-Policy` violation naming a Razorpay host goes into `src/lib/csp.ts` (`RAZORPAY`).
+5. **Content security policy:** keep the browser console open during the test purchase (step 6), starting from the pricing page. Any `Content-Security-Policy` violation naming a Razorpay host goes into `src/lib/csp.ts` (`RAZORPAY`).
 
 ## Test purchase (spec §20 Phase 7 "done when")
 

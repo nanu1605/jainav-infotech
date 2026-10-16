@@ -445,36 +445,36 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
   DROP TABLE "payload_jobs" CASCADE;
   DROP TABLE "commerce_settings" CASCADE;
   DROP TABLE "payload_jobs_stats" CASCADE;
-  ALTER TABLE "data_requests" DROP CONSTRAINT "data_requests_customer_id_customers_id_fk";
+  ALTER TABLE "data_requests" DROP CONSTRAINT IF EXISTS "data_requests_customer_id_customers_id_fk";
   
-  ALTER TABLE "private_files_rels" DROP CONSTRAINT "private_files_rels_invoices_fk";
+  ALTER TABLE "private_files_rels" DROP CONSTRAINT IF EXISTS "private_files_rels_invoices_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_orders_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_orders_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_invoices_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_invoices_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_customers_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_customers_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_coupons_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_coupons_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_webhook_events_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_webhook_events_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_invoice_counters_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_invoice_counters_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_otp_challenges_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_otp_challenges_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_customer_sessions_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_customer_sessions_fk";
   
-  DROP INDEX "data_requests_customer_idx";
-  DROP INDEX "private_files_rels_invoices_id_idx";
-  DROP INDEX "payload_locked_documents_rels_orders_id_idx";
-  DROP INDEX "payload_locked_documents_rels_invoices_id_idx";
-  DROP INDEX "payload_locked_documents_rels_customers_id_idx";
-  DROP INDEX "payload_locked_documents_rels_coupons_id_idx";
-  DROP INDEX "payload_locked_documents_rels_webhook_events_id_idx";
-  DROP INDEX "payload_locked_documents_rels_invoice_counters_id_idx";
-  DROP INDEX "payload_locked_documents_rels_otp_challenges_id_idx";
-  DROP INDEX "payload_locked_documents_rels_customer_sessions_id_idx";
+  DROP INDEX IF EXISTS "data_requests_customer_idx";
+  DROP INDEX IF EXISTS "private_files_rels_invoices_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_orders_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_invoices_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_customers_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_coupons_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_webhook_events_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_invoice_counters_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_otp_challenges_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_customer_sessions_id_idx";
   ALTER TABLE "data_requests" DROP COLUMN "customer_id";
   ALTER TABLE "private_files_rels" DROP COLUMN "invoices_id";
   ALTER TABLE "payload_locked_documents_rels" DROP COLUMN "orders_id";

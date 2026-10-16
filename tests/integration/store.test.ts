@@ -825,6 +825,72 @@ describe('checkout (spec §11.3)', () => {
   })
 })
 
+describe('housekeeping', () => {
+  it('lets the Owner delete a customer without orders (sessions go too), never one with orders', async () => {
+    const address = email('erase')
+    await signIn(address)
+    const [customer] = (
+      await payload.find({
+        collection: 'customers',
+        where: { email: { equals: address } },
+        depth: 0,
+        overrideAccess: true,
+      })
+    ).docs
+    await payload.delete({ collection: 'customers', id: customer!.id, overrideAccess: true })
+    const sessions = await payload.count({
+      collection: 'customer-sessions',
+      where: { customer: { equals: customer!.id } },
+      overrideAccess: true,
+    })
+    expect(sessions.totalDocs).toBe(0)
+
+    const buyer = (
+      await payload.find({
+        collection: 'customers',
+        where: { email: { equals: email('buyer') } },
+        depth: 0,
+        overrideAccess: true,
+      })
+    ).docs[0]!
+    await expect(
+      payload.delete({ collection: 'customers', id: buyer.id, overrideAccess: true }),
+    ).rejects.toThrow(/anonymize/)
+  })
+
+  it('releases jobs a crash left processing, and drops webhook payloads after 90 days', async () => {
+    const job = await payload.jobs.queue({ task: 'cleanup', input: {} })
+    await db().execute(
+      sql`UPDATE payload_jobs SET processing = true, updated_at = now() - interval '31 minutes' WHERE id = ${job.id}`,
+    )
+    await (payload.config.jobs.shouldAutoRun as (p: Payload) => Promise<boolean>)(payload)
+    const released = await payload.findByID({
+      collection: 'payload-jobs',
+      id: job.id,
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(released.processing).toBe(false)
+
+    const old = await payload.create({
+      collection: 'webhook-events',
+      data: {
+        eventId: `evt_dev${run}old`,
+        event: 'payment.failed',
+        status: 'failed',
+        payload: { contact: '+919999999999' },
+        receivedAt: new Date(Date.now() - 91 * 86_400_000).toISOString(),
+      },
+      overrideAccess: true,
+    })
+    const { cleanup } = await import('@/lib/commerce/webhooks')
+    await cleanup()
+    await expect(
+      payload.findByID({ collection: 'webhook-events', id: old.id, overrideAccess: true }),
+    ).rejects.toThrow()
+  })
+})
+
 describe('GST and coupons (spec §11.4, §11.5)', () => {
   let cookie: string
   beforeAll(async () => {

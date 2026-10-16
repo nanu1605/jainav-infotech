@@ -183,11 +183,24 @@ export async function fulfilOrder(
           AND (max_redemptions IS NULL OR COALESCE(redemptions, 0) < max_redemptions)
         RETURNING id
       `)
-      // The payment is taken either way; the limit was checked at checkout, so this is a race.
-      if (!counted.rows.length) {
-        const note = JSON.stringify([
-          { at: paidAt.toISOString(), type: 'coupon-limit', detail: 'Redemption limit reached' },
-        ])
+      // The limits were checked at checkout, but two checkouts open at once can both pass. The
+      // payment is taken either way: note it on the order for the Owner.
+      const { rows: overLimit } = await tx.execute(sql`
+        SELECT 1 FROM coupons c
+        WHERE c.id = ${couponId} AND c.per_customer_limit IS NOT NULL
+          AND (SELECT count(*) FROM orders o
+               WHERE o.coupon_id = c.id AND o.customer_id = ${order.customer as number}
+                 AND o.status IN ('paid', 'refunded', 'partially-refunded', 'disputed'))
+              > c.per_customer_limit
+      `)
+      const over = [
+        ...(counted.rows.length ? [] : ['Redemption limit reached']),
+        ...(overLimit.length ? ['Per-customer limit exceeded'] : []),
+      ]
+      if (over.length) {
+        const note = JSON.stringify(
+          over.map((detail) => ({ at: paidAt.toISOString(), type: 'coupon-limit', detail })),
+        )
         await tx.execute(
           sql`UPDATE orders SET events = COALESCE(events, '[]'::jsonb) || ${note}::jsonb WHERE id = ${orderId}`,
         )

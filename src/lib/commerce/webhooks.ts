@@ -253,17 +253,14 @@ export async function processWebhookEvent(id: number) {
   })
 }
 
-/** The daily cleanup job: expired sign-ins, and handled webhook payloads after 90 days. */
+/** The daily cleanup job: expired sign-ins, and webhook payloads after 90 days (handled or not). */
 export async function cleanup() {
   await deleteExpired()
   const payload = await getClient()
   await payload.delete({
     collection: 'webhook-events',
     where: {
-      and: [
-        { status: { in: ['processed', 'ignored'] } },
-        { receivedAt: { less_than: new Date(Date.now() - KEEP_DAYS * 86_400_000).toISOString() } },
-      ],
+      receivedAt: { less_than: new Date(Date.now() - KEEP_DAYS * 86_400_000).toISOString() },
     },
     overrideAccess: true,
     depth: 0,

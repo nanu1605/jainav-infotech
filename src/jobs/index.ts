@@ -4,6 +4,32 @@ import { hasRole } from '@/access/roles'
 
 const RETRIES = 5
 
+/**
+ * What a job failure may record: Payload stores and logs the thrown error's message and stack, and
+ * a database error's message lists every bound value (emails, phone numbers).
+ */
+function safeError(error: unknown): Error {
+  const code = (error as { cause?: { code?: unknown } } | null)?.cause?.code
+  const ours = error instanceof Error && /^(RazorpayError|Error)$/.test(error.name) && !code
+  return new Error(
+    ours
+      ? (error as Error).message
+      : typeof code === 'string'
+        ? `Database error ${code}`
+        : 'Job failed',
+  )
+}
+
+/** Runs a handler, rethrowing only what may be recorded. */
+async function guarded(run: () => Promise<void>) {
+  try {
+    await run()
+  } catch (error) {
+    console.error('jobs: failed:', safeError(error).message)
+    throw safeError(error)
+  }
+}
+
 type IdInput = { input: { id: number }; output: object }
 
 /**
@@ -29,7 +55,7 @@ const idTask = (slug: string, run: (id: number) => Promise<void>): TaskConfig<Id
   inputSchema: [{ name: 'id', type: 'number', required: true }],
   retries: { attempts: RETRIES, backoff: { type: 'exponential', delay: 30_000 } },
   handler: (async ({ input }) => {
-    await run(input.id)
+    await guarded(() => run(input.id))
     return { output: {} }
   }) as TaskHandler<IdInput>,
   onFail: alertWhenExhausted(slug),
@@ -43,6 +69,24 @@ const idTask = (slug: string, run: (id: number) => Promise<void>): TaskConfig<Id
 export const jobs: JobsConfig = {
   access: { run: ({ req }) => hasRole(req.user, 'owner') },
   autoRun: [{ cron: '* * * * *', queue: 'default' }],
+  // Payload never re-claims a job a crash or restart left "processing", and a stuck scheduled job
+  // stops its schedule for good. Our jobs take seconds: release any still processing after 30
+  // minutes, every tick, before the run.
+  shouldAutoRun: async (payload) => {
+    await payload.update({
+      collection: 'payload-jobs',
+      where: {
+        and: [
+          { processing: { equals: true } },
+          { updatedAt: { less_than: new Date(Date.now() - 30 * 60_000).toISOString() } },
+        ],
+      },
+      data: { processing: false },
+      overrideAccess: true,
+      depth: 0,
+    })
+    return true
+  },
   // Owner can look at the queue (failed jobs and their errors) under System.
   jobsCollectionOverrides: ({ defaultJobsCollection }) => ({
     ...defaultJobsCollection,
@@ -65,7 +109,7 @@ export const jobs: JobsConfig = {
       schedule: [{ cron: '*/15 * * * *', queue: 'default' }],
       retries: 0,
       handler: async () => {
-        await (await import('@/lib/commerce/reconcile')).reconcileOrders()
+        await guarded(async () => (await import('@/lib/commerce/reconcile')).reconcileOrders())
         return { output: {} }
       },
     },
@@ -75,7 +119,7 @@ export const jobs: JobsConfig = {
       schedule: [{ cron: '30 3 * * *', queue: 'default' }],
       retries: 0,
       handler: async () => {
-        await (await import('@/lib/commerce/webhooks')).cleanup()
+        await guarded(async () => (await import('@/lib/commerce/webhooks')).cleanup())
         return { output: {} }
       },
     },
