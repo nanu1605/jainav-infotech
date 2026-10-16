@@ -10,7 +10,8 @@ remote="backups:$BACKUP_BUCKET/daily"
 site=${SITE_DATABASE:-jainav}
 
 for db in $BACKUP_DATABASES; do
-  name=$(rclone lsf --files-only "$remote/" | grep "^$db-.*\.dump\.age\$" | sort | tail -n 1)
+  # No match is not an error here (the next line explains it); a failing rclone still is.
+  name=$(rclone lsf --files-only "$remote/" | { grep "^$db-.*\.dump\.age\$" || true; } | sort | tail -n 1)
   [ -n "$name" ] || { echo "no backup of $db in $remote" >&2; exit 1; }
   rclone copyto "$remote/$name" "$tmp/$name"
   age --decrypt --identity "$AGE_IDENTITY_FILE" "$tmp/$name" >"$tmp/$db.dump"
