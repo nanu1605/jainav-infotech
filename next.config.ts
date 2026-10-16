@@ -4,7 +4,7 @@ import createNextIntlPlugin from 'next-intl/plugin'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-import { securityHeaders } from './src/lib/csp'
+import { contentSecurityPolicy, securityHeaders } from './src/lib/csp'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 // Media URLs point at the R2 CDN in staging and production (payload.config.ts generateFileURL).
@@ -35,7 +35,16 @@ const nextConfig: NextConfig = {
       umamiUrl: process.env.NEXT_PUBLIC_UMAMI_URL,
       sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
     }
-    return [{ source: '/:path*', headers: securityHeaders(env) }]
+    return [
+      { source: '/:path*', headers: securityHeaders(env) },
+      // Later entries win for the same header: the admin also allows Payload's Monaco editor.
+      {
+        source: '/admin/:path*',
+        headers: [
+          { key: 'Content-Security-Policy', value: contentSecurityPolicy(env, { admin: true }) },
+        ],
+      },
+    ]
   },
   images: {
     localPatterns: [{ pathname: '/api/media/file/**' }],

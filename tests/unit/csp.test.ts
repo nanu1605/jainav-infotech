@@ -42,6 +42,17 @@ describe('content security policy', () => {
     ])
   })
 
+  it('allows Payload’s Monaco editor in the admin only', () => {
+    const site = directives(contentSecurityPolicy({}))
+    const admin = directives(contentSecurityPolicy({}, { admin: true }))
+    for (const d of ['script-src', 'style-src', 'font-src']) {
+      expect(site[d]).not.toContain('https://cdn.jsdelivr.net')
+      expect(admin[d]).toContain('https://cdn.jsdelivr.net')
+    }
+    expect(admin['worker-src']).toContain('data:')
+    expect(site['worker-src']).not.toContain('data:')
+  })
+
   it('ignores values that are not URLs', () => {
     const csp = contentSecurityPolicy({ cdnUrl: 'not a url', umamiUrl: '', sentryDsn: undefined })
     expect(csp).not.toMatch(/not a url|undefined/)
