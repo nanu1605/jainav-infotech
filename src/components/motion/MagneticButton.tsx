@@ -56,7 +56,7 @@ export function MagneticButton({
     <Button
       {...props}
       className={cn(
-        'transition-[background-color,color,border-color,box-shadow,opacity,translate] duration-(--duration-base)',
+        'transition-[background-color,color,border-color,box-shadow,opacity,translate,scale] duration-(--duration-base)',
         className,
       )}
       onPointerEnter={(e: PointerEvent<HTMLButtonElement>) => {

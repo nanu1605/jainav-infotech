@@ -20,7 +20,9 @@ export function Tag({ asChild = false, className, ...props }: TagProps) {
       className={cn(
         'inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-sm text-fg-muted [&_svg]:size-3.5 [&_svg]:shrink-0',
         '[&:is(a,button)]:min-h-10 [&:is(a,button)]:px-4',
-        '[&:is(a,button)]:transition-colors [&:is(a,button)]:duration-[var(--duration-fast)] [&:is(a,button)]:hover:border-border-strong [&:is(a,button)]:hover:text-fg',
+        '[&:is(a,button)]:transition-[color,background-color,border-color,translate] [&:is(a,button)]:duration-[var(--duration-fast)] [&:is(a,button)]:hover:border-border-strong [&:is(a,button)]:hover:text-fg',
+        // Hover lift (spec §14): `translate` only, settles while pressed; none with reduced motion.
+        '[&:is(a,button)]:motion-safe:hover:-translate-y-0.5 [&:is(a,button)]:motion-safe:active:translate-y-0',
         'disabled:pointer-events-none disabled:opacity-50',
         'aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:font-semibold aria-pressed:text-fg',
         'aria-[current=page]:border-primary aria-[current=page]:bg-primary/10 aria-[current=page]:font-semibold aria-[current=page]:text-fg',
