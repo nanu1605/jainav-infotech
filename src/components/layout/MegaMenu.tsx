@@ -82,8 +82,9 @@ const CLOSE_DELAY = 300
 
 /**
  * The header's products menu (spec §8.1): a disclosure button and its panel (WAI disclosure
- * navigation pattern). Opens on click, Enter or Space, or on hover with a mouse; closes on
- * Escape (focus returns to the button), a click or focus outside, and navigation. Hand-built
+ * navigation pattern). Opens on click, Enter or Space, or on hover with a mouse (a click then
+ * pins it open); closes on Escape (focus returns to the button when it was in the menu), a
+ * click or focus outside, the mouse leaving a hover-opened panel, and navigation. Hand-built
  * rather than Radix NavigationMenu, which put about 15 KB into every page's initial JS (§15).
  */
 export function ProductsMenu({
@@ -106,13 +107,18 @@ export function ProductsMenu({
   const root = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  // Opened by click or keyboard: stays open when the mouse leaves.
+  const pinned = useRef(false)
   // Open on the page it was opened on, so navigating closes it without an effect.
   const [openOn, setOpenOn] = useState<string | null>(defaultOpen ? pathname : null)
   const open = openOn === pathname
 
   const set = (next: boolean, delay = 0) => {
     clearTimeout(timer.current)
-    const apply = () => setOpenOn(next ? pathname : null)
+    const apply = () => {
+      if (!next) pinned.current = false
+      setOpenOn(next ? pathname : null)
+    }
     if (delay) timer.current = setTimeout(apply, delay)
     else apply()
   }
@@ -120,12 +126,13 @@ export function ProductsMenu({
   useEffect(() => {
     if (!open) return
     const onPointerDown = (e: globalThis.PointerEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpenOn(null)
+      if (!root.current?.contains(e.target as Node)) set(false)
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
-      setOpenOn(null)
-      trigger.current?.focus()
+      // Only take focus back from inside the menu; a hover-opened panel just closes.
+      if (root.current?.contains(document.activeElement)) trigger.current?.focus()
+      set(false)
     }
     document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
@@ -133,11 +140,15 @@ export function ProductsMenu({
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)
     }
+    // `set` only closes here; it changes identity every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
   useEffect(() => () => clearTimeout(timer.current), [])
 
+  // Focus moving to another element closes it. No relatedTarget (a press on the panel's padding,
+  // or Safari not focusing a clicked link) isn't leaving: outside presses close it above.
   const blur = (e: FocusEvent) => {
-    if (!root.current?.contains(e.relatedTarget as Node | null)) set(false)
+    if (e.relatedTarget && !root.current?.contains(e.relatedTarget as Node)) set(false)
   }
   const active = isCurrent(pathname, href)
 
@@ -145,8 +156,14 @@ export function ProductsMenu({
     <div
       ref={root}
       className="relative"
-      onPointerEnter={(e: PointerEvent) => e.pointerType === 'mouse' && set(true, OPEN_DELAY)}
-      onPointerLeave={(e: PointerEvent) => e.pointerType === 'mouse' && set(false, CLOSE_DELAY)}
+      onPointerEnter={(e: PointerEvent) => {
+        if (e.pointerType !== 'mouse') return
+        if (open) clearTimeout(timer.current)
+        else set(true, OPEN_DELAY)
+      }}
+      onPointerLeave={(e: PointerEvent) => {
+        if (e.pointerType === 'mouse' && !pinned.current) set(false, CLOSE_DELAY)
+      }}
       onBlur={blur}
     >
       <button
@@ -158,7 +175,16 @@ export function ProductsMenu({
         aria-current={active ? 'true' : undefined}
         data-active={active ? '' : undefined}
         data-state={open ? 'open' : 'closed'}
-        onClick={() => set(!open)}
+        onClick={() => {
+          // The click that usually follows a hover-open pins the panel instead of closing it.
+          if (open && !pinned.current) {
+            clearTimeout(timer.current)
+            pinned.current = true
+            return
+          }
+          set(!open)
+          pinned.current = !open
+        }}
         className={cn('group/trigger', triggerClassName)}
       >
         {label}
