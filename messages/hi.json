@@ -392,7 +392,8 @@
       "title": "ऑर्डर सारांश",
       "item": "{product} {plan}",
       "quantity": "मात्रा: 1",
-      "inclGst": "GST सहित"
+      "inclGst": "GST सहित",
+      "plusGst": "GST अलग से"
     },
     "coupon": {
       "label": "कूपन कोड",

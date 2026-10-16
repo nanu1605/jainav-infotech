@@ -3,7 +3,7 @@
 import * as z from 'zod/mini'
 
 import { routing } from '@/i18n/routing'
-import { gstinState } from '@/lib/tax/gstin'
+import { gstinState, normalizeGstin } from '@/lib/tax/gstin'
 import { isStateCode } from '@/lib/tax/states'
 
 /** Version of the marketing-consent wording on the account settings page (`account.settings`). */
@@ -36,10 +36,8 @@ const latin = (max: number, min = 0) =>
 const phone = z.string().check(z.trim(), z.regex(/^$|^\+?[\d\s()-]{7,20}$/, 'phone'))
 const state = z.string().check(z.refine(isStateCode, 'choose'))
 const gstin = z.pipe(
-  z.string().check(
-    z.overwrite((v) => v.replace(/s+/g, '')),
-    z.toUpperCase(),
-  ),
+  // Spaces anywhere go (a pasted "27 AAPFU 0939F1ZV"); stored and printed as 15 characters.
+  z.string().check(z.overwrite(normalizeGstin)),
   z.string().check(z.refine((v) => v === '' || gstinState(v) !== null, 'gstin')),
 )
 const couponCode = z.string().check(z.trim(), z.toUpperCase(), z.maxLength(32, 'tooLong'))

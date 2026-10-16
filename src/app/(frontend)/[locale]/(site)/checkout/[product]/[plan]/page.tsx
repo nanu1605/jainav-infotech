@@ -109,7 +109,11 @@ export default async function CheckoutPage({ params }: Props) {
                   {formatINR(locale, price)}
                 </span>
                 {settings.gstEnabled && (
-                  <span className="block text-sm text-fg-muted">{t('summary.inclGst')}</span>
+                  <span className="block text-sm text-fg-muted">
+                    {settings.pricesIncludeGst === false
+                      ? t('summary.plusGst')
+                      : t('summary.inclGst')}
+                  </span>
                 )}
               </p>
             </div>

@@ -858,6 +858,36 @@ describe('housekeeping', () => {
     ).rejects.toThrow(/anonymize/)
   })
 
+  it('sends the order email again when a crash ended the run after its claim', async () => {
+    const cookie = await signIn(email('lease'))
+    const { body } = await createOrder(cookie)
+    const paid = await gw('pay', {
+      order_id: body.razorpay.order_id,
+      outcome: 'success',
+      webhooks: false,
+    })
+    const order = await orderByNumber(body.order.number)
+    // Fulfilled, and the email claimed by a run that died before sending.
+    await fulfilOrder(payload, order.id, paid.response.razorpay_payment_id, 'verify')
+    await db().execute(sql`DELETE FROM payload_jobs WHERE input->>'id' = ${String(order.id)}`)
+    await db().execute(
+      sql`UPDATE orders SET emailed_at = now() - interval '31 minutes' WHERE id = ${order.id}`,
+    )
+    const { sendOrderEmail } = await import('@/lib/invoices/deliver')
+    await sendOrderEmail(order.id)
+    expect(
+      sent.filter((m) => m.to === order.billing.email && /confirmed/.test(String(m.subject))),
+    ).toHaveLength(1)
+    // Recorded as sent: a later run doesn't send it twice.
+    await db().execute(
+      sql`UPDATE orders SET emailed_at = now() - interval '31 minutes' WHERE id = ${order.id}`,
+    )
+    await sendOrderEmail(order.id)
+    expect(
+      sent.filter((m) => m.to === order.billing.email && /confirmed/.test(String(m.subject))),
+    ).toHaveLength(1)
+  })
+
   it('releases jobs a crash left processing, and drops webhook payloads after 90 days', async () => {
     const job = await payload.jobs.queue({ task: 'cleanup', input: {} })
     await db().execute(
@@ -875,6 +905,7 @@ describe('housekeeping', () => {
     const old = await payload.create({
       collection: 'webhook-events',
       data: {
+        provider: 'razorpay',
         eventId: `evt_dev${run}old`,
         event: 'payment.failed',
         status: 'failed',

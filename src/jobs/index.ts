@@ -8,9 +8,13 @@ const RETRIES = 5
  * What a job failure may record: Payload stores and logs the thrown error's message and stack, and
  * a database error's message lists every bound value (emails, phone numbers).
  */
-function safeError(error: unknown): Error {
-  const code = (error as { cause?: { code?: unknown } } | null)?.cause?.code
-  const ours = error instanceof Error && /^(RazorpayError|Error)$/.test(error.name) && !code
+export function safeError(error: unknown): Error {
+  const cause = (error as { cause?: { code?: unknown } } | null)?.cause
+  const code = cause?.code
+  // Our own errors have no cause; drizzle's (named plain "Error") wrap the database's and quote
+  // the query's parameters in their message.
+  const ours =
+    error instanceof Error && /^(RazorpayError|Error)$/.test(error.name) && cause === undefined
   return new Error(
     ours
       ? (error as Error).message

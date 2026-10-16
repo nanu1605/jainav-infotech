@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import { safeError } from '@/jobs'
+import { billingSchema } from '@/lib/commerce/schemas'
 import {
   couponProblem,
   discountFor,
@@ -187,5 +189,29 @@ describe('coupons (spec §11.5)', () => {
     expect(couponProblem(coupon({ products: [1], plans: [{ id: 2 }] }), target)).toBeNull()
     expect(couponProblem(coupon({ maxRedemptions: 5, redemptions: 5 }), target)).toBe('used_up')
     expect(couponProblem(coupon({ maxRedemptions: 5, redemptions: 4 }), target)).toBeNull()
+  })
+})
+
+describe('store input and job errors', () => {
+  it('normalizes a GSTIN: case and spaces anywhere, letters kept', () => {
+    const parse = (gstin: string) =>
+      billingSchema.safeParse({ name: 'Asha', phone: '', state: '23', businessName: '', gstin })
+    const valid = `27AASPS1234K1Z${gstinCheckChar('27AASPS1234K1Z')}`
+    expect(parse(valid.toLowerCase()).data?.gstin).toBe(valid)
+    expect(parse(` ${valid.slice(0, 2)} ${valid.slice(2)} `).data?.gstin).toBe(valid)
+    expect(parse('27AASPS1234K1Z0').success).toBe(valid.endsWith('0'))
+  })
+
+  it('records only safe text for a failed job', () => {
+    expect(safeError(new Error('Order has no invoice')).message).toBe('Order has no invoice')
+    const query = new Error('Failed query: insert … params: asha@example.com', {
+      cause: new Error('Connection terminated unexpectedly'),
+    })
+    expect(safeError(query).message).toBe('Job failed')
+    const unique = new Error('Failed query: … params: asha@example.com', {
+      cause: Object.assign(new Error('duplicate key'), { code: '23505' }),
+    })
+    expect(safeError(unique).message).toBe('Database error 23505')
+    expect(safeError({ odd: true }).message).toBe('Job failed')
   })
 })

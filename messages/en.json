@@ -392,7 +392,8 @@
       "title": "Order summary",
       "item": "{product} {plan}",
       "quantity": "Quantity: 1",
-      "inclGst": "incl. GST"
+      "inclGst": "incl. GST",
+      "plusGst": "+ GST"
     },
     "coupon": {
       "label": "Coupon code",
