@@ -35,6 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: post.excerpt,
     seo: post.meta,
     hiStatus: post.hiStatus,
+    shareImage: `/og/blog/${slug}.png`,
   })
   return {
     ...meta,

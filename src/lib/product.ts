@@ -62,6 +62,7 @@ export function productMetadata(
     description: sub?.description ?? product.summary ?? product.tagline,
     seo: sub ? null : product.meta,
     hiStatus: product.hiStatus,
+    shareImage: `/og/products/${product.slug}.png`,
   })
 }
 

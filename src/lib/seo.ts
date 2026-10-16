@@ -32,6 +32,7 @@ export function pageMetadata({
   seo,
   hiStatus = 'ready',
   noindex = false,
+  shareImage = '/og/site.png',
 }: {
   locale: Locale
   path: string
@@ -40,6 +41,8 @@ export function pageMetadata({
   seo?: Seo | null
   hiStatus?: HiStatus | null
   noindex?: boolean
+  /** Generated share image used when the SEO tab has none (spec §15). */
+  shareImage?: string
 }): Metadata {
   const paired = hiStatus === 'ready'
   const image = typeof seo?.image === 'object' && seo.image?.url ? seo.image : null
@@ -62,7 +65,9 @@ export function pageMetadata({
       description: desc,
       url: absoluteUrl(locale, path),
       locale: locale === 'hi' ? 'hi_IN' : 'en_IN',
-      ...(image && { images: [{ url: image.url!, alt: image.alt ?? '' }] }),
+      images: image
+        ? [{ url: image.url!, alt: image.alt ?? '' }]
+        : [{ url: `${SITE_URL}${shareImage}`, width: 1200, height: 630 }],
     },
     robots: noindex || (locale === 'hi' && !paired) ? { index: false, follow: true } : undefined,
   }
