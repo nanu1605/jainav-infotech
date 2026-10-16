@@ -93,3 +93,11 @@ export function sitemapEntries(
 
 /** Serialized JSON-LD, safe inside a <script> (no closing tag can appear in the output). */
 export const jsonLd = (data: object) => JSON.stringify(data).replace(/</g, '\\u003c')
+
+/**
+ * `lang` for CMS content shown on a Hindi page whose document has no Hindi yet: it is the English
+ * fallback (spec §6), so screen readers should read it as English (WCAG 3.1.2). Partly translated
+ * documents ("draft") mix both languages per field and keep the page language.
+ */
+export const fallbackLang = (locale: Locale, hiStatus?: HiStatus | null) =>
+  locale === 'hi' && hiStatus === 'missing' ? 'en' : undefined

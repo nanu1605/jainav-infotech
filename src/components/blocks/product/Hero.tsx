@@ -43,7 +43,7 @@ export async function ProductHero({
       />
       <Container className="grid items-center gap-12 py-16 sm:py-24 lg:grid-cols-2">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div lang={locale} className="flex flex-wrap items-center gap-2">
             <StatusBadge status={product.status} />
             {product.platforms?.map((p) => (
               <PlatformBadge key={p} platform={p} />

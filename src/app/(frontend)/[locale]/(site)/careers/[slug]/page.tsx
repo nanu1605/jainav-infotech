@@ -1,7 +1,6 @@
 import { Mail } from 'lucide-react'
 import type { Metadata } from 'next'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
-import { notFound } from 'next/navigation'
 
 import { JsonLd } from '@/components/content/JsonLd'
 import { PageHeader } from '@/components/content/PageHeader'
@@ -13,7 +12,8 @@ import type { Locale } from '@/i18n/routing'
 import { staticParams } from '@/lib/cms'
 import { formatDate, plainText } from '@/lib/format'
 import { getJob, getRoutable, getSettings } from '@/lib/queries'
-import { absoluteUrl, pageMetadata } from '@/lib/seo'
+import { redirectOrNotFound } from '@/lib/redirects'
+import { absoluteUrl, fallbackLang, pageMetadata } from '@/lib/seo'
 
 type Props = { params: Promise<{ locale: string; slug: string }> }
 
@@ -49,9 +49,10 @@ export default async function JobPage({ params }: Props) {
     getSettings(locale),
     getTranslations('careers'),
   ])
-  if (!job) notFound()
+  if (!job) return redirectOrNotFound(locale, `/careers/${slug}`)
   const email = settings.company?.emails?.careers || settings.company?.emails?.hello
   const posted = job.postedAt ?? job.createdAt
+  const lang = fallbackLang(locale, job.hiStatus)
   const meta = [t(`type.${job.type}`), t(`mode.${job.workMode}`), job.location].filter(Boolean)
 
   return (
@@ -70,7 +71,7 @@ export default async function JobPage({ params }: Props) {
         </p>
       </PageHeader>
       <Container size="prose" className="py-16 sm:py-24">
-        <RichText data={job.description} locale={locale} />
+        <RichText data={job.description} locale={locale} lang={lang} />
         <div className="mt-12 rounded-xl border border-border bg-surface p-6 shadow-sm">
           <h2 className="font-display text-xl font-semibold text-fg">{t('applyTitle')}</h2>
           <p className="mt-2 text-fg-muted">{t('applyText')}</p>

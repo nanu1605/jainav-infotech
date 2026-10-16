@@ -6,6 +6,9 @@ import { useState } from 'react'
 
 import { Button } from '@/components/ui/Button'
 
+// Keeps keyboard focus on the map that replaced the button (a stable ref runs once).
+const focusOnMount = (el: HTMLIFrameElement | null) => el?.focus()
+
 /**
  * Office map that loads only when asked for (spec §8.9): no third-party request, cookie or
  * script until the visitor clicks. Google's keyless embed by address.
@@ -28,6 +31,7 @@ export function MapEmbed({ address }: { address: string }) {
   }
   return (
     <iframe
+      ref={focusOnMount}
       title={t('mapTitle')}
       src={`https://www.google.com/maps?q=${query}&output=embed`}
       loading="lazy"

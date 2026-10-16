@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server'
 
 import type { Locale } from '@/i18n/routing'
+import { isPreview } from '@/lib/cms'
 import { getPosts } from '@/lib/queries'
 import { absoluteUrl, localizedPath, SITE_URL } from '@/lib/seo'
 
@@ -24,7 +25,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ feed: s
   const posts = locale === 'hi' ? docs.filter((p) => p.hiStatus === 'ready') : docs
   const items = posts
     .map((p) => {
-      const url = absoluteUrl(locale, `/blog/${p.slug}`)
+      const url = escape(absoluteUrl(locale, `/blog/${p.slug}`))
       return [
         '<item>',
         `<title>${escape(p.title ?? '')}</title>`,
@@ -53,7 +54,8 @@ ${items}
   return new Response(xml, {
     headers: {
       'Content-Type': 'application/rss+xml; charset=utf-8',
-      'Cache-Control': 'public, max-age=900',
+      // A previewing admin may see drafts listed: keep that copy out of shared caches.
+      'Cache-Control': (await isPreview()) ? 'private, no-store' : 'public, max-age=900',
     },
   })
 }

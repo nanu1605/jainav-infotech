@@ -5,7 +5,8 @@ import type { Product } from '@/payload-types'
 import { getClient } from '@/lib/cms'
 import { downloadRedirect } from '@/lib/downloads'
 
-const idParam = z.coerce.number().int().positive()
+// Postgres int4: larger ids would error instead of 404ing.
+const idParam = z.coerce.number().int().positive().max(2_147_483_647)
 
 /** GET /api/v1/downloads/release/{id} → count, 302 to that release's installer (spec §12.5). */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -26,5 +27,5 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!release || typeof product !== 'object' || product.status === 'coming-soon') {
     return new Response('Not found', { status: 404 })
   }
-  return downloadRedirect(payload, product.slug, release, req.nextUrl.origin)
+  return downloadRedirect(payload, product.slug, release, req)
 }

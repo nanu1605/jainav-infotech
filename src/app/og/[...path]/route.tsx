@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server'
 
+import { isPreview } from '@/lib/cms'
 import { ogImage } from '@/lib/og'
 import { getPost, getProduct } from '@/lib/queries'
 
@@ -33,6 +34,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ path: s
     if (post) image = ogImage({ title: post.title ?? '', eyebrow: t('feedTitle') })
   }
   if (!image) return new Response('Not found', { status: 404 })
-  image.headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400')
+  // A previewing admin may have rendered drafts: never let a CDN keep that image.
+  image.headers.set(
+    'Cache-Control',
+    (await isPreview()) ? 'private, no-store' : 'public, max-age=3600, s-maxage=86400',
+  )
   return image
 }

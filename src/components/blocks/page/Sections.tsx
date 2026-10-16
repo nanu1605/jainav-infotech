@@ -1,5 +1,7 @@
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Check } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
+import { Fragment } from 'react'
 
 import { Icon } from '@/components/content/Icon'
 import { RichText } from '@/components/content/RichText'
@@ -135,7 +137,9 @@ export async function CompanyFacts({ block, locale }: BlockProps<PageCompanyFact
       <dl className="divide-y divide-border rounded-lg border border-border bg-surface">
         {facts.map(([label, value]) => (
           <div key={label} className="grid gap-1 px-5 py-4 sm:grid-cols-3 sm:gap-4">
-            <dt className="text-sm font-medium text-fg-muted">{label}</dt>
+            <dt lang={locale} className="text-sm font-medium text-fg-muted">
+              {label}
+            </dt>
             <dd className="whitespace-pre-line text-fg sm:col-span-2">{value}</dd>
           </div>
         ))}
@@ -204,19 +208,54 @@ export async function ServicesOverview({ block, locale }: BlockProps<PageService
   )
 }
 
+/**
+ * The service pillars (spec §8.7): summary, the main capabilities and our own products as proof.
+ * Deliverables are on each pillar's page. The title link covers the card; product links sit above.
+ */
 export function ServiceCards({ services }: { services: Service[] }) {
+  const t = useTranslations('services')
   return (
     <Grid cols={services.length % 3 === 0 ? 3 : 2}>
-      {services.map((s) => (
-        <Card key={s.id} variant="interactive">
-          <Icon name={s.icon} className="text-primary" />
-          <CardTitle href={`/services/${s.slug}`} className="mt-4">
-            {s.title}
-          </CardTitle>
-          <CardDescription>{s.summary}</CardDescription>
-          <ArrowRight aria-hidden className="mt-4 size-4 text-fg-muted" />
-        </Card>
-      ))}
+      {services.map((s) => {
+        const capabilities = (s.capabilities ?? []).flatMap((c) => (c.text ? [c.text] : []))
+        const proof = docs<Product>(s.relatedProducts)
+        return (
+          <Card key={s.id} variant="interactive" className="flex flex-col">
+            <Icon name={s.icon} className="text-primary" />
+            <CardTitle href={`/services/${s.slug}`} className="mt-4">
+              {s.title}
+            </CardTitle>
+            <CardDescription>{s.summary}</CardDescription>
+            {capabilities.length > 0 && (
+              <ul className="mt-4 space-y-1.5 text-sm text-fg">
+                {capabilities.slice(0, 4).map((text) => (
+                  <li key={text} className="flex gap-2">
+                    <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />
+                    {text}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {proof.length > 0 && (
+              <p className="relative z-10 mt-4 text-sm text-fg-muted">
+                {t('proof')}:{' '}
+                {proof.map((p, i) => (
+                  <Fragment key={p.slug}>
+                    {i > 0 && ', '}
+                    <Link
+                      href={`/products/${p.slug}`}
+                      className="font-medium text-fg underline underline-offset-4 hover:no-underline"
+                    >
+                      {p.name}
+                    </Link>
+                  </Fragment>
+                ))}
+              </p>
+            )}
+            <ArrowRight aria-hidden className="mt-auto size-4 pt-4 text-fg-muted" />
+          </Card>
+        )
+      })}
     </Grid>
   )
 }
@@ -271,7 +310,9 @@ export async function Latest({ block, locale }: BlockProps<PageLatestBlock>) {
       <div className="grid gap-12 lg:grid-cols-2">
         {posts.docs.length > 0 && (
           <div>
-            <h3 className="font-display text-xl font-semibold text-fg">{t('posts')}</h3>
+            <h3 lang={locale} className="font-display text-xl font-semibold text-fg">
+              {t('posts')}
+            </h3>
             <ul className="mt-6 space-y-6">
               {posts.docs.map((post) => (
                 <li key={post.id}>
@@ -289,12 +330,16 @@ export async function Latest({ block, locale }: BlockProps<PageLatestBlock>) {
                 </li>
               ))}
             </ul>
-            <MoreLink href="/blog">{t('allPosts')}</MoreLink>
+            <MoreLink href="/blog" lang={locale}>
+              {t('allPosts')}
+            </MoreLink>
           </div>
         )}
         {changes.length > 0 && (
           <div>
-            <h3 className="font-display text-xl font-semibold text-fg">{t('changelog')}</h3>
+            <h3 lang={locale} className="font-display text-xl font-semibold text-fg">
+              {t('changelog')}
+            </h3>
             <ul className="mt-6 divide-y divide-border border-y border-border">
               {changes.map((item) => (
                 <li key={item.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-4">
@@ -308,7 +353,9 @@ export async function Latest({ block, locale }: BlockProps<PageLatestBlock>) {
                 </li>
               ))}
             </ul>
-            <MoreLink href="/changelog">{t('allChanges')}</MoreLink>
+            <MoreLink href="/changelog" lang={locale}>
+              {t('allChanges')}
+            </MoreLink>
           </div>
         )}
       </div>
@@ -316,10 +363,11 @@ export async function Latest({ block, locale }: BlockProps<PageLatestBlock>) {
   )
 }
 
-function MoreLink({ href, children }: { href: string; children: string }) {
+function MoreLink({ href, lang, children }: { href: string; lang: string; children: string }) {
   return (
     <Link
       href={href}
+      lang={lang}
       className="mt-6 inline-flex min-h-10 items-center gap-1.5 font-medium text-fg underline-offset-4 hover:underline"
     >
       {children}

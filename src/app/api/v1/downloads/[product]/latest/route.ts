@@ -25,5 +25,5 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prod
   if (!release || found.product.status === 'coming-soon') {
     return new Response('Not found', { status: 404 })
   }
-  return downloadRedirect(payload, slug.data, release, req.nextUrl.origin)
+  return downloadRedirect(payload, slug.data, release, req)
 }

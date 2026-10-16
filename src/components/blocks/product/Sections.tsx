@@ -162,7 +162,7 @@ export function Screenshots({ block }: ProductBlockProps<ProductScreenshotsBlock
   )
 }
 
-export async function Video({ block, locale }: ProductBlockProps<ProductVideoBlock>) {
+export async function Video({ block }: ProductBlockProps<ProductVideoBlock>) {
   const video = media(block.video)
   if (!video) return null
   const captions = media(block.captions)
@@ -181,8 +181,9 @@ export async function Video({ block, locale }: ProductBlockProps<ProductVideoBlo
           <track
             kind="captions"
             src={captions.url!}
-            srcLang={locale}
-            label={t('captions')}
+            // The captions file isn't localized: product videos are captioned in English.
+            srcLang="en"
+            label={t('captionsEnglish')}
             default
           />
         )}

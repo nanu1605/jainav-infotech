@@ -40,10 +40,17 @@ export const installerUrl = (release: Release, origin: string): string | null =>
 }
 
 /** Counts the download after the response, then 302s to the file (spec §12.5). */
-export function downloadRedirect(payload: Payload, slug: string, release: Release, origin: string) {
-  const url = installerUrl(release, origin)
+export function downloadRedirect(
+  payload: Payload,
+  slug: string,
+  release: Release,
+  req: Request & { nextUrl: URL },
+) {
+  const url = installerUrl(release, req.nextUrl.origin)
   if (!url) return new Response('Not found', { status: 404 })
-  after(() => countEvent(payload, 'download', `${slug}@${release.version}`))
+  // Next answers HEAD with the GET handler; a HEAD probe (link checkers) is not a download.
+  if (req.method !== 'HEAD')
+    after(() => countEvent(payload, 'download', `${slug}@${release.version}`))
   return new Response(null, {
     status: 302,
     headers: { Location: url, 'Cache-Control': 'no-store' },

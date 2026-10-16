@@ -8,8 +8,10 @@ import { as, getClient, read } from './cms'
 import { publicPath, type RoutedCollection } from './routes'
 import { downloadTotal } from './stats'
 
+/** Rich text populates its uploads and internal links (any routed collection) at depth >= 1. */
+const RICH_TEXT_TAGS = ['media', ...Object.keys(publicPath), 'docs']
 /** Collections whose documents page blocks can pull in at depth 2. */
-const BLOCK_TAGS = ['media', 'products', 'services', 'faqs', 'testimonials', 'team']
+const BLOCK_TAGS = [...new Set([...RICH_TEXT_TAGS, 'faqs', 'testimonials', 'team'])]
 
 export const getSettings = (locale: Locale) =>
   read(locale, ['site-settings', 'media'], ['settings'], (payload, v) =>
@@ -86,6 +88,8 @@ const redirectTarget = (to: Redirect['to']): string | null => {
   if (to?.type === 'custom') return to.url ?? null
   const ref = to?.reference
   if (!ref || typeof ref.value !== 'object' || !ref.value.slug) return null
+  // Read with access off: never send visitors to a page that isn't published.
+  if (ref.value._status !== 'published') return null
   return publicPath[ref.relationTo as RoutedCollection](ref.value.slug)
 }
 
@@ -164,7 +168,7 @@ export const getPosts = (
       page,
       limit,
       sort: '-publishedAt',
-      where: tag ? { tags: { contains: tag } } : {},
+      where: tag ? { tags: { equals: tag } } : {},
       select: {
         title: true,
         slug: true,
@@ -181,7 +185,7 @@ export const getPosts = (
   )
 
 export const getPost = (locale: Locale, slug: string) =>
-  read(locale, ['posts', 'team', 'media'], ['post', slug], async (payload, v) => {
+  read(locale, ['team', ...RICH_TEXT_TAGS], ['post', slug], async (payload, v) => {
     const { docs } = await payload.find({
       collection: 'posts',
       where: { slug: { equals: slug } },
@@ -224,7 +228,7 @@ export const getChangelogFeed = (
 ) =>
   read(
     locale,
-    ['changelog', 'releases', 'products'],
+    ['changelog', 'releases', ...RICH_TEXT_TAGS],
     ['changelog-feed', productId, limit],
     async (payload, v): Promise<FeedItem[]> => {
       const where: Where = productId ? { product: { equals: productId } } : {}
@@ -240,29 +244,33 @@ export const getChangelogFeed = (
           ...as(v),
         }),
       ])
-      return [
-        ...entries.docs.map((e): FeedItem => ({
-          kind: 'entry',
-          id: `entry-${e.id}`,
-          date: e.date,
-          product: feedProduct(e.product),
-          title: e.title ?? '',
-          type: e.type,
-          body: e.body,
-        })),
-        ...releases.docs.map((r): FeedItem => ({
-          kind: 'release',
-          id: `release-${r.id}`,
-          date: r.releasedAt,
-          product: feedProduct(r.product),
-          title: r.version,
-          version: r.version,
-          notes: r.notes ?? null,
-          channel: r.channel,
-        })),
-      ]
-        .sort((a, b) => b.date.localeCompare(a.date))
-        .slice(0, limit)
+      return (
+        [
+          ...entries.docs.map((e): FeedItem => ({
+            kind: 'entry',
+            id: `entry-${e.id}`,
+            date: e.date,
+            product: feedProduct(e.product),
+            title: e.title ?? '',
+            type: e.type,
+            body: e.body,
+          })),
+          ...releases.docs.map((r): FeedItem => ({
+            kind: 'release',
+            id: `release-${r.id}`,
+            date: r.releasedAt,
+            product: feedProduct(r.product),
+            title: r.version,
+            version: r.version,
+            notes: r.notes ?? null,
+            channel: r.channel,
+          })),
+        ]
+          // An unreadable product (unpublished) hides its entries and releases too.
+          .filter((item) => item.product)
+          .sort((a, b) => b.date.localeCompare(a.date))
+          .slice(0, limit)
+      )
     },
   )
 
@@ -322,10 +330,12 @@ export const getTestimonials = (locale: Locale, productId: number) =>
 
 /** A product's docs, flat; the docs pages build the tree from `parent`. */
 export const getDocs = (locale: Locale, productId: number) =>
-  read(locale, ['docs'], ['docs', productId], async (payload, v) => {
+  read(locale, RICH_TEXT_TAGS, ['docs', productId], async (payload, v) => {
     const { docs } = await payload.find({
       collection: 'docs',
-      depth: 0,
+      // Rich text needs its uploads and link targets; keep the product and parent to slugs.
+      depth: 1,
+      populate: { products: { slug: true }, docs: { slug: true } },
       pagination: false,
       sort: 'sortOrder',
       where: { product: { equals: productId } },
@@ -373,7 +383,7 @@ export const getJobs = (locale: Locale) =>
   })
 
 export const getJob = (locale: Locale, slug: string) =>
-  read(locale, ['jobs'], ['job', slug], async (payload, v) => {
+  read(locale, RICH_TEXT_TAGS, ['job', slug], async (payload, v) => {
     const { docs } = await payload.find({
       collection: 'jobs',
       where: { slug: { equals: slug } },
@@ -385,7 +395,7 @@ export const getJob = (locale: Locale, slug: string) =>
   })
 
 export const getLegalPage = (locale: Locale, slug: string) =>
-  read(locale, ['legal-pages'], ['legal', slug], async (payload, v) => {
+  read(locale, RICH_TEXT_TAGS, ['legal', slug], async (payload, v) => {
     const { docs } = await payload.find({
       collection: 'legal-pages',
       where: { slug: { equals: slug } },

@@ -1,7 +1,8 @@
 {
   "metadata": {
     "title": "Jainav Infotech: software products and custom software",
-    "description": "Jainav Infotech builds its own software products, MenuMesh, VYRO and Baby, and custom software for businesses. Based in Indore, India."
+    "description": "Jainav Infotech builds its own software products, MenuMesh, VYRO and Baby, and custom software for businesses. Based in Indore, India.",
+    "titleTemplate": "%s | Jainav Infotech"
   },
   "site": {
     "name": "Jainav",
@@ -112,7 +113,8 @@
     "video": {
       "captions": "English",
       "play": "Play video",
-      "pause": "Pause video"
+      "pause": "Pause video",
+      "captionsEnglish": "English"
     },
     "callout": {
       "info": "Note",
@@ -186,7 +188,8 @@
       "notes": "What's new",
       "verifyTitle": "Check your download",
       "verifyText": "In PowerShell, run this in the folder with the installer and compare the result with the SHA-256 above. If they differ, delete the file and download it again.",
-      "previous": "All versions"
+      "previous": "All versions",
+      "verifyFile": "file name"
     },
     "changelog": {
       "new": "New",
@@ -369,6 +372,7 @@
   },
   "legal": {
     "version": "Version {version}, effective {date}",
-    "englishPrevails": "This is a translation. If the Hindi and English versions differ, the English version prevails."
+    "englishPrevails": "This is a translation. If the Hindi and English versions differ, the English version prevails.",
+    "englishOnly": "This page is available in English only."
   }
 }

@@ -7,7 +7,7 @@ import { ProductShell } from '@/components/product/ProductShell'
 import { WaitlistSlot } from '@/components/product/WaitlistSlot'
 import type { Locale } from '@/i18n/routing'
 import { loadProduct, productMetadata, productParams } from '@/lib/product'
-import { absoluteUrl } from '@/lib/seo'
+import { absoluteUrl, fallbackLang } from '@/lib/seo'
 
 type Props = { params: Promise<{ locale: string; slug: string }> }
 
@@ -29,7 +29,10 @@ export default async function ProductPage({ params }: Props) {
 
   return (
     <ProductShell loaded={loaded} active="overview">
-      <ProductBlocks loaded={loaded} locale={locale} />
+      {/* Untranslated product: its CMS content is the English fallback (buttons stay Hindi). */}
+      <div lang={fallbackLang(locale, product.hiStatus)}>
+        <ProductBlocks loaded={loaded} locale={locale} />
+      </div>
       {buttons.some((b) => b.kind === 'waitlist') && (
         <WaitlistSlot
           name={product.name}

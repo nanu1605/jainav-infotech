@@ -6,7 +6,7 @@ import { withUtm } from '@/lib/links'
 import { countEvent } from '@/lib/stats'
 
 /** Tracked outbound redirect: active short link → 302 with UTM; the click is counted after. */
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const slug = slugParam.safeParse((await params).slug)
   if (!slug.success) return new Response('Not found', { status: 404 })
 
@@ -22,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
   const link = docs[0]
   if (!link) return new Response('Not found', { status: 404 })
 
-  after(() => countEvent(payload, 'go-click', slug.data))
+  if (req.method !== 'HEAD') after(() => countEvent(payload, 'go-click', slug.data))
   return new Response(null, {
     status: 302,
     headers: {

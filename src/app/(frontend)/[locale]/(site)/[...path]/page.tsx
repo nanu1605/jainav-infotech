@@ -1,12 +1,12 @@
 import type { Metadata } from 'next'
 import { setRequestLocale } from 'next-intl/server'
-import { notFound, permanentRedirect, redirect } from 'next/navigation'
 
 import { PageView } from '@/components/content/PageView'
 import type { Locale } from '@/i18n/routing'
 import { staticParams } from '@/lib/cms'
-import { findRedirect, getPage, getPageSlugs } from '@/lib/queries'
-import { localizedPath, pageMetadata } from '@/lib/seo'
+import { getPage, getPageSlugs } from '@/lib/queries'
+import { redirectOrNotFound } from '@/lib/redirects'
+import { pageMetadata } from '@/lib/seo'
 
 type Props = { params: Promise<{ locale: string; path: string[] }> }
 
@@ -44,12 +44,5 @@ export default async function CatchAllPage({ params }: Props) {
   const page = await pageFor(locale, path)
   if (page) return <PageView page={page} locale={locale} />
 
-  const target = await findRedirect(`/${path.map(decodeURIComponent).join('/')}`)
-  if (target) {
-    const to = target.to.startsWith('/') ? localizedPath(locale, target.to) : target.to
-    // Next.js sends 308 / 307; 301 and 302 map to those (same caching, method preserved).
-    if (target.permanent) permanentRedirect(to)
-    redirect(to)
-  }
-  notFound()
+  return redirectOrNotFound(locale, `/${path.map(decodeURIComponent).join('/')}`)
 }

@@ -1,7 +1,6 @@
 import { ArrowRight, Check } from 'lucide-react'
 import type { Metadata } from 'next'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
-import { notFound } from 'next/navigation'
 
 import { PageBlocks } from '@/components/blocks/PageBlocks'
 import { docs, media } from '@/components/blocks/shared'
@@ -16,7 +15,8 @@ import type { Locale } from '@/i18n/routing'
 import type { Product } from '@/payload-types'
 import { staticParams } from '@/lib/cms'
 import { getRoutable, getService } from '@/lib/queries'
-import { absoluteUrl, pageMetadata } from '@/lib/seo'
+import { redirectOrNotFound } from '@/lib/redirects'
+import { absoluteUrl, fallbackLang, pageMetadata } from '@/lib/seo'
 
 type Props = { params: Promise<{ locale: string; slug: string }> }
 
@@ -42,11 +42,12 @@ export default async function ServicePage({ params }: Props) {
   const { locale, slug } = (await params) as { locale: Locale; slug: string }
   setRequestLocale(locale)
   const [service, t] = await Promise.all([getService(locale, slug), getTranslations('services')])
-  if (!service) notFound()
+  if (!service) return redirectOrNotFound(locale, `/services/${slug}`)
   const lists = [
     { title: t('capabilities'), items: service.capabilities },
     { title: t('deliverables'), items: service.deliverables },
   ].filter((l) => l.items?.some((i) => i.text))
+  const lang = fallbackLang(locale, service.hiStatus)
   const related = docs<Product>(service.relatedProducts).map((p) => ({ ...p, logo: media(p.logo) }))
 
   return (
@@ -59,6 +60,7 @@ export default async function ServicePage({ params }: Props) {
           { label: service.title ?? '', href: `/services/${slug}` },
         ]}
         locale={locale}
+        lang={lang}
       >
         <div className="mt-8">
           <MagneticButton asChild size="lg">
@@ -79,7 +81,7 @@ export default async function ServicePage({ params }: Props) {
                   <Icon name={service.icon} className="text-primary" />
                   {list.title}
                 </h2>
-                <ul className="mt-6 space-y-3">
+                <ul lang={lang} className="mt-6 space-y-3">
                   {list.items!.map(
                     (item) =>
                       item.text && (
@@ -108,7 +110,9 @@ export default async function ServicePage({ params }: Props) {
         </Section>
       )}
 
-      <PageBlocks blocks={service.layout} locale={locale} />
+      <div lang={lang}>
+        <PageBlocks blocks={service.layout} locale={locale} headed />
+      </div>
 
       <JsonLd
         data={{

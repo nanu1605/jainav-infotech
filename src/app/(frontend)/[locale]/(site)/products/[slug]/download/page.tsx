@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import semver from 'semver'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 import { Container } from '@/components/layout/Container'
@@ -24,8 +25,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   })
 }
 
-const VERIFY = 'Get-FileHash .\\<file name> -Algorithm SHA256'
-
 /**
  * Downloads (spec §12.5): the latest stable (and beta) build with its facts and notes, how to
  * verify the file, and every earlier version.
@@ -36,7 +35,12 @@ export default async function DownloadPage({ params }: Props) {
   const loaded = await loadProduct(locale, slug, true)
   const { product, releases, latest, settings } = loaded
   const t = await getTranslations('ui.release')
-  const current = [latest.stable, latest.beta].filter((r) => r !== null)
+  // A beta only while it is newer than stable; older betas stay in the version list.
+  const { stable, beta } = latest
+  const current = [
+    stable,
+    beta && (!stable || semver.gt(beta.version, stable.version)) ? beta : null,
+  ].filter((r) => r !== null)
 
   return (
     <ProductShell loaded={loaded} active="download">
@@ -46,7 +50,15 @@ export default async function DownloadPage({ params }: Props) {
       ) : (
         <Container size="prose" className="space-y-16 py-16 sm:py-24">
           {current.map((release) => (
-            <section key={release.id} aria-label={release.version} className="space-y-6">
+            <section
+              key={release.id}
+              aria-labelledby={`release-${release.id}`}
+              className="space-y-6"
+            >
+              <h2 id={`release-${release.id}`} className="sr-only">
+                {t('version', { version: release.version })}
+                {release.channel === 'beta' && ` (${t('beta')})`}
+              </h2>
               <ReleaseDetails
                 release={release}
                 locale={locale}
@@ -54,7 +66,7 @@ export default async function DownloadPage({ params }: Props) {
               />
               {release.notes && (
                 <div>
-                  <h2 className="font-display text-lg font-semibold text-fg">{t('notes')}</h2>
+                  <h3 className="font-display text-lg font-semibold text-fg">{t('notes')}</h3>
                   <p className="mt-2 whitespace-pre-line text-fg-muted">{release.notes}</p>
                 </div>
               )}
@@ -65,7 +77,8 @@ export default async function DownloadPage({ params }: Props) {
             <h2 className="font-display text-2xl font-semibold text-fg">{t('verifyTitle')}</h2>
             <p className="mt-3 text-fg-muted">{t('verifyText')}</p>
             <pre className="mt-4 overflow-x-auto rounded-lg border border-border bg-bg-subtle p-4 text-sm text-fg">
-              <code>{VERIFY}</code>
+              {/* The placeholder is translated; angle brackets would be read as ICU tags. */}
+              <code>{`Get-FileHash .\\<${t('verifyFile')}> -Algorithm SHA256`}</code>
             </pre>
           </section>
 

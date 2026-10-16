@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 import { FaqList } from '@/components/blocks/FaqList'
+import { Comparison } from '@/components/blocks/product/Sections'
 import { Container } from '@/components/layout/Container'
 import { PricingTable, planTiers } from '@/components/product/PricingTable'
 import { ProductShell } from '@/components/product/ProductShell'
@@ -42,11 +43,22 @@ export default async function PricingPage({ params }: Props) {
       <SubpageHeader loaded={loaded} locale={locale} page="pricing" />
       <Container className="py-16 sm:py-24">
         {tiers.length ? (
-          <PricingTable tiers={tiers} />
+          <PricingTable tiers={tiers} level={2} />
         ) : (
           <p className="text-lg text-fg-muted">{t('noPlans')}</p>
         )}
       </Container>
+      {/* The Free vs Pro comparison (spec §11.1) is the product's own Comparison block. */}
+      {(loaded.product.layout ?? []).map((block) =>
+        block.blockType === 'comparison' ? (
+          <Comparison
+            key={block.id ?? 'comparison'}
+            block={block}
+            locale={locale}
+            loaded={loaded}
+          />
+        ) : null,
+      )}
       <FaqList heading={t('pricingFaq')} faqs={faqs} />
     </ProductShell>
   )

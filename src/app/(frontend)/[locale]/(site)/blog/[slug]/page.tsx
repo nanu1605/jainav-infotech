@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
-import { notFound } from 'next/navigation'
 
 import { media } from '@/components/blocks/shared'
 import { JsonLd } from '@/components/content/JsonLd'
@@ -17,7 +16,8 @@ import type { Team } from '@/payload-types'
 import { staticParams } from '@/lib/cms'
 import { formatDate, plainText, readingMinutes } from '@/lib/format'
 import { getPosts, getPost, getRoutable } from '@/lib/queries'
-import { absoluteUrl, pageMetadata, SITE_URL } from '@/lib/seo'
+import { redirectOrNotFound } from '@/lib/redirects'
+import { absoluteUrl, fallbackLang, pageMetadata, SITE_URL } from '@/lib/seo'
 
 type Props = { params: Promise<{ locale: string; slug: string }> }
 
@@ -48,8 +48,9 @@ export default async function PostPage({ params }: Props) {
   const { locale, slug } = (await params) as { locale: Locale; slug: string }
   setRequestLocale(locale)
   const [post, t] = await Promise.all([getPost(locale, slug), getTranslations('blog')])
-  if (!post) notFound()
+  if (!post) return redirectOrNotFound(locale, `/blog/${slug}`)
   const text = plainText(post.body)
+  const lang = fallbackLang(locale, post.hiStatus)
   const author = typeof post.author === 'object' ? (post.author as Team | null) : null
   const cover = media(post.cover)
   const url = absoluteUrl(locale, `/blog/${slug}`)
@@ -83,6 +84,7 @@ export default async function PostPage({ params }: Props) {
           { label: post.title ?? '', href: `/blog/${slug}` },
         ]}
         locale={locale}
+        lang={lang}
       >
         <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-fg-muted">
           {author && (
@@ -112,7 +114,7 @@ export default async function PostPage({ params }: Props) {
             />
           </div>
         )}
-        <RichText data={post.body} locale={locale} />
+        <RichText data={post.body} locale={locale} lang={lang} />
 
         <div className="mt-12 flex flex-wrap items-center justify-between gap-6 border-t border-border pt-8">
           {!!post.tags?.length && (

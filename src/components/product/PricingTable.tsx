@@ -26,7 +26,8 @@ type Tier = {
  * international sales are off): a free plan offers the download, paid plans "Buy", disabled with
  * "Available soon" until the store opens. External products pass manual tiers.
  */
-export async function PricingTable({ tiers }: { tiers: Tier[] }) {
+export async function PricingTable({ tiers, level = 3 }: { tiers: Tier[]; level?: 2 | 3 }) {
+  const Heading = `h${level}` as const
   const t = await getTranslations('ui.pricing')
   if (!tiers.length) return null
   return (
@@ -47,7 +48,7 @@ export async function PricingTable({ tiers }: { tiers: Tier[] }) {
           )}
         >
           <div className="flex items-center justify-between gap-3">
-            <h3 className="font-display text-xl font-semibold text-fg">{tier.name}</h3>
+            <Heading className="font-display text-xl font-semibold text-fg">{tier.name}</Heading>
             {tier.highlight && <Badge tone="primary">{t('recommended')}</Badge>}
           </div>
           {tier.description && <p className="mt-2 text-sm text-fg-muted">{tier.description}</p>}
@@ -103,12 +104,20 @@ export async function PricingTable({ tiers }: { tiers: Tier[] }) {
 /** Tiers from a hosted product's plans. */
 export async function planTiers(loaded: LoadedProduct, locale: Locale): Promise<Tier[]> {
   const t = await getTranslations('ui.pricing')
-  const { product, plans, latest, settings } = loaded
+  const { product, plans, latest, settings, buttons } = loaded
+  // The same build the product's own Download button offers (its channel), else any build.
+  const download =
+    buttons.find((b) => b.kind === 'download')?.href ??
+    (latest.stable && `/api/v1/downloads/${product.slug}/latest?channel=stable`) ??
+    (latest.beta && `/api/v1/downloads/${product.slug}/latest?channel=beta`)
+  // #waitlist only exists on the overview when a button resolves to the waitlist.
+  const waitlist = buttons.some((b) => b.kind === 'waitlist')
+    ? `/products/${product.slug}#waitlist`
+    : `/contact?product=${product.slug}`
   const period = (p: Plan) =>
     p.billing === 'yearly' ? t('perYear') : p.billing === 'monthly' ? t('perMonth') : t('oneTime')
   return plans.map((plan): Tier => {
     const free = (plan.priceINR ?? 0) === 0
-    const download = latest.stable && `/api/v1/downloads/${product.slug}/latest?channel=stable`
     return {
       key: plan.code,
       name: plan.name ?? plan.code,
@@ -120,7 +129,7 @@ export async function planTiers(loaded: LoadedProduct, locale: Locale): Promise<
       action: free
         ? download
           ? { label: t('downloadFree'), href: download }
-          : { label: t('waitlist'), href: `/products/${product.slug}#waitlist` }
+          : { label: t('waitlist'), href: waitlist }
         : settings.storeEnabled
           ? {
               label: t('buy', { plan: plan.name ?? '' }),

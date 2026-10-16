@@ -7,6 +7,7 @@ import type { Locale } from '@/i18n/routing'
 import type { Plan } from '@/payload-types'
 
 import { resolveProductButton } from './productButtons'
+import { redirectOrNotFound } from './redirects'
 import { staticParams } from './cms'
 import { getProduct, getProductSlugs, getReleases, getSettings } from './queries'
 import { latestRelease } from './releases'
@@ -19,7 +20,9 @@ import { pageMetadata } from './seo'
  */
 export const loadProduct = cache(async (locale: Locale, slug: string, hostedOnly = false) => {
   const [product, settings] = await Promise.all([getProduct(locale, slug), getSettings(locale)])
-  if (!product || (hostedOnly && product.hostingMode !== 'hosted')) notFound()
+  // A renamed product's old URL may be in the redirects table (spec §8.6).
+  if (!product) return redirectOrNotFound(locale, `/products/${slug}`)
+  if (hostedOnly && product.hostingMode !== 'hosted') notFound()
   const releases = await getReleases(locale, product.id)
   const latest = {
     stable: latestRelease(releases, { channel: 'stable' }),

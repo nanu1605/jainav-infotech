@@ -24,13 +24,22 @@ type PageBlock = NonNullable<Page['layout']>[number]
  * Layout blocks of pages and services (spec §8.2). Every block renders nothing when empty.
  * Only a hero that opens the page gets the h1; `heading` supplies it otherwise.
  */
-export function PageBlocks({ blocks, locale }: { blocks?: PageBlock[] | null; locale: Locale }) {
+export function PageBlocks({
+  blocks,
+  locale,
+  headed = false,
+}: {
+  blocks?: PageBlock[] | null
+  locale: Locale
+  /** The page already has its h1 (a title header), so an opening hero gets an h2. */
+  headed?: boolean
+}) {
   return blocks?.map((block, i) => {
     const key = block.id ?? `${block.blockType}-${i}`
     const props = { locale }
     switch (block.blockType) {
       case 'hero':
-        return <Hero key={key} {...props} block={block} level={i === 0 ? 1 : 2} />
+        return <Hero key={key} {...props} block={block} level={i === 0 && !headed ? 1 : 2} />
       case 'productShowcase':
         return <ProductShowcase key={key} {...props} block={block} />
       case 'servicesOverview':

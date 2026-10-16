@@ -19,12 +19,15 @@ export function PageHeader({
   intro,
   crumbs,
   locale,
+  lang,
   children,
 }: {
   title: string
   intro?: ReactNode
   crumbs: Crumb[]
   locale: Locale
+  /** Language of the CMS title and intro when it differs from the page (English fallback). */
+  lang?: string
   children?: ReactNode
 }) {
   const t = useTranslations('ui.breadcrumbs')
@@ -33,10 +36,17 @@ export function PageHeader({
     <header className="border-b border-border bg-bg-subtle">
       <Container className="py-12 sm:py-16">
         <Breadcrumbs items={items} />
-        <h1 className="mt-6 max-w-3xl font-display text-4xl leading-tight font-bold text-balance text-fg sm:text-5xl [&:not(:lang(hi))]:tracking-tight">
+        <h1
+          lang={lang}
+          className="mt-6 max-w-3xl font-display text-4xl leading-tight font-bold text-balance text-fg sm:text-5xl [&:not(:lang(hi))]:tracking-tight"
+        >
           {title}
         </h1>
-        {intro && <div className="mt-4 max-w-2xl text-lg text-pretty text-fg-muted">{intro}</div>}
+        {intro && (
+          <div lang={lang} className="mt-4 max-w-2xl text-lg text-pretty text-fg-muted">
+            {intro}
+          </div>
+        )}
         {children}
       </Container>
       <JsonLd

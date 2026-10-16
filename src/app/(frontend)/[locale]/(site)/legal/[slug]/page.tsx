@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
-import { notFound } from 'next/navigation'
 
 import { PageHeader } from '@/components/content/PageHeader'
 import { RichText } from '@/components/content/RichText'
@@ -10,7 +9,8 @@ import type { Locale } from '@/i18n/routing'
 import { staticParams } from '@/lib/cms'
 import { formatDate } from '@/lib/format'
 import { getLegalPage, getRoutable } from '@/lib/queries'
-import { pageMetadata } from '@/lib/seo'
+import { redirectOrNotFound } from '@/lib/redirects'
+import { fallbackLang, pageMetadata } from '@/lib/seo'
 
 type Props = { params: Promise<{ locale: string; slug: string }> }
 
@@ -37,7 +37,7 @@ export default async function LegalPage({ params }: Props) {
   const { locale, slug } = (await params) as { locale: Locale; slug: string }
   setRequestLocale(locale)
   const [page, t] = await Promise.all([getLegalPage(locale, slug), getTranslations('legal')])
-  if (!page) notFound()
+  if (!page) return redirectOrNotFound(locale, `/legal/${slug}`)
 
   return (
     <main id="main" className="scroll-mt-16">
@@ -45,6 +45,7 @@ export default async function LegalPage({ params }: Props) {
         title={page.title ?? ''}
         crumbs={[{ label: page.title ?? '', href: `/legal/${slug}` }]}
         locale={locale}
+        lang={fallbackLang(locale, page.hiStatus)}
       >
         <p className="mt-4 text-sm text-fg-muted">
           {t('version', {
@@ -54,12 +55,13 @@ export default async function LegalPage({ params }: Props) {
         </p>
       </PageHeader>
       <Container size="prose" className="py-12 sm:py-16">
+        {/* A Hindi translation says English prevails; an untranslated page just says so. */}
         {locale !== 'en' && (
           <Callout tone="info" className="mb-10">
-            {t('englishPrevails')}
+            {page.hiStatus === 'missing' ? t('englishOnly') : t('englishPrevails')}
           </Callout>
         )}
-        <RichText data={page.body} locale={locale} />
+        <RichText data={page.body} locale={locale} lang={fallbackLang(locale, page.hiStatus)} />
       </Container>
     </main>
   )

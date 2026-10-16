@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
-import { notFound } from 'next/navigation'
 
 import { RichText } from '@/components/content/RichText'
 import { Container } from '@/components/layout/Container'
@@ -11,8 +10,9 @@ import type { Locale } from '@/i18n/routing'
 import type { Doc } from '@/payload-types'
 import { loadProduct, productMetadata, productParams } from '@/lib/product'
 import { getDocs } from '@/lib/queries'
+import { redirectOrNotFound } from '@/lib/redirects'
 import { docPaths } from '@/lib/routes'
-import { pageMetadata } from '@/lib/seo'
+import { fallbackLang, pageMetadata } from '@/lib/seo'
 
 type Props = { params: Promise<{ locale: string; slug: string; path?: string[] }> }
 
@@ -26,7 +26,7 @@ async function load(locale: Locale, slug: string, path: string[] = []) {
   const paths = docPaths(docs)
   const key = path.map(decodeURIComponent).join('/')
   const doc = key ? docs.find((d) => paths.get(d.id)?.join('/') === key) : null
-  if (key && !doc) notFound()
+  if (key && !doc) return redirectOrNotFound(locale, `/products/${slug}/docs/${key}`)
   return { loaded, docs, paths, doc }
 }
 
@@ -94,7 +94,11 @@ export default async function DocsPage({ params }: Props) {
             </nav>
             <div>
               {doc ? (
-                <RichText data={doc.body} locale={locale} />
+                <RichText
+                  data={doc.body}
+                  locale={locale}
+                  lang={fallbackLang(locale, doc.hiStatus)}
+                />
               ) : (
                 <p className="text-lg text-fg-muted">
                   {t('docsIntro', { name: loaded.product.name })}

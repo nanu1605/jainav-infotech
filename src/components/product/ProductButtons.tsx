@@ -1,5 +1,6 @@
 import { ArrowUpRight, Download } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { useId } from 'react'
 
 import { MagneticButton } from '@/components/motion/MagneticButton'
 import { Button } from '@/components/ui/Button'
@@ -13,10 +14,12 @@ type Props = { buttons: ResolvedButton[]; name: string; slug: string; locale: Lo
 /** A product's primary (magnetic) and secondary buttons, resolved per spec §8.5. */
 export function ProductButtons({ buttons, name, slug, locale }: Props) {
   const t = useTranslations('ui.productButton')
+  // Hero and CTA band both render these buttons: ids must differ between them.
+  const uid = useId()
   if (!buttons.length) return null
 
   return (
-    <div className="flex flex-wrap items-start gap-3">
+    <div lang={locale} className="flex flex-wrap items-start gap-3">
       {buttons.map((b, i) => {
         const variant = i === 0 ? 'primary' : 'secondary'
         const Comp = i === 0 ? MagneticButton : Button
@@ -56,10 +59,10 @@ export function ProductButtons({ buttons, name, slug, locale }: Props) {
           case 'buy':
             return b.disabled ? (
               <div key={b.href} className="flex flex-col items-start gap-1.5">
-                <Button size="lg" variant={variant} aria-disabled aria-describedby={`soon-${slug}`}>
+                <Button size="lg" variant={variant} aria-disabled aria-describedby={`${uid}-${i}`}>
                   {b.label ?? t('buy', { plan: b.plan ?? name })}
                 </Button>
-                <p id={`soon-${slug}`} className="text-xs text-fg-muted">
+                <p id={`${uid}-${i}`} className="text-xs text-fg-muted">
                   {t('soon')}
                 </p>
               </div>
