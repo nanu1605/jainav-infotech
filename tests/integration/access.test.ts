@@ -307,6 +307,50 @@ describe('private data', () => {
     }
   })
 
+  it('keeps every store collection from anonymous readers and editors (spec §9.3)', async () => {
+    const store = [
+      'customers',
+      'orders',
+      'invoices',
+      'coupons',
+      'otp-challenges',
+      'customer-sessions',
+      'invoice-counters',
+      'webhook-events',
+      'payload-jobs',
+    ] as const
+    for (const collection of store) {
+      await expect(payload.find({ collection, ...anonymous }), collection).rejects.toMatchObject(
+        forbidden,
+      )
+      await expect(payload.find({ collection, ...as('editor') }), collection).rejects.toMatchObject(
+        forbidden,
+      )
+    }
+    await expect(
+      payload.findGlobal({ slug: 'commerce-settings', ...anonymous }),
+    ).rejects.toMatchObject(forbidden)
+    // Support reads customers and orders; sign-in plumbing and raw webhooks are the owner's.
+    for (const collection of ['customers', 'orders', 'invoices'] as const) {
+      await expect(payload.find({ collection, ...as('support') })).resolves.toBeTruthy()
+    }
+    for (const collection of ['otp-challenges', 'customer-sessions', 'webhook-events'] as const) {
+      await expect(
+        payload.find({ collection, ...as('support') }),
+        collection,
+      ).rejects.toMatchObject(forbidden)
+    }
+  })
+
+  it('never lets the API create or change orders, invoices or customers, even for the owner', async () => {
+    for (const collection of ['orders', 'invoices', 'customers'] as const) {
+      await expect(
+        payload.create({ collection, data: {} as never, ...as('owner') }),
+        collection,
+      ).rejects.toMatchObject(forbidden)
+    }
+  })
+
   it('never accepts leads or data requests through the API, even from staff', async () => {
     await expect(
       payload.create({

@@ -148,10 +148,23 @@ const invoicesFor = async (orderId: number) =>
     })
   ).docs
 
-async function setGlobal(
-  slug: 'site-settings' | 'commerce-settings',
-  data: Record<string, unknown>,
-) {
+/** Site settings in SQL: other suites leave values there that a full validation would refuse. */
+async function setSite(storeEnabled: boolean, gstin: string | null) {
+  const { rows } = await db().execute(
+    sql`SELECT store_enabled, company_gstin FROM site_settings LIMIT 1`,
+  )
+  const before = rows[0] as { store_enabled: boolean | null; company_gstin: string | null }
+  await db().execute(
+    sql`UPDATE site_settings SET store_enabled = ${storeEnabled}, company_gstin = ${gstin}`,
+  )
+  restore.push(() =>
+    db().execute(
+      sql`UPDATE site_settings SET store_enabled = ${before.store_enabled}, company_gstin = ${before.company_gstin}`,
+    ),
+  )
+}
+
+async function setGlobal(slug: 'commerce-settings', data: Record<string, unknown>) {
   const before = await payload.findGlobal({ slug, depth: 0, overrideAccess: true })
   await payload.updateGlobal({
     slug,
@@ -164,7 +177,10 @@ async function setGlobal(
     payload.updateGlobal({
       slug,
       data: Object.fromEntries(
-        Object.keys(data).map((k) => [k, (before as Record<string, unknown>)[k] ?? null]),
+        Object.keys(data).map((k) => [
+          k,
+          (before as unknown as Record<string, unknown>)[k] ?? null,
+        ]),
       ),
       depth: 0,
       overrideAccess: true,
@@ -204,7 +220,7 @@ beforeAll(async () => {
     .execute(sql`DELETE FROM rate_limit.hits`)
     .catch(() => undefined)
 
-  await setGlobal('site-settings', { storeEnabled: true })
+  await setSite(true, null)
   await setGlobal('commerce-settings', {
     currentTermsVersion: '1.0',
     currentEulaVersion: '1.0',
@@ -727,9 +743,47 @@ describe('checkout (spec §11.3)', () => {
     const { body } = await createOrder(cookie)
     await gw('pay', { order_id: body.razorpay.order_id, outcome: 'failure' })
     await settled()
+    expect((await orderByNumber(body.order.number)).status).toBe('created')
+
+    const paid = await gw('pay', {
+      order_id: body.razorpay.order_id,
+      outcome: 'success',
+      webhooks: false,
+    })
+    await verify(cookie, paid.response)
+    const paymentId = paid.response.razorpay_payment_id
+    /** A webhook as Razorpay signs it. */
+    const send = (event: string, entities: object) => {
+      const raw = JSON.stringify({ entity: 'event', event, payload: entities, created_at: 0 })
+      return webhookRoute(
+        new Request(`${SITE_URL}/api/v1/webhooks/razorpay`, {
+          method: 'POST',
+          headers: {
+            'x-razorpay-signature': hmacHex(DEV_GATEWAY.webhookSecret, raw),
+            'x-razorpay-event-id': `evt_dev${run}${event}`,
+          },
+          body: raw,
+        }),
+      )
+    }
+    const refund = { id: 'rfnd_dev1', payment_id: paymentId, amount: 99_900, status: 'processed' }
+    expect((await send('refund.processed', { refund: { entity: refund } })).status).toBe(200)
+    const dispute = { id: 'disp_dev1', payment_id: paymentId, amount: 99_900, reason_code: 'fraud' }
+    expect((await send('payment.dispute.created', { dispute: { entity: dispute } })).status).toBe(
+      200,
+    )
+    await settled()
     const order = await orderByNumber(body.order.number)
-    expect(order.status).toBe('created')
-    expect((order.events as { type: string }[]).map((e) => e.type)).toContain('payment-failed')
+    expect((order.events as { type: string }[]).map((e) => e.type)).toEqual(
+      expect.arrayContaining([
+        'payment-failed',
+        'paid',
+        'refund.processed',
+        'payment.dispute.created',
+      ]),
+    )
+    // Recorded only: the order stays paid until Phase 9 acts on them.
+    expect(order.status).toBe('paid')
   })
 
   it('numbers concurrent invoices consecutively, without gaps or repeats', async () => {
@@ -775,9 +829,7 @@ describe('GST and coupons (spec §11.4, §11.5)', () => {
   let cookie: string
   beforeAll(async () => {
     cookie = await signIn(email('gst'))
-    await setGlobal('site-settings', {
-      company: { legalName: 'Jainav Infotech Private Limited', gstin: '23AAACJ1234A1ZJ' },
-    })
+    await setSite(true, '23AAACJ1234A1ZJ')
     await setGlobal('commerce-settings', {
       gstEnabled: true,
       gstRatePercent: 18,

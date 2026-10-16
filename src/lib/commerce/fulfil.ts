@@ -266,13 +266,25 @@ async function alreadyPaid(
   return 'paid-twice'
 }
 
+let running: Promise<void> = Promise.resolve()
+
 /**
  * Runs queued jobs now (the invoice PDF, then the email it queues), so a buyer's email doesn't
- * wait for the next autoRun tick. Call it inside after(). The cron is the safety net.
+ * wait for the next autoRun tick. Call it inside after(); the cron is the safety net. Payload
+ * doesn't claim jobs atomically, so runs in this process go one at a time, and a run that loses
+ * a race with the cron (the job finished and was deleted under it) is only logged: every
+ * handler is idempotent.
  */
-export async function runQueuedJobs(payload: Payload) {
-  for (let round = 0; round < 3; round++) {
-    const { jobStatus } = await payload.jobs.run({ queue: 'default', limit: 10, silent: true })
-    if (!jobStatus || !Object.keys(jobStatus).length) return
-  }
+export function runQueuedJobs(payload: Payload): Promise<void> {
+  running = running.then(async () => {
+    try {
+      for (let round = 0; round < 3; round++) {
+        const { jobStatus } = await payload.jobs.run({ queue: 'default', limit: 10, silent: true })
+        if (!jobStatus || !Object.keys(jobStatus).length) return
+      }
+    } catch (error) {
+      console.error('jobs: run failed:', error instanceof Error ? error.message : error)
+    }
+  })
+  return running
 }

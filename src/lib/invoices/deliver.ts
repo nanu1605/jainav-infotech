@@ -116,7 +116,7 @@ export async function sendOrderEmail(orderId: number) {
       locale: order.locale,
       orderNumber: order.orderNumber,
       productName: product.name,
-      planName: plan.name,
+      planName: plan.name ?? plan.code,
       total: order.total,
       invoiceNumber: invoice.number,
       accountUrl: absoluteUrl(order.locale, '/account/orders'),
