@@ -186,7 +186,7 @@ export interface Config {
       renderInvoicePdf: TaskRenderInvoicePdf;
       sendOrderEmail: TaskSendOrderEmail;
       reconcileOrders: TaskReconcileOrders;
-      cleanupSignIns: TaskCleanupSignIns;
+      cleanup: TaskCleanup;
       inline: {
         input: unknown;
         output: unknown;
@@ -2146,8 +2146,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug:
-          'inline' | 'processWebhook' | 'renderInvoicePdf' | 'sendOrderEmail' | 'reconcileOrders' | 'cleanupSignIns';
+        taskSlug: 'inline' | 'processWebhook' | 'renderInvoicePdf' | 'sendOrderEmail' | 'reconcileOrders' | 'cleanup';
         taskID: string;
         input?:
           | {
@@ -2181,7 +2180,7 @@ export interface PayloadJob {
       }[]
     | null;
   taskSlug?:
-    ('inline' | 'processWebhook' | 'renderInvoicePdf' | 'sendOrderEmail' | 'reconcileOrders' | 'cleanupSignIns') | null;
+    ('inline' | 'processWebhook' | 'renderInvoicePdf' | 'sendOrderEmail' | 'reconcileOrders' | 'cleanup') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -4221,9 +4220,9 @@ export interface TaskReconcileOrders {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "TaskCleanupSignIns".
+ * via the `definition` "TaskCleanup".
  */
-export interface TaskCleanupSignIns {
+export interface TaskCleanup {
   input?: unknown;
   output?: unknown;
 }
