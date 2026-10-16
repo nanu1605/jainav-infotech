@@ -11,6 +11,7 @@ Do these in the Cloudflare dashboard for the domain's zone.
 | `www`               | A / AAAA                                                              | the VPS (Caddy redirects to the apex with a 308)                  | proxied  |
 | `staging`           | A / AAAA                                                              | the VPS                                                           | proxied  |
 | `analytics`         | A / AAAA                                                              | the VPS (Umami)                                                   | proxied  |
+| `ssh`               | created by the tunnel ([SSH tunnel](#ssh-tunnel))                     | the VPS's SSH, behind Access                                      | proxied  |
 | `status`            | CNAME                                                                 | the uptime monitor's status page ([monitoring.md](monitoring.md)) | DNS only |
 | `cdn`               | R2 custom domain on the public bucket (media)                         |                                                                   | proxied  |
 | `downloads`         | R2 custom domain on the public bucket (installers under `downloads/`) |                                                                   | proxied  |
@@ -51,8 +52,29 @@ Do these in the Cloudflare dashboard for the domain's zone.
 
   Policy: _Allow_, include the emails of the people who run the site; one-time PIN or Google as
   the login method; session 24 hours. Payload's own login (5 attempts, then a 15-minute lock)
-  still applies behind it. Afterwards set `SMOKE_ADMIN_ACCESS=1` in both GitHub environments:
-  the smoke tests then check that `/admin` redirects to `cloudflareaccess.com`.
+  still applies behind it. Afterwards set the repository variables `STAGING_SMOKE_ADMIN_ACCESS`
+  and `PRODUCTION_SMOKE_ADMIN_ACCESS` to `1`: the smoke tests then check that `/admin`
+  redirects to `cloudflareaccess.com`.
+
+## SSH tunnel
+
+The VPS's SSH port stays closed to the internet. Deploys from GitHub, and your own sessions,
+reach it through a Cloudflare Tunnel.
+
+1. Zero Trust → Networks → Tunnels → Create a tunnel (Cloudflared), named `jainav-vps`. Run
+   the install command it shows on the VPS: Debian package plus `cloudflared service install
+<token>`. The connector only makes outbound connections.
+2. In the tunnel, add a public hostname `ssh.{{DOMAIN}}` with service `ssh://localhost:22`.
+3. Zero Trust → Access → Service Auth → Create service token `github-deploy`. Its client ID and
+   secret go in the GitHub environment secrets `CF_ACCESS_CLIENT_ID` and
+   `CF_ACCESS_CLIENT_SECRET` ([server.md §4](server.md#4-github-setup-once)).
+4. Access → Applications → Add → Self-hosted, domain `ssh.{{DOMAIN}}`, two policies:
+   - _Service Auth_: include the service token `github-deploy`;
+   - _Allow_: include your own email, for interactive sessions.
+5. On your machine, install `cloudflared` and add the `Host jainav` block from
+   [server.md §1](server.md#1-provision-the-vps). `ssh jainav` opens a browser sign-in the
+   first time.
+6. Once `ssh jainav` works, close port 22 in the provider firewall.
 
 ## R2
 
@@ -77,7 +99,7 @@ API tokens (R2 → Manage API tokens), each _Object Read & Write_ on the named b
 ## Turnstile
 
 Turnstile → Add widget for `{{DOMAIN}}` and `staging.{{DOMAIN}}`, managed mode. The site key goes
-in the GitHub environment variable `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, the secret in
+in the repository variables `STAGING_TURNSTILE_SITE_KEY` / `PRODUCTION_TURNSTILE_SITE_KEY`, the secret in
 `TURNSTILE_SECRET_KEY` (production.env / staging.env).
 
 ## Email

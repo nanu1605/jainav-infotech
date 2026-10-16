@@ -166,9 +166,29 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
   - Turnstile, the Google Maps iframe and Gravatar (admin avatars);
   - the CDN, Umami and Sentry-ingest origins from the build's `NEXT_PUBLIC_*` values.
 
-  It was checked on a production build across 16 public pages and the signed-in admin with no violations. **Razorpay's origins are left out until Phase 7** builds checkout and can test them. HSTS is one year with `includeSubDomains`, without `preload` (a commitment for every subdomain).
+  **The admin gets a wider policy** (a later `/admin/:path*` header entry, which Next lets win). Payload's JSON field (a lead's `details`) loads the Monaco editor from `cdn.jsdelivr.net` through `@monaco-editor/loader`, which needs script, style, font and `data:` worker sources there. Public pages never allow jsdelivr. Bundling Monaco instead would need a new dependency.
 
-- **Deploys** (`.github/workflows/deploy.yml`): a merge to `main` builds `staging-<sha>` and deploys staging; a `v*` tag builds `prod-<tag>` and deploys production after the `production` environment's required reviewer approves. `NEXT_PUBLIC_*` come from each environment's variables, so images are never promoted. The VPS pulls with the job's short-lived token; no long-lived registry credential is stored there. `docker/deploy.sh` waits for the healthcheck and rolls back to the previous image if the new one never turns healthy, then smoke tests run (`tests/smoke`, read-only; `playwright.smoke.config.ts`). Deploys are skipped until the repository variable `DEPLOY_ENABLED` is `true`. Pull requests also build the image.
+  Checked on a production build with no violations:
+  - 16 public pages;
+  - the signed-in admin, including a lead whose Monaco editor loaded its four files from jsdelivr.
+
+  **Razorpay's origins are left out until Phase 7** builds checkout and can test them. HSTS is one year with `includeSubDomains`, without `preload` (a commitment for every subdomain).
+
+- **Deploys** (`.github/workflows/deploy.yml`): a merge to `main` builds `staging-<sha>` and deploys staging; a `v*` tag builds `prod-<tag>` and deploys production after the `production` environment's required reviewer approves. The workflow has three jobs, so the server's SSH key never shares a runner with third-party code:
+  - `build`: actions pinned to commits, registry push only.
+  - `deploy`: shell only, the one job with the environment, its approval and the SSH key. The key is deleted on exit.
+  - `smoke`: installs dependencies and runs `tests/smoke`; it holds no deploy secret.
+
+  Other choices:
+  - **SSH goes through a Cloudflare Tunnel** (`ssh.{{DOMAIN}}`, an Access service token, `cloudflared` pinned and checked against its release digest). GitHub's runner IPs change constantly, and the VPS keeps port 22 closed to the internet.
+  - **Public build values are repository variables** (`STAGING_*`, `PRODUCTION_*`), so the build job needs no environment and production is approved once. Images are never promoted.
+  - **Registry access:** the VPS pulls the app and tools images with the job's short-lived token and signs out afterwards.
+  - **`docker/deploy.sh`** waits for the healthcheck and rolls back to the previous image if the new one never turns healthy. It removes that environment's older images, keeping the rollback target.
+  - **Caches:** tag builds reuse main's build cache and write none (tag caches can't be read by later tags).
+  - Deploys are skipped until the repository variable `DEPLOY_ENABLED` is `true`. Pull requests also build the image.
+
+- **No personal data in Caddy's logs:** the access log and the upstream-error log drop all request headers (visitor IPs, Access identities) and the `token` query parameter. Checked with a request carrying both: neither reached any log line.
+- **The restore test's Postgres sits on an internal network** shared only with the restore job. It briefly holds a decrypted copy of production under a fixed password that is in this repository.
 - **Backups** (`docker/backup`): nightly at 02:30 IST, `pg_dump` of `jainav` and `umami`, encrypted with age to a public key (the private key stays offline with the Owner), uploaded with rclone to an R2 bucket; 30 daily and 12 monthly copies; Telegram alert on failure. The restore test restores the newest dumps into a throwaway Postgres whose data lives only in memory, and checks the tables, the migrations and the site's content. The real restore test needs the server; locally the full path (backup → R2 stand-in → decrypt → restore → checks) passed on 2026-10-16. The test caught a bug on the way: on a first run, pruning a missing `monthly/` folder failed the whole backup.
 - **Rehearsal:** the whole stack ran locally on 2026-10-16 (port 8443, self-signed certificates, a local folder for the bucket). Checked:
   - both apps healthy, with migrations under their own roles;

@@ -18,31 +18,36 @@ Phase 6 in order (spec §20). Each step names who does it. Details are in the ot
    - DNS records, SSL Full (strict), Origin CA certificate;
    - Bot Fight Mode off, the WAF skip rule;
    - R2 buckets, custom domains and tokens; a Turnstile widget.
-2. **Server** ([server.md](server.md)): provision it and set the firewall to Cloudflare's IP
-   ranges. Put the files and env files in place, then start postgres, umami, caddy and backup.
-3. **GitHub** ([server.md §4](server.md#4-github-setup-once)):
-   - the environments with their variables and secrets;
+2. **Backup key** ([backups.md](backups.md#the-key)): make it now. The server's `.env` needs its
+   public half before anything starts.
+3. **Server** ([server.md](server.md)):
+   - provision it, with the SSH tunnel ([cloudflare.md](cloudflare.md#ssh-tunnel));
+   - firewall: 443 from Cloudflare's IP ranges, 22 closed;
+   - put the files and env files in place, then start postgres, umami, caddy and backup.
+4. **GitHub** ([server.md §4](server.md#4-github-setup-once)):
+   - repository variables and secrets, and the environments' secrets;
    - the production reviewer;
    - `DEPLOY_ENABLED=true`.
-4. **Staging:** merge to `main` and confirm the deploy and smoke tests pass. Seed staging, then
-   click through it.
-5. **Cloudflare Access** on `/admin*` and `/api/users/*`, then set `SMOKE_ADMIN_ACCESS=1`.
-6. **Production:**
+5. **Staging:**
+   - merge to `main` and confirm the deploy and smoke tests pass;
+   - seed staging, publish its content in the admin, then click through it.
+6. **Cloudflare Access** on `/admin*` and `/api/users/*`, then set `STAGING_SMOKE_ADMIN_ACCESS`
+   and `PRODUCTION_SMOKE_ADMIN_ACCESS` to `1`.
+7. **Production:**
    - tag `v1.0.0`, approve the deploy, seed;
    - create the Owner account in the admin;
    - publish the reviewed content.
-7. **Legal pages:** the Owner publishes the approved texts (spec §8.13). Razorpay checks six
+8. **Legal pages:** the Owner publishes the approved texts (spec §8.13). Razorpay checks six
    pages: Contact, Pricing, Terms, Privacy, Cancellation & Refunds, Shipping.
-8. **VYRO download** (if it goes live): `pnpm import:release <tag>` with the tools image
+9. **VYRO download** (if it goes live): `pnpm import:release <tag>` with the tools image
    ([server.md §8](server.md#8-one-off-commands)), then the Owner publishes the release.
-9. **Email** ([cloudflare.md](cloudflare.md#email)): Resend domain verified, mailboxes, SPF,
-   DKIM, DMARC `p=none`.
-10. **Monitoring** ([monitoring.md](monitoring.md)):
+10. **Email** ([cloudflare.md](cloudflare.md#email)): Resend domain verified, mailboxes, SPF,
+    DKIM, DMARC `p=none`.
+11. **Monitoring** ([monitoring.md](monitoring.md)):
     - uptime monitors, status page and Telegram alerts;
     - Sentry DSN;
     - Umami: password changed, website ID set.
-11. **Backups** ([backups.md](backups.md)): make the age key, then run one backup and one
-    restore test.
+12. **Backups** ([backups.md](backups.md)): run one backup and one restore test on the server.
 
 ## Done when (spec §20)
 

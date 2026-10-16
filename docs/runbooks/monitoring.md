@@ -26,8 +26,8 @@ Phase 4 sends a Telegram alert for every new lead. The backup job alerts on fail
 
 - Create a Sentry project (platform Next.js). Its DSN goes in two places:
   - `SENTRY_DSN` in production.env and staging.env, for server errors;
-  - the GitHub environment variable `NEXT_PUBLIC_SENTRY_DSN`, for browser errors (baked in, so
-    redeploy afterwards).
+  - the repository variables `STAGING_SENTRY_DSN` and `PRODUCTION_SENTRY_DSN`, for browser
+    errors (baked in as `NEXT_PUBLIC_SENTRY_DSN`, so redeploy afterwards).
 - Project settings → Security & Privacy:
   - turn on _Prevent Storing of IP Addresses_;
   - keep _Data Scrubber_ and _Use Default Scrubbers_ on.
@@ -48,9 +48,10 @@ cookie banner.
 
 1. Sign in with Umami's default account (`admin` / `umami`) and **change the password
    immediately**.
-2. Settings → Websites → Add `{{DOMAIN}}`. Copy its website ID into the production GitHub
-   environment variable `NEXT_PUBLIC_UMAMI_WEBSITE_ID`, and set `NEXT_PUBLIC_UMAMI_URL` to
-   `https://analytics.{{DOMAIN}}`. Leave both empty on staging so tests don't count. Redeploy.
+2. Settings → Websites → Add `{{DOMAIN}}`. Copy its website ID into the repository variable
+   `PRODUCTION_UMAMI_WEBSITE_ID`, and set `PRODUCTION_UMAMI_URL` to
+   `https://analytics.{{DOMAIN}}`. Leave the `STAGING_UMAMI_*` ones empty, so tests don't count.
+   Redeploy.
 3. Events (spec §17):
    - `cta_click`, `chip_click` and `download` come from `data-umami-event` attributes on
      wrapper elements;
