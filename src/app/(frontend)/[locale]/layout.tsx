@@ -3,7 +3,6 @@ import { hasLocale, NextIntlClientProvider } from 'next-intl'
 import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server'
 import { ThemeProvider } from 'next-themes'
 import { notFound } from 'next/navigation'
-import Script from 'next/script'
 import type { ReactNode } from 'react'
 
 import { Toaster } from '@/components/feedback/Toast'
@@ -63,7 +62,8 @@ export default async function LocaleLayout({ children, params }: Props) {
           </ThemeProvider>
         </NextIntlClientProvider>
         {UMAMI_URL && UMAMI_ID && (
-          <Script src={`${UMAMI_URL}/script.js`} data-website-id={UMAMI_ID} strategy="lazyOnload" />
+          // A plain async tag (React hoists it into <head>): next/script would add ~1.4 KB of JS.
+          <script async src={`${UMAMI_URL}/script.js`} data-website-id={UMAMI_ID} />
         )}
       </body>
     </html>
