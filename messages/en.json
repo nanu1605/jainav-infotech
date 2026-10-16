@@ -451,7 +451,134 @@
     "newTab": "(opens in a new tab)",
     "related": "Related posts"
   },
-  "account": {},
+  "account": {
+    "nav": {
+      "label": "Account",
+      "account": "Account",
+      "overview": "Overview",
+      "orders": "Orders & invoices",
+      "settings": "Settings"
+    },
+    "signOut": {
+      "label": "Sign out",
+      "pending": "Signing out…",
+      "failed": "We couldn't sign you out. Please try again."
+    },
+    "signIn": {
+      "title": "Sign in",
+      "intro": "Sign in with your email address. We'll email you a 6-digit code, so there's no password to remember.",
+      "email": "Email address",
+      "sendCode": "Send code",
+      "code": "6-digit code",
+      "sent": "We sent a 6-digit code to {email}. It works for 10 minutes.",
+      "resent": "We sent a new code to {email}.",
+      "verify": "Sign in",
+      "signedIn": "Signed in. Taking you on…",
+      "invalidCode": "That code isn't right. {count, plural, =0 {Please ask for a new code.} one {You can try # more time.} other {You can try # more times.}}",
+      "noCode": "No email? Check your spam folder, or ask for a new code.",
+      "resend": "Send a new code",
+      "resendIn": "{count, plural, one {Send a new code in # second} other {Send a new code in # seconds}}",
+      "changeEmail": "Use a different email",
+      "firstTime": "New here? Signing in for the first time creates your account. Our <privacy>privacy policy</privacy> explains how we use your details."
+    },
+    "wait": {
+      "seconds": "{count, plural, one {# second} other {# seconds}}",
+      "minutes": "{count, plural, one {# minute} other {# minutes}}"
+    },
+    "problems": {
+      "invalid": "Please check the highlighted fields.",
+      "verification": "The spam check didn't pass. Please try again.",
+      "verificationPending": "Please wait a moment for the spam check to finish.",
+      "rateLimited": "Too many attempts. Please try again in {wait}.",
+      "cooldown": "We sent a code a moment ago. You can ask for another in {wait}.",
+      "codeExpired": "This code has expired or was entered wrongly too many times. Please ask for a new code.",
+      "signedOut": "You've been signed out.",
+      "server": "Something went wrong on our side. Please try again in a moment."
+    },
+    "errors": {
+      "required": "This field is required.",
+      "tooLong": "This is too long.",
+      "latinOnly": "Please use Latin letters only (A–Z): invoices are printed in a Latin font.",
+      "phone": "Enter a valid phone number.",
+      "choose": "Choose an option.",
+      "gstin": "Enter a valid 15-character GSTIN.",
+      "email": "Enter a valid email address.",
+      "code": "Enter the 6 digits from the email.",
+      "invalid": "Please check this field."
+    },
+    "status": {
+      "created": "Awaiting payment",
+      "expired": "Expired",
+      "paid": "Paid",
+      "refunded": "Refunded",
+      "partially-refunded": "Partly refunded",
+      "disputed": "Disputed"
+    },
+    "overview": {
+      "greeting": "Hello, {name}",
+      "signedInAs": "Signed in as {email}",
+      "recent": "Recent orders",
+      "orderLine": "Order {number} · {date}",
+      "allOrders": "All orders and invoices",
+      "settingsText": "Your name, billing details, GSTIN and email preferences.",
+      "settingsLink": "Edit settings",
+      "helpTitle": "Need help?",
+      "helpText": "Questions about an order, an invoice or a product? We're happy to help.",
+      "helpLink": "Contact support"
+    },
+    "orders": {
+      "intro": "Every purchase, with its invoice to download.",
+      "caption": "Your orders",
+      "number": "Order",
+      "date": "Date",
+      "product": "Product",
+      "total": "Total",
+      "status": "Status",
+      "invoice": "Invoice",
+      "invoiceLink": "{number} (PDF)",
+      "noInvoice": "Not issued yet",
+      "emptyTitle": "No orders yet",
+      "emptyText": "When you buy a product, its order and invoice appear here.",
+      "browse": "Browse products"
+    },
+    "settings": {
+      "intro": "You sign in with {email}.",
+      "title": "Your details",
+      "name": "Name",
+      "phone": "Phone",
+      "latinHint": "In Latin letters (A–Z), as it should appear on invoices.",
+      "language": "Language for emails",
+      "languageHint": "We send sign-in codes, receipts and other emails in this language.",
+      "locales": {
+        "en": "English",
+        "hi": "हिंदी"
+      },
+      "billing": "Billing details",
+      "billingHint": "Printed on your invoices.",
+      "businessName": "Business name",
+      "gstin": "GSTIN",
+      "gstinHint": "Optional: add it to claim input tax credit. It sets your state.",
+      "state": "State",
+      "stateHint": "Your place of supply, printed on invoices.",
+      "stateLocked": "Set from your GSTIN.",
+      "chooseState": "Choose your state",
+      "marketing": "Email me occasional news about Jainav products and offers. You can turn this off here at any time.",
+      "signInAgain": "Sign in again",
+      "save": "Save changes",
+      "saved": "Your changes are saved."
+    },
+    "delete": {
+      "title": "Delete account",
+      "text": "Deleting your account anonymizes your profile (your name, phone and billing details are removed) and signs you out on every device. Your orders and invoices are kept for the period tax law requires.",
+      "button": "Delete account",
+      "confirmTitle": "Delete your account?",
+      "confirmText": "Your profile will be anonymized and every session ends. Orders and invoices are kept for the period tax law requires. This can't be undone.",
+      "cancel": "Keep my account",
+      "confirm": "Delete account",
+      "pending": "Deleting…",
+      "done": "Your account has been deleted."
+    }
+  },
   "changelog": {
     "title": "Changelog",
     "productTitle": "{name} changelog",
