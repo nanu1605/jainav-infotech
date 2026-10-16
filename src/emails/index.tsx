@@ -18,6 +18,7 @@ import { createTranslator } from 'next-intl'
 import type { CSSProperties, ReactElement, ReactNode } from 'react'
 
 import type { Locale } from '@/i18n/routing'
+import { formatINR } from '@/lib/format'
 import { tokens } from '@/styles/tokens.generated'
 
 import en from '../../messages/en.json'
@@ -155,6 +156,43 @@ export function autoReplyEmail({
   )
 }
 
+/** Label/value rows (plain text keeps them a table: `table.fields` in htmlToTextOptions). */
+function Fields({ locale, rows }: { locale: Locale; rows: [label: string, value: string][] }) {
+  const cell: CSSProperties = {
+    padding: '8px 0',
+    borderBottom: `1px solid ${c.border}`,
+    verticalAlign: 'top',
+    textAlign: 'left',
+    fontSize: '14px',
+    lineHeight: locale === 'hi' ? '24px' : '22px',
+  }
+  return (
+    <table
+      className="fields"
+      width="100%"
+      cellPadding={0}
+      cellSpacing={0}
+      style={{ borderCollapse: 'collapse' }}
+    >
+      <tbody>
+        {rows.map(([label, value], i) => (
+          <tr key={i}>
+            <th
+              scope="row"
+              style={{ ...cell, width: '35%', paddingRight: '16px', color: c['fg-muted'] }}
+            >
+              {label}
+            </th>
+            <td style={{ ...cell, color: c.fg }}>
+              {value.split(/\r?\n/).flatMap((line, j) => (j ? [<br key={j} />, line] : [line]))}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
 /** Internal notification for a new lead (English only): its fields and a link to the admin. */
 export function notificationEmail({
   title,
@@ -165,46 +203,113 @@ export function notificationEmail({
   adminUrl: string
   fields: [label: string, value: string][]
 }): Promise<RenderedEmail> {
-  const cell: CSSProperties = {
-    padding: '8px 0',
-    borderBottom: `1px solid ${c.border}`,
-    verticalAlign: 'top',
-    textAlign: 'left',
-    fontSize: '14px',
-    lineHeight: '22px',
-  }
   return renderEmail(
     title,
     <Layout locale="en" preview={title}>
       <Heading as="h1" style={{ margin: '0 0 16px', fontSize: '22px', color: c.fg }}>
         {title}
       </Heading>
-      <table
-        className="fields"
-        width="100%"
-        cellPadding={0}
-        cellSpacing={0}
-        style={{ borderCollapse: 'collapse' }}
-      >
-        <tbody>
-          {fields.map(([label, value], i) => (
-            <tr key={i}>
-              <th
-                scope="row"
-                style={{ ...cell, width: '35%', paddingRight: '16px', color: c['fg-muted'] }}
-              >
-                {label}
-              </th>
-              <td style={{ ...cell, color: c.fg }}>
-                {value.split(/\r?\n/).flatMap((line, j) => (j ? [<br key={j} />, line] : [line]))}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <Fields locale="en" rows={fields} />
       <Button href={adminUrl} style={{ ...button, marginTop: '24px' }}>
         {translator('en')('openInAdmin')}
       </Button>
+    </Layout>,
+  )
+}
+
+/**
+ * Sign-in code (spec §11.2). The code is only in the body: subjects and preview text show up in
+ * notifications and lock screens.
+ */
+export function otpEmail({
+  locale,
+  code,
+}: {
+  locale: Locale
+  code: string
+}): Promise<RenderedEmail> {
+  const t = translator(locale)
+  return renderEmail(
+    t('otp.subject'),
+    <Layout
+      locale={locale}
+      preview={t('otp.body')}
+      footer={<Text style={smallText(locale)}>{t('otp.ignore')}</Text>}
+    >
+      <Text style={bodyText(locale)}>{t('greeting')}</Text>
+      <Text style={bodyText(locale)}>{t('otp.body')}</Text>
+      <Text
+        style={{
+          margin: '8px 0 24px',
+          padding: '16px',
+          backgroundColor: c['bg-subtle'],
+          border: `1px solid ${c.border}`,
+          borderRadius: '6px',
+          textAlign: 'center',
+          fontFamily: "ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
+          fontSize: '32px',
+          lineHeight: '40px',
+          fontWeight: 700,
+          // Spacing by CSS, not spaces, so a copied code pastes as six digits.
+          letterSpacing: '8px',
+          userSelect: 'all',
+          color: c.fg,
+        }}
+      >
+        {code}
+      </Text>
+      <Text style={bodyText(locale)}>{t('otp.expiry')}</Text>
+    </Layout>,
+  )
+}
+
+/**
+ * Order confirmation (spec §11.3 step 8, §11.7), sent with the invoice PDF attached. `total` is
+ * in paise.
+ */
+export function orderConfirmationEmail({
+  locale,
+  orderNumber,
+  productName,
+  planName,
+  total,
+  invoiceNumber,
+  accountUrl,
+}: {
+  locale: Locale
+  orderNumber: string
+  productName: string
+  planName: string
+  total: number
+  invoiceNumber: string
+  accountUrl: string
+}): Promise<RenderedEmail> {
+  const t = translator(locale)
+  return renderEmail(
+    t('order.subject', { orderNumber }),
+    <Layout
+      locale={locale}
+      preview={t('order.thanks')}
+      footer={<Text style={smallText(locale)}>{t('order.support')}</Text>}
+    >
+      <Text style={bodyText(locale)}>{t('greeting')}</Text>
+      <Text style={bodyText(locale)}>{t('order.thanks')}</Text>
+      <Fields
+        locale={locale}
+        rows={[
+          [t('order.number'), orderNumber],
+          [t('order.item'), t('order.itemValue', { product: productName, plan: planName })],
+          [t('order.total'), formatINR(locale, total)],
+        ]}
+      />
+      {/* Phase 8 (spec §11.7): the license key joins this email here. */}
+      <Text style={{ ...bodyText(locale), marginTop: '24px' }}>
+        {t('order.invoice', { invoiceNumber })}
+      </Text>
+      <Button href={accountUrl} style={button}>
+        {t('order.button')}
+      </Button>
+      <Text style={bodyText(locale)}>{t('signoff')}</Text>
     </Layout>,
   )
 }
