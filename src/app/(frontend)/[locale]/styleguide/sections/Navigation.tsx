@@ -1,8 +1,7 @@
 'use client'
 
-import { ChevronDown, RotateCcw } from 'lucide-react'
+import { RotateCcw } from 'lucide-react'
 import { useLocale } from 'next-intl'
-import { NavigationMenu } from 'radix-ui'
 import type { ReactNode } from 'react'
 
 import { NewsletterForm } from '@/components/forms/NewsletterForm'
@@ -14,7 +13,7 @@ import { Header, type HeaderNavItem } from '@/components/layout/Header'
 import { LanguageSuggestionBanner } from '@/components/layout/LanguageSuggestion'
 import { LanguageSwitch } from '@/components/layout/LanguageSwitch'
 import { Logo } from '@/components/layout/Logo'
-import { MegaMenu, type MenuProduct } from '@/components/layout/MegaMenu'
+import { ProductsMenu, type MenuProduct } from '@/components/layout/MegaMenu'
 import { ProductSubNav } from '@/components/layout/ProductSubNav'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { Button, buttonVariants } from '@/components/ui/Button'
@@ -342,19 +341,15 @@ export default function NavigationSection() {
 
       <Demo demo={c.demos.megaMenu}>
         <div className={`${frame} min-h-[27rem] overflow-x-auto p-3`}>
-          <NavigationMenu.Root defaultValue="products" aria-label={c.demos.megaMenu[0]}>
-            <NavigationMenu.List>
-              <NavigationMenu.Item value="products">
-                <NavigationMenu.Trigger
-                  className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-                >
-                  {products.label}
-                  <ChevronDown aria-hidden />
-                </NavigationMenu.Trigger>
-                <MegaMenu products={c.products} href={products.href} />
-              </NavigationMenu.Item>
-            </NavigationMenu.List>
-          </NavigationMenu.Root>
+          <nav aria-label={c.demos.megaMenu[0]}>
+            <ProductsMenu
+              label={products.label ?? ''}
+              href={products.href}
+              products={c.products}
+              triggerClassName={buttonVariants({ variant: 'ghost', size: 'sm' })}
+              defaultOpen
+            />
+          </nav>
         </div>
       </Demo>
 
