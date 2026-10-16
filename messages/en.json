@@ -173,7 +173,8 @@
       "waitlist": "Join the waitlist",
       "buy": "Buy {plan}",
       "soon": "Available soon",
-      "fullPricing": "See full pricing"
+      "fullPricing": "See full pricing",
+      "inclGst": "incl. GST"
     },
     "release": {
       "version": "Version {version}",

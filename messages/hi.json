@@ -173,7 +173,8 @@
       "waitlist": "वेटलिस्ट में जुड़ें",
       "buy": "{plan} ख़रीदें",
       "soon": "जल्द उपलब्ध",
-      "fullPricing": "पूरी क़ीमतें देखें"
+      "fullPricing": "पूरी क़ीमतें देखें",
+      "inclGst": "GST सहित"
     },
     "release": {
       "version": "वर्ज़न {version}",

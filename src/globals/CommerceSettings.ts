@@ -7,6 +7,7 @@ import {
 
 import { ownerOnly, storeStaff } from '@/access/roles'
 import { integer } from '@/fields/validators'
+import { revalidateGlobal } from '@/hooks/revalidate'
 import { GST_STATES } from '@/lib/tax/states'
 
 const prefix = (value: string | null | undefined) =>
@@ -41,7 +42,7 @@ export const CommerceSettings: GlobalConfig = {
     description: 'Confirm every tax setting with the CA before going live.',
   },
   access: { read: storeStaff, update: ownerOnly },
-  hooks: { beforeChange: [gstNeedsGstin] },
+  hooks: { beforeChange: [gstNeedsGstin], afterChange: [revalidateGlobal('commerce-settings')] },
   fields: [
     {
       type: 'tabs',

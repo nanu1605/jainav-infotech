@@ -18,6 +18,21 @@ export const getSettings = (locale: Locale) =>
     payload.findGlobal({ slug: 'site-settings', depth: 1, ...as(v) }),
   )
 
+/**
+ * Whether prices include GST lines ("incl. GST", spec §11.1). Commerce settings are staff-only
+ * through the API; this one non-personal flag is read for the public pricing table.
+ */
+export const getGstEnabled = () =>
+  read('en', ['commerce-settings'], ['gst-enabled'], async (payload) => {
+    const settings = await payload.findGlobal({
+      slug: 'commerce-settings',
+      select: { gstEnabled: true },
+      depth: 0,
+      overrideAccess: true,
+    })
+    return settings.gstEnabled === true
+  })
+
 export const getNavigation = (locale: Locale) =>
   read(locale, ['navigation'], ['navigation'], (payload, v) =>
     payload.findGlobal({ slug: 'navigation', depth: 0, ...as(v) }),
