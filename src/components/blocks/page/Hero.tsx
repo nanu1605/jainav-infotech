@@ -1,6 +1,7 @@
 import { Pause, Play } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
+import { Tracked } from '@/components/Tracked'
 import { Container } from '@/components/layout/Container'
 import { GradientMesh } from '@/components/motion/GradientMesh'
 import { iconButtonVariants } from '@/components/ui/IconButton'
@@ -45,11 +46,11 @@ export function Hero({ block, level = 1 }: BlockProps<PageHeroBlock> & { level?:
             <ul className="mt-10 flex flex-wrap gap-2">
               {chips.map((chip) => (
                 <li key={chip.id ?? chip.href}>
-                  <Tag asChild>
-                    <Link href={chip.href} data-umami-event="chip_click">
-                      {chip.label}
-                    </Link>
-                  </Tag>
+                  <Tracked event="chip_click">
+                    <Tag asChild>
+                      <Link href={chip.href}>{chip.label}</Link>
+                    </Tag>
+                  </Tracked>
                 </li>
               ))}
             </ul>
