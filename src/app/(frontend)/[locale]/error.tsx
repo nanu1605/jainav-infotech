@@ -1,12 +1,24 @@
 'use client'
 
 import { useLocale, useTranslations } from 'next-intl'
+import { useEffect } from 'react'
 
 import { Container } from '@/components/layout/Container'
 import { Button } from '@/components/ui/Button'
 
 /** 500 page (spec §8.15). Shown without the header: the site layout itself may have failed. */
-export default function ErrorPage({ reset }: { error: Error; reset: () => void }) {
+export default function ErrorPage({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  // Hands a browser render error to Sentry's global handler (once it has loaded). Server errors
+  // (with a digest) were already reported by instrumentation.ts.
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_SENTRY_DSN && !error.digest) reportError(error)
+  }, [error])
   const t = useTranslations('system.error')
   const locale = useLocale()
   return (

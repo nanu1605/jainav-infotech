@@ -4,6 +4,8 @@ import createNextIntlPlugin from 'next-intl/plugin'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
+import { contentSecurityPolicy, securityHeaders } from './src/lib/csp'
+
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 // Media URLs point at the R2 CDN in staging and production (payload.config.ts generateFileURL).
 const cdn = process.env.NEXT_PUBLIC_CDN_URL?.replace(/\/$/, '')
@@ -17,10 +19,32 @@ const withNextIntl = createNextIntlPlugin({
 })
 
 const nextConfig: NextConfig = {
+  // The Docker image runs the traced standalone server (docker/Dockerfile sets NEXT_OUTPUT);
+  // local `pnpm start` and Lighthouse runs keep `next start`, which standalone output disables.
+  output: process.env.NEXT_OUTPUT === 'standalone' ? 'standalone' : undefined,
   // Turbopack on Windows can't resolve Payload's Sass imports without this.
   // See https://github.com/vercel/next.js/issues/86431
   sassOptions: {
     loadPaths: ['./node_modules/@payloadcms/ui/dist/scss/'],
+  },
+  // Development keeps Next's defaults: its dev tooling needs eval, which the CSP blocks.
+  async headers() {
+    if (process.env.NODE_ENV !== 'production') return []
+    const env = {
+      cdnUrl: process.env.NEXT_PUBLIC_CDN_URL,
+      umamiUrl: process.env.NEXT_PUBLIC_UMAMI_URL,
+      sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+    }
+    return [
+      { source: '/:path*', headers: securityHeaders(env) },
+      // Later entries win for the same header: the admin also allows Payload's Monaco editor.
+      {
+        source: '/admin/:path*',
+        headers: [
+          { key: 'Content-Security-Policy', value: contentSecurityPolicy(env, { admin: true }) },
+        ],
+      },
+    ]
   },
   images: {
     localPatterns: [{ pathname: '/api/media/file/**' }],

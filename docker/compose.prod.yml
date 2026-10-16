@@ -1,0 +1,146 @@
+# Production VPS (spec §18.2): production and staging apps, one Postgres server (databases
+# jainav, jainav_staging, umami), Umami, Caddy and nightly backups. Lives in /srv/jainav with:
+#   .env            compose values: DOMAIN, image tags, database passwords, backup settings
+#   production.env  the production app's environment (DATABASE_URL, PAYLOAD_SECRET, R2, Resend…)
+#   staging.env     the staging app's environment (test keys; STAGING_BASIC_AUTH=1)
+#   certs/          the Cloudflare Origin CA certificate and key
+# See docs/runbooks/deploy.md.
+name: jainav
+
+x-app: &app
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+  # Healthcheck comes from the image (/api/v1/health, which also applies pending migrations).
+  logging: &logging
+    driver: json-file
+    options: { max-size: 10m, max-file: '5' }
+
+services:
+  app:
+    <<: *app
+    image: ${APP_IMAGE:?set APP_IMAGE in .env}
+    env_file: production.env
+
+  app-staging:
+    <<: *app
+    image: ${STAGING_IMAGE:?set STAGING_IMAGE in .env}
+    env_file: staging.env
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      # Read once by init/roles.sh when the volume is empty.
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?}
+      STAGING_DB_PASSWORD: ${STAGING_DB_PASSWORD:?}
+      UMAMI_DB_PASSWORD: ${UMAMI_DB_PASSWORD:?}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/roles.sh:/docker-entrypoint-initdb.d/roles.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: *logging
+
+  umami:
+    image: ghcr.io/umami-software/umami:3.4.0
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD}@postgres:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET:?}
+    logging: *logging
+
+  caddy:
+    image: caddy:2.11.6-alpine
+    restart: unless-stopped
+    # Only 443: Cloudflare connects over HTTPS (SSL Full (strict)); the firewall admits only
+    # Cloudflare's IP ranges (docs/runbooks/vps.md).
+    ports:
+      - '443:443'
+    environment:
+      DOMAIN: ${DOMAIN:?}
+      STAGING_AUTH_USER: ${STAGING_AUTH_USER:?}
+      STAGING_AUTH_HASH: ${STAGING_AUTH_HASH:?}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/certs:ro
+      - caddy_data:/data
+    logging: *logging
+
+  backup:
+    build: ./backup
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_DATABASES: jainav umami
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:?}
+      BACKUP_BUCKET: ${BACKUP_BUCKET:?}
+      # rclone remote "backups" = the R2 backup bucket.
+      RCLONE_CONFIG_BACKUPS_TYPE: s3
+      RCLONE_CONFIG_BACKUPS_PROVIDER: Cloudflare
+      RCLONE_CONFIG_BACKUPS_ENDPOINT: ${BACKUP_S3_ENDPOINT:?}
+      RCLONE_CONFIG_BACKUPS_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:?}
+      RCLONE_CONFIG_BACKUPS_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:?}
+      RCLONE_CONFIG_BACKUPS_NO_CHECK_BUCKET: 'true'
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+    logging: *logging
+
+  # Monthly restore test (docs/runbooks/backups.md): restores the newest dump into a throwaway
+  # Postgres that keeps its data in memory, checks it, and is removed afterwards.
+  restore-db:
+    image: postgres:17-alpine
+    profiles: [restore-test]
+    environment:
+      POSTGRES_PASSWORD: restore-test
+    tmpfs: /var/lib/postgresql/data
+    # It holds a decrypted copy of production: reachable from restore-test only.
+    networks: [restore]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  restore-test:
+    build: ./backup
+    profiles: [restore-test]
+    depends_on:
+      restore-db:
+        condition: service_healthy
+    entrypoint: ['restore-test.sh']
+    networks: [default, restore]
+    environment:
+      PGHOST: restore-db
+      PGUSER: postgres
+      PGPASSWORD: restore-test
+      BACKUP_DATABASES: jainav umami
+      BACKUP_BUCKET: ${BACKUP_BUCKET:?}
+      AGE_IDENTITY_FILE: /run/age/identity.txt
+      RCLONE_CONFIG_BACKUPS_TYPE: s3
+      RCLONE_CONFIG_BACKUPS_PROVIDER: Cloudflare
+      RCLONE_CONFIG_BACKUPS_ENDPOINT: ${BACKUP_S3_ENDPOINT:?}
+      RCLONE_CONFIG_BACKUPS_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:?}
+      RCLONE_CONFIG_BACKUPS_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:?}
+      RCLONE_CONFIG_BACKUPS_NO_CHECK_BUCKET: 'true'
+
+networks:
+  restore:
+    internal: true
+
+volumes:
+  pgdata:
+  caddy_data:

@@ -1,0 +1,70 @@
+# Origin web server (spec §16, §18). Cloudflare terminates visitors' TLS and connects here over
+# HTTPS with SSL "Full (strict)", so every site uses the Cloudflare Origin CA certificate.
+# Compression and caching headers come from Next.js and Cloudflare.
+
+{
+	# No automatic certificates: the Origin CA certificate is mounted at /certs.
+	auto_https disable_redirects
+	# Upstream errors (e.g. the app restarting) log the whole request: same filter as the
+	# access log below.
+	log default {
+		exclude http.log.error
+	}
+	log errors {
+		include http.log.error
+		format filter {
+			wrap json
+			request>headers delete
+			request>uri query {
+				delete token
+			}
+		}
+	}
+}
+
+(origin) {
+	tls /certs/origin.pem /certs/origin-key.pem
+	# Installer uploads in the admin (Cloudflare's free plan caps a request at 100 MB anyway).
+	request_body {
+		max_size 110MB
+	}
+	# Access log without personal data or secrets: no request headers (visitor IPs, Access
+	# identities) and no token query parameter (newsletter confirm and unsubscribe links).
+	log {
+		output stdout
+		format filter {
+			wrap json
+			request>headers delete
+			request>uri query {
+				delete token
+			}
+		}
+	}
+}
+
+{$DOMAIN} {
+	import origin
+	reverse_proxy app:3000
+}
+
+www.{$DOMAIN} {
+	import origin
+	redir https://{$DOMAIN}{uri} 308
+}
+
+# Staging: basic auth everywhere except the machine-to-machine APIs (spec §18.1), and never
+# indexed. STAGING_AUTH_HASH comes from `caddy hash-password`.
+staging.{$DOMAIN} {
+	import origin
+	header X-Robots-Tag "noindex, nofollow"
+	@protected not path /api/v1/webhooks/* /api/v1/licensing/* /api/v1/updates/* /api/v1/downloads/*
+	basic_auth @protected {
+		{$STAGING_AUTH_USER} {$STAGING_AUTH_HASH}
+	}
+	reverse_proxy app-staging:3000
+}
+
+analytics.{$DOMAIN} {
+	import origin
+	reverse_proxy umami:3000
+}

@@ -1,0 +1,33 @@
+# spec §16: dependency updates. The cooldown keeps the project's two-week supply-chain rule
+# (docs/decisions.md): no update is proposed until its release is 14 days old. Security updates
+# (enable them in the repository settings) are not delayed.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 14 }
+    open-pull-requests-limit: 5
+    groups:
+      payload:
+        patterns: ['payload', '@payloadcms/*']
+      next:
+        patterns: ['next', 'react', 'react-dom', '@next/*']
+      dev-tools:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 14 }
+
+  - package-ecosystem: docker
+    directories: [/docker, /docker/backup]
+    schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 14 }
+
+  - package-ecosystem: docker-compose
+    directory: /docker
+    schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 14 }

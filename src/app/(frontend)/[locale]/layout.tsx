@@ -11,6 +11,10 @@ import { SITE_URL } from '@/lib/seo'
 import { fontVariables } from '@/styles/fonts'
 import '@/styles/globals.css'
 
+// Umami (spec §17): self-hosted and cookie-free. Public pages only; off until both are set.
+const UMAMI_URL = process.env.NEXT_PUBLIC_UMAMI_URL?.replace(/\/$/, '')
+const UMAMI_ID = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID
+
 type Props = { children: ReactNode; params: Promise<{ locale: string }> }
 
 /**
@@ -57,6 +61,10 @@ export default async function LocaleLayout({ children, params }: Props) {
             <Toaster />
           </ThemeProvider>
         </NextIntlClientProvider>
+        {UMAMI_URL && UMAMI_ID && (
+          // A plain async tag (React hoists it into <head>): next/script would add ~1.4 KB of JS.
+          <script async src={`${UMAMI_URL}/script.js`} data-website-id={UMAMI_ID} />
+        )}
       </body>
     </html>
   )

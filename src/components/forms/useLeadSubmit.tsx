@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl'
 import { useRef, useState, type RefObject } from 'react'
 
+import { track } from '@/lib/analytics'
 import { submitForm } from '@/lib/forms/client'
 import type { FormName } from '@/lib/forms/schemas'
 
@@ -33,6 +34,7 @@ export function useLeadSubmit(form: FormName) {
     })
     if (result.ok) {
       setSent(true)
+      track('form_submit', { type: form })
       return result
     }
     setToken(null)

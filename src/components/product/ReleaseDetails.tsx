@@ -1,6 +1,7 @@
 import { Download } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
 
+import { Tracked } from '@/components/Tracked'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import type { Locale } from '@/i18n/routing'
@@ -50,16 +51,14 @@ export async function ReleaseDetails({
           </div>
         )}
       </dl>
-      <Button asChild size="lg" className="mt-8">
-        <a
-          href={href ?? `/api/v1/downloads/release/${release.id}`}
-          data-umami-event="download"
-          data-umami-event-version={release.version}
-        >
-          <Download aria-hidden />
-          {t('download')}
-        </a>
-      </Button>
+      <Tracked event="download" data={{ version: release.version }}>
+        <Button asChild size="lg" className="mt-8">
+          <a href={href ?? `/api/v1/downloads/release/${release.id}`}>
+            <Download aria-hidden />
+            {t('download')}
+          </a>
+        </Button>
+      </Tracked>
     </div>
   )
 }

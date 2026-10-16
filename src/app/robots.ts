@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next'
 
 import { SITE_URL } from '@/lib/seo'
 
-// Read at request time: the same image serves staging (basic auth on) and production.
+// Read at request time: staging sets STAGING_BASIC_AUTH=1 in its runtime environment.
 export const dynamic = 'force-dynamic'
 
 /** spec §15: keep crawlers out of the admin, account, checkout and APIs, and out of staging. */

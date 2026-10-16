@@ -3,6 +3,7 @@ import { useTranslations } from 'next-intl'
 import { useId } from 'react'
 
 import { MagneticButton } from '@/components/motion/MagneticButton'
+import { Tracked } from '@/components/Tracked'
 import { Button } from '@/components/ui/Button'
 import { Link } from '@/i18n/navigation'
 import type { Locale } from '@/i18n/routing'
@@ -23,33 +24,33 @@ export function ProductButtons({ buttons, name, slug, locale }: Props) {
       {buttons.map((b, i) => {
         const variant = i === 0 ? 'primary' : 'secondary'
         const Comp = i === 0 ? MagneticButton : Button
-        const track = {
-          'data-umami-event': 'cta_click',
-          'data-umami-event-product': slug,
-          'data-umami-event-type': b.kind,
-        }
+        const track = { product: slug, type: b.kind }
         switch (b.kind) {
           case 'visit':
           case 'demo':
             return (
-              <Comp key={b.href} asChild size="lg" variant={variant}>
-                <a href={b.href} target="_blank" rel="noopener" {...track}>
-                  {b.label ?? (b.kind === 'visit' ? t('visit', { name }) : t('demo'))}
-                  <ArrowUpRight aria-hidden />
-                  <span className="sr-only">{t('newTab')}</span>
-                </a>
-              </Comp>
+              <Tracked key={b.href} event="cta_click" data={track}>
+                <Comp asChild size="lg" variant={variant}>
+                  <a href={b.href} target="_blank" rel="noopener">
+                    {b.label ?? (b.kind === 'visit' ? t('visit', { name }) : t('demo'))}
+                    <ArrowUpRight aria-hidden />
+                    <span className="sr-only">{t('newTab')}</span>
+                  </a>
+                </Comp>
+              </Tracked>
             )
           case 'download':
             return (
               <div key={b.href} className="flex flex-col items-start gap-1.5">
                 {/* A plain link: the endpoint redirects to the installer file. */}
-                <Comp asChild size="lg" variant={variant}>
-                  <a href={b.href} {...track}>
-                    <Download aria-hidden />
-                    {b.label ?? t('download')}
-                  </a>
-                </Comp>
+                <Tracked event="cta_click" data={track}>
+                  <Comp asChild size="lg" variant={variant}>
+                    <a href={b.href}>
+                      <Download aria-hidden />
+                      {b.label ?? t('download')}
+                    </a>
+                  </Comp>
+                </Tracked>
                 <p className="text-xs text-fg-muted tabular-nums">
                   {t('version', { version: b.version })}
                   {b.sizeBytes ? ` · ${formatBytes(locale, b.sizeBytes)}` : ''}
@@ -67,20 +68,22 @@ export function ProductButtons({ buttons, name, slug, locale }: Props) {
                 </p>
               </div>
             ) : (
-              <Comp key={b.href} asChild size="lg" variant={variant}>
-                <Link href={b.href} {...track}>
-                  {b.label ?? t('buy', { plan: b.plan ?? name })}
-                </Link>
-              </Comp>
+              <Tracked key={b.href} event="cta_click" data={track}>
+                <Comp asChild size="lg" variant={variant}>
+                  <Link href={b.href}>{b.label ?? t('buy', { plan: b.plan ?? name })}</Link>
+                </Comp>
+              </Tracked>
             )
           case 'waitlist':
           case 'contact':
             return (
-              <Comp key={b.href} asChild size="lg" variant={variant}>
-                <Link href={b.href} {...track}>
-                  {b.label ?? (b.kind === 'waitlist' ? t('waitlist') : t('contact'))}
-                </Link>
-              </Comp>
+              <Tracked key={b.href} event="cta_click" data={track}>
+                <Comp asChild size="lg" variant={variant}>
+                  <Link href={b.href}>
+                    {b.label ?? (b.kind === 'waitlist' ? t('waitlist') : t('contact'))}
+                  </Link>
+                </Comp>
+              </Tracked>
             )
         }
       })}

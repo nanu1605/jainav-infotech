@@ -60,6 +60,15 @@ test('the founder section shows the photo (a local upload) with a quote', async 
     .toBeGreaterThan(0)
 })
 
+// Umami's tracker cancels clicks on a tracked <a> and reloads the page: tracking goes on a wrapper.
+test('tracked links keep client-side navigation', async ({ page }) => {
+  for (const path of ['/', '/products/vyro', '/products/baby']) {
+    await page.goto(path)
+    expect(await page.locator('[data-umami-event]').count()).toBeGreaterThan(0)
+    await expect(page.locator('a[data-umami-event]')).toHaveCount(0)
+  }
+})
+
 test('vanity /vyro redirects permanently and keeps the language', async ({ request }) => {
   for (const [from, to] of [
     ['/vyro', '/products/vyro'],
