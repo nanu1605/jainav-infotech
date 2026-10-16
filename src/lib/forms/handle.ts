@@ -14,6 +14,7 @@ import {
 } from '@/emails'
 import { routing, type Locale } from '@/i18n/routing'
 import { getClient } from '@/lib/cms'
+import { requestCustomer } from '@/lib/commerce/http'
 import { inboxAddress, sendEmail, sendTelegram, settle, type Inbox } from '@/lib/notify'
 import { clientIp, hashIp, limit, sha256 } from '@/lib/rateLimit'
 import { localizedPath, SITE_URL } from '@/lib/seo'
@@ -48,7 +49,15 @@ const TOPIC_INBOX: Record<(typeof CONTACT_TOPICS)[number], Inbox> = {
   other: 'hello',
 }
 
-type Ctx = { payload: Payload; meta: FormMeta; ipHash: string; now: string; cv: Buffer | null }
+type Ctx = {
+  payload: Payload
+  meta: FormMeta
+  ipHash: string
+  now: string
+  cv: Buffer | null
+  /** The signed-in store customer, linked to a data request (spec §9.1). */
+  customer: number | null
+}
 
 /** What a saved submission still needs: alerts for staff and emails for the visitor. */
 type Outcome = {
@@ -349,7 +358,13 @@ const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome 
   async 'data-request'(v, ctx) {
     const doc = await ctx.payload.create({
       collection: 'data-requests',
-      data: { email: v.email, type: v.type, details: v.details, status: 'new' },
+      data: {
+        email: v.email,
+        type: v.type,
+        details: v.details,
+        status: 'new',
+        customer: ctx.customer,
+      },
       overrideAccess: true,
       depth: 0,
     })
@@ -441,7 +456,15 @@ export async function handleForm(form: FormName, req: Request): Promise<Response
   if (meta.website) return json(200, { ok: true })
 
   const payload = await getClient()
-  const ctx: Ctx = { payload, meta, ipHash: hashIp(ip), now: new Date().toISOString(), cv }
+  const customer = form === 'data-request' ? await requestCustomer(req) : null
+  const ctx: Ctx = {
+    payload,
+    meta,
+    ipHash: hashIp(ip),
+    now: new Date().toISOString(),
+    cv,
+    customer: customer?.id ?? null,
+  }
   let outcome: Outcome | null
   try {
     // `save[form]` and `values` match per form; TypeScript can't correlate the two unions.
