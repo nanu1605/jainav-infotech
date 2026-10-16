@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 import { PageHeader } from '@/components/content/PageHeader'
 import { RichText } from '@/components/content/RichText'
+import { DataRequestForm } from '@/components/forms/lazy'
 import { Container } from '@/components/layout/Container'
 import { Callout } from '@/components/ui/Callout'
 import type { Locale } from '@/i18n/routing'
@@ -31,12 +32,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 /**
  * Legal page (spec §8.13): only the Owner-published version shows, with its version and effective
- * date. In Hindi it says that the English text prevails (spec §6).
+ * date. In Hindi it says that the English text prevails (spec §6). Privacy requests end with the
+ * data request form (spec §16).
  */
 export default async function LegalPage({ params }: Props) {
   const { locale, slug } = (await params) as { locale: Locale; slug: string }
   setRequestLocale(locale)
-  const [page, t] = await Promise.all([getLegalPage(locale, slug), getTranslations('legal')])
+  const [page, t, tf] = await Promise.all([
+    getLegalPage(locale, slug),
+    getTranslations('legal'),
+    getTranslations('forms.dataRequest'),
+  ])
   if (!page) return redirectOrNotFound(locale, `/legal/${slug}`)
 
   return (
@@ -62,6 +68,20 @@ export default async function LegalPage({ params }: Props) {
           </Callout>
         )}
         <RichText data={page.body} locale={locale} lang={fallbackLang(locale, page.hiStatus)} />
+        {slug === 'privacy-requests' && (
+          <section
+            aria-labelledby="data-request"
+            className="mt-12 rounded-xl border border-border bg-surface p-6 shadow-sm"
+          >
+            <h2 id="data-request" className="font-display text-xl font-semibold text-fg">
+              {tf('title')}
+            </h2>
+            <p className="mt-2 text-fg-muted">{tf('intro')}</p>
+            <div className="mt-6">
+              <DataRequestForm />
+            </div>
+          </section>
+        )}
       </Container>
     </main>
   )

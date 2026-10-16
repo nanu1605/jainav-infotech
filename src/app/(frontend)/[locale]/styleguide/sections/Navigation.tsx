@@ -5,6 +5,7 @@ import { useLocale } from 'next-intl'
 import { NavigationMenu } from 'radix-ui'
 import type { ReactNode } from 'react'
 
+import { NewsletterForm } from '@/components/forms/NewsletterForm'
 import { AnnouncementBar, type AnnouncementBarProps } from '@/components/layout/AnnouncementBar'
 import { Breadcrumbs, type BreadcrumbsProps } from '@/components/layout/Breadcrumbs'
 import { Container } from '@/components/layout/Container'
@@ -37,7 +38,6 @@ type Copy = {
     [title: string, note: string]
   >
   filler: string
-  newsletter: [title: string, text: string]
   announcements: AnnouncementBarProps[]
   crumbs: BreadcrumbsProps['items'][]
   reset: string
@@ -148,10 +148,6 @@ const COPY: Record<'en' | 'hi', Copy> = {
     },
     filler:
       'MenuMesh, VYRO and Baby are software products built and run by Jainav Infotech in Indore. We also build custom software for businesses.',
-    newsletter: [
-      'Product updates, once a month',
-      'New releases from MenuMesh, VYRO and Baby. The sign-up form arrives in Phase 4.',
-    ],
     announcements: [
       {
         id: 'styleguide-baby',
@@ -265,10 +261,6 @@ const COPY: Record<'en' | 'hi', Copy> = {
     },
     filler:
       'MenuMesh, VYRO और Baby, जैनव इन्फोटेक के बनाए और इंदौर से चलाए जाने वाले सॉफ़्टवेयर प्रोडक्ट हैं। हम व्यवसायों के लिए कस्टम सॉफ़्टवेयर भी बनाते हैं।',
-    newsletter: [
-      'प्रोडक्ट अपडेट, महीने में एक बार',
-      'MenuMesh, VYRO और Baby की नई रिलीज़। साइन-अप फ़ॉर्म फ़ेज़ 4 में आएगा।',
-    ],
     announcements: [
       {
         id: 'styleguide-baby',
@@ -372,12 +364,7 @@ export default function NavigationSection() {
             columns={c.columns}
             socials={SOCIALS}
             legal={LEGAL}
-            newsletter={
-              <div className="rounded-lg border border-dashed border-border-strong p-4">
-                <p className="font-medium text-fg">{c.newsletter[0]}</p>
-                <p className="mt-1 text-sm text-fg-muted">{c.newsletter[1]}</p>
-              </div>
-            }
+            newsletter={<NewsletterForm />}
           />
         </div>
       </Demo>

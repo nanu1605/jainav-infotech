@@ -64,7 +64,7 @@ export default async function ServicePage({ params }: Props) {
       >
         <div className="mt-8">
           <MagneticButton asChild size="lg">
-            <Link href={`/contact?topic=project&service=${slug}`}>
+            <Link href={`/services?service=${slug}#start`}>
               {t('start')}
               <ArrowRight aria-hidden />
             </Link>

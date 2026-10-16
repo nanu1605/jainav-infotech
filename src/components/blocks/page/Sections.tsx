@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server'
 import { Fragment } from 'react'
 
 import { Icon } from '@/components/content/Icon'
+import { NewsletterForm } from '@/components/forms/NewsletterForm'
 import { RichText } from '@/components/content/RichText'
 import { Grid } from '@/components/layout/Grid'
 import { Section } from '@/components/layout/Section'
@@ -105,7 +106,6 @@ export function RichTextBlock({ block, locale }: BlockProps<PageRichTextBlock>) 
 }
 
 export function Cta({ block }: BlockProps<PageCtaBlock>) {
-  // The newsletter sign-up (showNewsletter) arrives with the forms in Phase 4.
   return (
     <Section align="center" title={block.heading} intro={block.text} tone="subtle">
       <div className="flex justify-center">
@@ -114,6 +114,11 @@ export function Cta({ block }: BlockProps<PageCtaBlock>) {
           <LinkButton link={block.secondary} variant="secondary" />
         </ButtonRow>
       </div>
+      {block.showNewsletter && (
+        <div className="mx-auto mt-12 max-w-lg rounded-xl border border-border bg-surface p-6 shadow-sm">
+          <NewsletterForm level={3} />
+        </div>
+      )}
     </Section>
   )
 }

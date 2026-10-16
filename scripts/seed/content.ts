@@ -554,7 +554,7 @@ const contactCta = {
     blockType: 'cta' as const,
     heading: 'Have a project in mind?',
     text: 'Tell us what you need and we’ll take it from there.',
-    primary: { label: 'Start a project', href: '/contact' },
+    primary: { label: 'Start a project', href: '/services#start' },
     showNewsletter: true,
   },
   hi: {
@@ -659,7 +659,7 @@ export const pages: SeedDoc<'pages'>[] = [
           blockType: 'hero',
           headline: 'We built these. We can build yours.',
           subheadline: 'Custom software from the team behind MenuMesh, VYRO and Baby.',
-          primary: { label: 'Start a project', href: '/contact' },
+          primary: { label: 'Start a project', href: '/services#start' },
         },
         { blockType: 'servicesOverview', heading: 'What we do' },
         { blockType: 'process', heading: 'How we work', steps: processSteps.en },

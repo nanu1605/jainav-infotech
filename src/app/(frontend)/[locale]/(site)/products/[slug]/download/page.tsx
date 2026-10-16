@@ -33,7 +33,7 @@ export default async function DownloadPage({ params }: Props) {
   const { locale, slug } = (await params) as { locale: Locale; slug: string }
   setRequestLocale(locale)
   const loaded = await loadProduct(locale, slug, true)
-  const { product, releases, latest, settings } = loaded
+  const { product, releases, latest } = loaded
   const t = await getTranslations('ui.release')
   // A beta only while it is newer than stable; older betas stay in the version list.
   const { stable, beta } = latest
@@ -46,7 +46,7 @@ export default async function DownloadPage({ params }: Props) {
     <ProductShell loaded={loaded} active="download">
       <SubpageHeader loaded={loaded} locale={locale} page="download" />
       {product.status === 'coming-soon' || !current.length ? (
-        <WaitlistSlot name={product.name} slug={slug} email={settings.company?.emails?.hello} />
+        <WaitlistSlot name={product.name} slug={slug} />
       ) : (
         <Container size="prose" className="space-y-16 py-16 sm:py-24">
           {current.map((release) => (

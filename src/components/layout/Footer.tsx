@@ -21,7 +21,7 @@ export type FooterProps = {
     email?: string | null
     phone?: string | null
   }
-  /** Newsletter sign-up (the form arrives in Phase 4). */
+  /** Newsletter sign-up (NewsletterForm). */
   newsletter?: ReactNode
 }
 
@@ -95,7 +95,8 @@ export function Footer({ columns, socials, legal, newsletter }: FooterProps) {
 
   return (
     <footer className="@container border-t border-border bg-bg-subtle text-fg">
-      <Container className="py-12 @3xl:py-16">
+      {/* Bottom room so the floating WhatsApp button never covers the legal line. */}
+      <Container className="pt-12 pb-24 @3xl:pt-16">
         <div className="grid gap-12 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] @4xl:gap-16">
           <div className="flex flex-col items-start gap-6">
             <Link href="/" className="-ml-1 rounded-md p-1">
