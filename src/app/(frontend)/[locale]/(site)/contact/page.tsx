@@ -37,7 +37,10 @@ export default async function ContactPage({ params }: Props) {
     getTranslations('contact'),
     getTranslations('forms.contact'),
   ])
-  const emails = EMAILS.flatMap((k) => (company?.emails?.[k] ? [[k, company.emails[k]!]] : []))
+  // An address that serves several inboxes is listed once, under its first label.
+  const emails = EMAILS.flatMap((k) =>
+    company?.emails?.[k] ? [[k, company.emails[k]!] as const] : [],
+  ).filter(([, email], i, all) => all.findIndex(([, e]) => e === email) === i)
 
   return (
     <main id="main" className="scroll-mt-16">

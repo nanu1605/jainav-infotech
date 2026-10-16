@@ -36,7 +36,7 @@ export const products: SeedDoc<'products'>[] = [
       platforms: ['web'],
       status: 'live', // {{CONFIRM}}
       hostingMode: 'external',
-      externalUrl: null, // {{MENUMESH_URL}}
+      externalUrl: 'https://menumesh.in',
       accentColor: '#EA580C', // placeholder
       primaryButton: { type: 'visit' },
       featured: true,
@@ -138,12 +138,12 @@ export const products: SeedDoc<'products'>[] = [
       type: 'desktop',
       category: 'assistants',
       platforms: ['windows'],
-      status: 'coming-soon',
+      status: 'beta',
       hostingMode: 'external',
       externalUrl: null, // {{BABY_URL}}
       accentColor: '#9333EA', // placeholder
-      // While Baby is coming soon the button resolves to "Join the waitlist" (spec §8.5).
-      primaryButton: { type: 'contact' },
+      // Until a beta build is published here the button resolves to "Join the waitlist" (spec §8.5).
+      primaryButton: { type: 'download', channel: 'beta' },
       featured: true,
       sortOrder: 3,
       ...draftHi,
@@ -463,13 +463,19 @@ export const founder: SeedDoc<'team'> = {
   en: {
     name: 'Tanishq Jain',
     role: 'Founder',
-    bio: 'Software engineer, previously at Bosch Global Software Technologies (DevOps); Google Summer of Code 2022 contributor.', // {{CONFIRM_WORDING}}
+    // From Tanishq's resume (2026-10-16); written without pronouns.
+    bio: 'Tanishq Jain founded Jainav Infotech and builds its products: MenuMesh, VYRO and Baby. Before that, Tanishq spent a year and a half as a software engineer at Bosch Global Software Technologies in Bangalore, building CI/CD pipelines and moving services to Docker and Kubernetes, then built a complete online counselling platform as a freelancer, from bookings to Razorpay payments. Tanishq was selected for Google Summer of Code 2022 (the PEcAn project) and studied Computer Science and Engineering at Bangalore Institute of Technology.',
+    // {{FOUNDER_PHOTO}}: upload in the admin (Team → Tanishq Jain → Photo).
+    links: [
+      { label: 'LinkedIn', url: 'https://www.linkedin.com/in/tanishqjain010' },
+      { label: 'Instagram', url: 'https://www.instagram.com/tan.ishq_1605/' },
+    ],
     founder: true,
     sortOrder: 1,
   },
   hi: {
     role: 'संस्थापक',
-    bio: 'सॉफ़्टवेयर इंजीनियर, पहले Bosch Global Software Technologies (DevOps) में; Google Summer of Code 2022 योगदानकर्ता।',
+    bio: 'तनिष्क जैन Jainav Infotech के संस्थापक हैं, और MenuMesh, VYRO और Baby इन्हीं के बनाए प्रोडक्ट हैं। इससे पहले तनिष्क ने बेंगलुरु में Bosch Global Software Technologies में डेढ़ साल सॉफ़्टवेयर इंजीनियर के रूप में काम किया: CI/CD पाइपलाइन बनाईं और सर्विसेज़ को Docker और Kubernetes पर चलाया। फिर फ़्रीलांसर के तौर पर एक पूरा ऑनलाइन काउंसलिंग प्लैटफ़ॉर्म बनाया, बुकिंग से लेकर Razorpay पेमेंट तक। Google Summer of Code 2022 (PEcAn प्रोजेक्ट) में तनिष्क का चयन हुआ था, और पढ़ाई Bangalore Institute of Technology से कंप्यूटर साइंस एंड इंजीनियरिंग में की।',
   },
 }
 
@@ -739,6 +745,15 @@ export const siteSettings = {
         '8A Brejeshwary annex, near bangali square, Indore, Madhya Pradesh, 452016',
       phone: '+91 92441 17127',
       whatsapp: '919244117127',
+      // One inbox for now: every form's alerts and replies go to it.
+      emails: {
+        hello: 'support@jainavinfotech.in',
+        sales: 'support@jainavinfotech.in',
+        support: 'support@jainavinfotech.in',
+        careers: 'support@jainavinfotech.in',
+        privacy: 'support@jainavinfotech.in',
+      },
+      businessHours: '9:00 am – 6:00 pm IST', // {{BUSINESS_DAYS}}
     },
     storeEnabled: false,
     maintenanceMode: false,
@@ -748,6 +763,7 @@ export const siteSettings = {
     },
   },
   hi: {
+    company: { businessHours: 'सुबह 9:00 बजे से शाम 6:00 बजे तक (IST)' },
     defaultSeo: {
       title: 'Jainav Infotech',
       description: 'इंदौर, भारत से सॉफ़्टवेयर प्रोडक्ट और कस्टम सॉफ़्टवेयर।',

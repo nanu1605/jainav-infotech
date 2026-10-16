@@ -71,6 +71,7 @@ Tasks from spec §20. Each phase ends with all checks green, a phase report, and
 - [ ] Security headers / CSP (§16).
 - [ ] SPF / DKIM / DMARC.
 - [ ] Final content check; Owner publishes the legal pages (§8.13).
+- [ ] VYRO downloads: import the latest release from GitHub `nanu1605/vyro-releases` (v0.3.0 on 2026-10-16: `Vyro_0.3.0_x64_en-US.msi`, its updater signature in `latest.json`, checksums in `SHA256SUMS.txt`) as an installer + release; check the SHA-256 matches.
 
 ## Milestone C — VYRO store live (Launch 2)
 
