@@ -652,6 +652,8 @@
       "invoice": "Invoice",
       "invoiceLink": "{number} (PDF)",
       "noInvoice": "Not issued yet",
+      "creditNoteLink": "Credit note {number} (PDF)",
+      "refunded": "{amount} refunded",
       "emptyTitle": "No orders yet",
       "emptyText": "When you buy a product, its order and invoice appear here.",
       "browse": "Browse products"
@@ -982,6 +984,34 @@
       "when": "Activated",
       "button": "Manage your devices",
       "notYou": "If this wasn't you, deactivate the device from your account and reply to this email."
+    },
+    "refund": {
+      "subject": "Refund for order {orderNumber}",
+      "partial": "We've refunded {amount} of your order {orderNumber}.",
+      "full": "We've refunded your order {orderNumber} in full: {amount}.",
+      "amount": "Amount refunded",
+      "creditNote": "Credit note",
+      "timing": "The money goes back to the account you paid from. Banks usually take 5–7 working days to show it.",
+      "licenseRevoked": "Your {product} license from this order has been revoked, so the app now runs as the free version.",
+      "attached": "Your credit note {creditNoteNumber} is attached as a PDF.",
+      "support": "Questions about your refund? Reply to this email and we'll help."
+    },
+    "duplicateRefund": {
+      "subject": "We've refunded a duplicate payment for order {orderNumber}",
+      "body": "Your order {orderNumber} was paid twice, so we've refunded the extra payment of {amount}. Your order and license aren't affected."
+    },
+    "licenseStatus": {
+      "suspended": {
+        "subject": "Your {product} license is suspended",
+        "body": "We've suspended your {product} license while a payment dispute or a support review is open.",
+        "next": "Until it's resolved, Pro features are off and {product} runs as the free version. If you think this is a mistake, reply to this email."
+      },
+      "revoked": {
+        "subject": "Your {product} license has been revoked",
+        "body": "Your {product} license has been revoked, after a refund or because the license terms weren't followed.",
+        "next": "Pro features are off, and {product} runs as the free version."
+      },
+      "support": "Questions about your license? Reply to this email and we'll help."
     }
   }
 }
