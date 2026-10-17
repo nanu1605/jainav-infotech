@@ -98,6 +98,9 @@ export interface Config {
     invoices: Invoice;
     customers: Customer;
     coupons: Coupon;
+    licenses: License;
+    activations: Activation;
+    trials: Trial;
     leads: Lead;
     'data-requests': DataRequest;
     'private-files': PrivateFile;
@@ -141,6 +144,9 @@ export interface Config {
     invoices: InvoicesSelect<false> | InvoicesSelect<true>;
     customers: CustomersSelect<false> | CustomersSelect<true>;
     coupons: CouponsSelect<false> | CouponsSelect<true>;
+    licenses: LicensesSelect<false> | LicensesSelect<true>;
+    activations: ActivationsSelect<false> | ActivationsSelect<true>;
+    trials: TrialsSelect<false> | TrialsSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
     'data-requests': DataRequestsSelect<false> | DataRequestsSelect<true>;
     'private-files': PrivateFilesSelect<false> | PrivateFilesSelect<true>;
@@ -185,6 +191,8 @@ export interface Config {
       processWebhook: TaskProcessWebhook;
       renderInvoicePdf: TaskRenderInvoicePdf;
       sendOrderEmail: TaskSendOrderEmail;
+      sendLicenseEmail: TaskSendLicenseEmail;
+      sendDeviceEmail: TaskSendDeviceEmail;
       reconcileOrders: TaskReconcileOrders;
       cleanup: TaskCleanup;
       inline: {
@@ -1916,6 +1924,85 @@ export interface User {
   collection: 'users';
 }
 /**
+ * Create new issues a complimentary license: the key is generated on save and emailed to the customer.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "licenses".
+ */
+export interface License {
+  id: number;
+  /**
+   * Shown to the customer on their Licenses page.
+   */
+  licenseKey?: string | null;
+  product: number | Product;
+  plan: number | Plan;
+  /**
+   * For someone new, create the customer first (Store → Customers).
+   */
+  customer: number | Customer;
+  order?: (number | null) | Order;
+  /**
+   * Suspended and revoked licenses drop the app to the free tier.
+   */
+  status: 'active' | 'suspended' | 'revoked' | 'expired';
+  source: 'purchase' | 'complimentary' | 'manual';
+  /**
+   * Devices at once. Empty on create: the plan’s number.
+   */
+  maxActivations?: number | null;
+  /**
+   * Builds released after this run as the free tier. Empty on create: the plan’s update period; clear it later for lifetime updates.
+   */
+  updatesUntil?: string | null;
+  issuedAt?: string | null;
+  keyLast4?: string | null;
+  /**
+   * Internal only.
+   */
+  notes?: string | null;
+  keyHash?: string | null;
+  keyEncrypted?: string | null;
+  emailedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Untick Active to free a device slot. It doesn’t count toward the monthly limit.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "activations".
+ */
+export interface Activation {
+  id: number;
+  license: number | License;
+  active?: boolean | null;
+  deviceName: string;
+  os?: string | null;
+  appVersion?: string | null;
+  firstSeenAt?: string | null;
+  lastSeenAt?: string | null;
+  deactivatedAt?: string | null;
+  deactivatedBy?: ('device' | 'account' | 'support') | null;
+  deviceIdHash: string;
+  notifiedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trials".
+ */
+export interface Trial {
+  id: number;
+  product: number | Product;
+  startedAt: string;
+  expiresAt: string;
+  deviceIdHash: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "data-requests".
  */
@@ -2152,7 +2239,15 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'processWebhook' | 'renderInvoicePdf' | 'sendOrderEmail' | 'reconcileOrders' | 'cleanup';
+        taskSlug:
+          | 'inline'
+          | 'processWebhook'
+          | 'renderInvoicePdf'
+          | 'sendOrderEmail'
+          | 'sendLicenseEmail'
+          | 'sendDeviceEmail'
+          | 'reconcileOrders'
+          | 'cleanup';
         taskID: string;
         input?:
           | {
@@ -2186,7 +2281,17 @@ export interface PayloadJob {
       }[]
     | null;
   taskSlug?:
-    ('inline' | 'processWebhook' | 'renderInvoicePdf' | 'sendOrderEmail' | 'reconcileOrders' | 'cleanup') | null;
+    | (
+        | 'inline'
+        | 'processWebhook'
+        | 'renderInvoicePdf'
+        | 'sendOrderEmail'
+        | 'sendLicenseEmail'
+        | 'sendDeviceEmail'
+        | 'reconcileOrders'
+        | 'cleanup'
+      )
+    | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -2284,6 +2389,18 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'coupons';
         value: number | Coupon;
+      } | null)
+    | ({
+        relationTo: 'licenses';
+        value: number | License;
+      } | null)
+    | ({
+        relationTo: 'activations';
+        value: number | Activation;
+      } | null)
+    | ({
+        relationTo: 'trials';
+        value: number | Trial;
       } | null)
     | ({
         relationTo: 'leads';
@@ -3550,6 +3667,60 @@ export interface CouponsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "licenses_select".
+ */
+export interface LicensesSelect<T extends boolean = true> {
+  licenseKey?: T;
+  product?: T;
+  plan?: T;
+  customer?: T;
+  order?: T;
+  status?: T;
+  source?: T;
+  maxActivations?: T;
+  updatesUntil?: T;
+  issuedAt?: T;
+  keyLast4?: T;
+  notes?: T;
+  keyHash?: T;
+  keyEncrypted?: T;
+  emailedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "activations_select".
+ */
+export interface ActivationsSelect<T extends boolean = true> {
+  license?: T;
+  active?: T;
+  deviceName?: T;
+  os?: T;
+  appVersion?: T;
+  firstSeenAt?: T;
+  lastSeenAt?: T;
+  deactivatedAt?: T;
+  deactivatedBy?: T;
+  deviceIdHash?: T;
+  notifiedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trials_select".
+ */
+export interface TrialsSelect<T extends boolean = true> {
+  product?: T;
+  startedAt?: T;
+  expiresAt?: T;
+  deviceIdHash?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "leads_select".
  */
 export interface LeadsSelect<T extends boolean = true> {
@@ -4211,6 +4382,26 @@ export interface TaskRenderInvoicePdf {
  * via the `definition` "TaskSendOrderEmail".
  */
 export interface TaskSendOrderEmail {
+  input: {
+    id: number;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskSendLicenseEmail".
+ */
+export interface TaskSendLicenseEmail {
+  input: {
+    id: number;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskSendDeviceEmail".
+ */
+export interface TaskSendDeviceEmail {
   input: {
     id: number;
   };

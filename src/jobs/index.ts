@@ -107,6 +107,12 @@ export const jobs: JobsConfig = {
     idTask('sendOrderEmail', async (id) =>
       (await import('@/lib/invoices/deliver')).sendOrderEmail(id),
     ),
+    idTask('sendLicenseEmail', async (id) =>
+      (await import('@/lib/licensing/deliver')).sendLicenseEmail(id),
+    ),
+    idTask('sendDeviceEmail', async (id) =>
+      (await import('@/lib/licensing/deliver')).sendDeviceEmail(id),
+    ),
     {
       // Late UPI captures and missed webhooks (spec §11.3 step 10).
       slug: 'reconcileOrders',

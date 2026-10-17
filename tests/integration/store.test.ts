@@ -316,6 +316,10 @@ afterAll(async () => {
       await db().execute(sql`DELETE FROM invoices WHERE order_id IN ${orderIds}`)
       await db().execute(sql`DELETE FROM orders WHERE id IN ${orderIds}`)
     }
+    await db().execute(
+      sql`DELETE FROM activations WHERE license_id IN (SELECT id FROM licenses WHERE customer_id IN ${customerIds})`,
+    )
+    await db().execute(sql`DELETE FROM licenses WHERE customer_id IN ${customerIds}`)
     await db().execute(sql`DELETE FROM customer_sessions WHERE customer_id IN ${customerIds}`)
     await db().execute(sql`DELETE FROM customers WHERE id IN ${customerIds}`)
   }
@@ -582,12 +586,40 @@ describe('checkout (spec §11.3)', () => {
     expect(mail?.attachments).toEqual([
       expect.objectContaining({ filename: `${invoice!.number.replaceAll('/', '-')}.pdf` }),
     ])
+    // Phase 8: the order created a license, and its key is in the email.
+    const licenses = await payload.find({
+      collection: 'licenses',
+      where: { order: { equals: order.id } },
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(licenses.docs).toHaveLength(1)
+    const license = licenses.docs[0]!
+    expect(license).toMatchObject({
+      source: 'purchase',
+      status: 'active',
+      maxActivations: 2,
+      customer: order.customer,
+      plan: ids.plan,
+    })
+    expect(license.licenseKey).toMatch(/^[A-Z0-9]+(-[0-9A-HJKMNP-TV-Z]{5}){4}$/)
+    expect(license.licenseKey!.endsWith(license.keyLast4!)).toBe(true)
+    expect(mail?.text).toContain(license.licenseKey)
     // Verifying again, or a late webhook, changes nothing.
     expect(await (await verify(cookie, paid.response)).json()).toMatchObject({ status: 'paid' })
     expect(await fulfilOrder(payload, order.id, paid.response.razorpay_payment_id, 'webhook')).toBe(
       'already',
     )
     expect(await invoicesFor(order.id)).toHaveLength(1)
+    expect(
+      (
+        await payload.count({
+          collection: 'licenses',
+          where: { order: { equals: order.id } },
+          overrideAccess: true,
+        })
+      ).totalDocs,
+    ).toBe(1)
 
     // The PDF is the owner's alone.
     const pdf = await invoiceRoute(

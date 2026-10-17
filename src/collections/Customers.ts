@@ -1,6 +1,6 @@
 import { APIError, type CollectionBeforeDeleteHook, type CollectionConfig } from 'payload'
 
-import { nobody, ownerOnly, ownerOnlyField, storeStaff } from '@/access/roles'
+import { ownerOnly, ownerOnlyField, storeStaff } from '@/access/roles'
 import { routing } from '@/i18n/routing'
 import { gstinState } from '@/lib/tax/gstin'
 import { GST_STATES } from '@/lib/tax/states'
@@ -27,6 +27,15 @@ const keepBuyers: CollectionBeforeDeleteHook = async ({ id, req }) => {
       400,
     )
   }
+  const licenses = await req.payload.count({
+    collection: 'licenses',
+    where: { customer: { equals: id } },
+    overrideAccess: true,
+    req,
+  })
+  if (licenses.totalDocs) {
+    throw new APIError('This customer has licenses: revoke or keep them instead of deleting.', 400)
+  }
   await req.payload.delete({
     collection: 'customer-sessions',
     where: { customer: { equals: id } },
@@ -50,7 +59,8 @@ export const Customers: CollectionConfig = {
   },
   access: {
     read: storeStaff,
-    create: nobody,
+    // The Owner adds someone new to give them a complimentary license (Store → Licenses).
+    create: ownerOnly,
     update: storeStaff,
     delete: ownerOnly,
   },

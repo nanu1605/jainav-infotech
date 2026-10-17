@@ -132,7 +132,7 @@ export type FulfilResult = 'fulfilled' | 'already' | 'paid-twice'
 /**
  * Fulfilment (spec §11.3 step 7): one transaction, idempotent. The guarded UPDATE decides who
  * fulfils: a second caller (verify, a webhook, reconciliation) finds no row and stops. The
- * license (Phase 8) and the coupon count, the invoice number and the invoice are written in the
+ * license and the coupon count, the invoice number and the invoice are written in the
  * same transaction; the PDF and email jobs are queued in it too, so they exist only if it commits.
  * Orders are only ever changed in SQL here: a Local API update would rewrite the event history.
  */
@@ -173,7 +173,23 @@ export async function fulfilOrder(
       req,
     })
 
-    // Licenses are issued here from Phase 8 (spec §20).
+    // The license (spec §12): the Licenses hook generates its key, which reaches the customer in
+    // the order email.
+    const item = order.items[0]!
+    await payload.create({
+      collection: 'licenses',
+      data: {
+        product: item.product,
+        plan: item.plan,
+        customer: order.customer,
+        order: orderId,
+        status: 'active',
+        source: 'purchase',
+      },
+      overrideAccess: true,
+      depth: 0,
+      req,
+    })
 
     const couponId = typeof order.coupon === 'object' ? order.coupon?.id : order.coupon
     if (couponId) {

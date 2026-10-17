@@ -55,6 +55,14 @@ export const otpVerifySchema = z.object({
   code: z.string().check(z.regex(/^\d{6}$/, 'code')),
 })
 
+/**
+ * POST /api/v1/account/licenses/deactivate → `{ ok: true }`, or 409 `deactivationLimit` with
+ * `resetsAt` (an ISO instant: midnight IST on the 1st of next month).
+ */
+export const deactivateDeviceSchema = z.object({
+  activationId: z.number().check(z.int(), z.positive()),
+})
+
 /** POST /api/v1/account/profile → `{ ok: true }`. A valid GSTIN sets (and locks) the state. */
 export const profileSchema = z.object({
   name: latin(100),
@@ -154,4 +162,5 @@ export type StoreError =
   | 'unavailable'
   | 'mismatch'
   | 'notFound'
+  | 'deactivationLimit'
   | 'server'

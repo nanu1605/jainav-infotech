@@ -906,6 +906,25 @@
       "invoice": "Your invoice {invoiceNumber} is attached as a PDF.",
       "button": "View your orders",
       "support": "Questions about your order? Reply to this email and we'll help."
+    },
+    "license": {
+      "subject": "Your {product} license key",
+      "body": "Here is your {product} license. It's also on the Licenses page of your account.",
+      "keyIntro": "Your {product} license key:",
+      "keyHelp": "Open {product}, choose Activate Pro and paste the key. Keep this email: you need the key to activate a new device.",
+      "updates": "Updates until",
+      "lifetime": "Lifetime",
+      "button": "View your licenses",
+      "support": "Questions about your license? Reply to this email and we'll help."
+    },
+    "device": {
+      "subject": "{product} was activated on a new device",
+      "body": "Your {product} license was just activated on a new device:",
+      "name": "Device",
+      "os": "Operating system",
+      "when": "Activated",
+      "button": "Manage your devices",
+      "notYou": "If this wasn't you, deactivate the device from your account and reply to this email."
     }
   }
 }
