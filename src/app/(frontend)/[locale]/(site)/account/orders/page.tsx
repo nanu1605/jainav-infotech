@@ -80,7 +80,7 @@ export default async function OrdersPage({ params }: Props) {
                   </td>
                   <td>
                     <OrderStatus status={order.status} />
-                    {order.status === 'partially-refunded' && order.amountRefunded > 0 && (
+                    {order.status !== 'refunded' && order.amountRefunded > 0 && (
                       <p className="mt-1 text-sm whitespace-nowrap">
                         {t('orders.refunded', { amount: formatINR(locale, order.amountRefunded) })}
                       </p>
