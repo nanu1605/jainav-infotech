@@ -82,8 +82,37 @@ export const paymentSchema = z.object({
   currency: z.string(),
   status: z.string(),
   error_code: z.string().nullish(),
+  /** Paise refunded so far (Phase 9). */
+  amount_refunded: z.number().int().nullish(),
 })
 export type RazorpayPayment = z.infer<typeof paymentSchema>
+
+/** Razorpay sends empty notes as `[]`. */
+const notesSchema = z
+  .union([z.record(z.string(), z.unknown()), z.array(z.unknown())])
+  .nullish()
+  .transform((notes) => (notes && !Array.isArray(notes) ? notes : {}))
+
+export const refundSchema = z.object({
+  id: z.string(),
+  payment_id: z.string(),
+  amount: z.number().int(),
+  currency: z.string().optional(),
+  status: z.string(),
+  notes: notesSchema,
+})
+export type RazorpayRefund = z.infer<typeof refundSchema>
+
+/** A chargeback (webhooks only): `respond_by` is a Unix time in seconds. */
+export const disputeSchema = z.object({
+  id: z.string(),
+  payment_id: z.string(),
+  amount: z.number().int(),
+  reason_code: z.string().nullish(),
+  respond_by: z.number().nullish(),
+  status: z.string().nullish(),
+})
+export type RazorpayDispute = z.infer<typeof disputeSchema>
 
 const orderSchema = z.object({
   id: z.string(),
@@ -96,6 +125,8 @@ export class RazorpayError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
+    /** Razorpay's own explanation, e.g. "The payment has been fully refunded already." */
+    readonly description = '',
   ) {
     super(`Razorpay API error ${status} ${code}`)
     this.name = 'RazorpayError'
@@ -120,8 +151,12 @@ async function call<T>(
   })
   const data: unknown = await res.json().catch(() => null)
   if (!res.ok) {
-    const code = (data as { error?: { code?: unknown } } | null)?.error?.code
-    throw new RazorpayError(res.status, typeof code === 'string' ? code : 'unknown')
+    const error = (data as { error?: { code?: unknown; description?: unknown } } | null)?.error
+    throw new RazorpayError(
+      res.status,
+      typeof error?.code === 'string' ? error.code : 'unknown',
+      typeof error?.description === 'string' ? error.description.slice(0, 200) : '',
+    )
   }
   return schema.parse(data)
 }
@@ -135,6 +170,16 @@ export const createRazorpayOrder = (
 /** Payments fetch: the source of truth before fulfilling (spec §3, §11.3 step 5). */
 export const fetchPayment = (cfg: RazorpayConfig, id: string) =>
   call(cfg, 'GET', `/payments/${encodeURIComponent(id)}`, paymentSchema)
+
+/**
+ * Refunds API (spec §11.6): `amount` in paise. Notes carry our order id and number only: the
+ * reason stays in our database.
+ */
+export const createRefund = (
+  cfg: RazorpayConfig,
+  paymentId: string,
+  refund: { amount: number; notes: Record<string, string> },
+) => call(cfg, 'POST', `/payments/${encodeURIComponent(paymentId)}/refund`, refundSchema, refund)
 
 /** Every payment attempt on an order (reconciliation, spec §11.3 step 10). */
 export const fetchOrderPayments = async (cfg: RazorpayConfig, orderId: string) =>
