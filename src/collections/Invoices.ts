@@ -52,10 +52,21 @@ export const Invoices: CollectionConfig = {
     listSearchableFields: ['number'],
     description:
       'Amounts are in paise. Issued invoices are read-only: correct them with a credit note.',
+    components: {
+      edit: { beforeDocumentControls: ['@/components/admin/InvoiceActions#InvoiceActions'] },
+    },
   },
   defaultSort: '-issuedAt',
   access: { read: storeStaff, create: nobody, update: nobody, delete: nobody },
   hooks: { beforeChange: [immutable] },
+  endpoints: [
+    {
+      path: '/:id/render-pdf',
+      method: 'post',
+      // Imported on use: server-only code can't load in the Payload CLI, which reads this config.
+      handler: async (req) => (await import('@/lib/invoices/deliver')).renderPdfEndpoint(req),
+    },
+  ],
   fields: [
     {
       type: 'row',
@@ -87,7 +98,23 @@ export const Invoices: CollectionConfig = {
         },
       ],
     },
+    {
+      // A credit note per Razorpay refund: the unique id makes a redelivered webhook a no-op.
+      name: 'razorpayRefundId',
+      type: 'text',
+      unique: true,
+      admin: { readOnly: true, condition: (data) => data?.kind === 'credit-note' },
+    },
     { name: 'pdf', label: 'PDF', type: 'upload', relationTo: 'private-files' },
+    {
+      // The credit note email's claim and sent time (written in SQL, like the order email).
+      type: 'row',
+      admin: { condition: (data) => data?.kind === 'credit-note' },
+      fields: [
+        { name: 'emailClaimedAt', type: 'date', admin: { hidden: true } },
+        { name: 'emailedAt', type: 'date', admin: { readOnly: true } },
+      ],
+    },
     party('seller', [
       {
         type: 'row',

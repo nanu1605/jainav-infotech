@@ -29,3 +29,42 @@ export async function downloadTotal(payload: Payload): Promise<number> {
   )
   return Number((rows[0] as { total?: string | number } | undefined)?.total ?? 0)
 }
+
+export type StatsInsight = {
+  kind: StatKind
+  key: string
+  last7: number
+  last30: number
+  /** The kind's totals over every key, not just the top 10. */
+  total7: number
+  total30: number
+}
+
+const DAY = 86_400_000
+
+/**
+ * The daily-stats insights (spec §10): per kind, the top 10 keys over the last 30 IST days
+ * (today included) with their last-7-day counts, and the kind's totals. One query.
+ */
+export async function statsInsights(payload: Payload, now = new Date()): Promise<StatsInsight[]> {
+  const today = istDate(now)
+  const since7 = istDate(new Date(now.getTime() - 6 * DAY))
+  const since30 = istDate(new Date(now.getTime() - 29 * DAY))
+  const { rows } = await db(payload).execute(sql`
+    SELECT kind, key, last7, last30, total7, total30 FROM (
+      SELECT kind::text AS kind, key,
+        COALESCE(SUM(count) FILTER (WHERE date >= ${since7}), 0)::int AS last7,
+        SUM(count)::int AS last30,
+        COALESCE(SUM(SUM(count) FILTER (WHERE date >= ${since7})) OVER w, 0)::int AS total7,
+        (SUM(SUM(count)) OVER w)::int AS total30,
+        ROW_NUMBER() OVER (PARTITION BY kind ORDER BY SUM(count) DESC, key) AS rank
+      FROM daily_stats
+      WHERE date >= ${since30} AND date <= ${today}
+      GROUP BY kind, key
+      WINDOW w AS (PARTITION BY kind)
+    ) ranked
+    WHERE rank <= 10
+    ORDER BY kind, rank
+  `)
+  return rows as StatsInsight[]
+}

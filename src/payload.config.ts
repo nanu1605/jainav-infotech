@@ -41,6 +41,7 @@ import { ShortLinks } from './collections/ShortLinks'
 import { Team } from './collections/Team'
 import { Testimonials } from './collections/Testimonials'
 import { Users } from './collections/Users'
+import { WaitlistDeliveries, WaitlistEmails } from './collections/WaitlistEmails'
 import { WebhookEvents } from './collections/WebhookEvents'
 import { CommerceSettings } from './globals/CommerceSettings'
 import { Navigation } from './globals/Navigation'
@@ -164,6 +165,10 @@ export default buildConfig({
         Logo: '@/components/admin/AdminLogo#AdminLogo',
         Icon: '@/components/admin/AdminIcon#AdminIcon',
       },
+      afterNavLinks: ['@/components/admin/ReportsNav#ReportsNav'],
+      views: {
+        reports: { Component: '@/components/admin/ReportsView#ReportsView', path: '/reports' },
+      },
     },
   },
   // Order sets the admin sidebar: Content · Products · Store · Leads · Settings · System.
@@ -191,6 +196,7 @@ export default buildConfig({
     Activations,
     Trials,
     Leads,
+    WaitlistEmails,
     DataRequests,
     PrivateFiles,
     ShortLinks,
@@ -201,8 +207,22 @@ export default buildConfig({
     InvoiceCounters,
     OtpChallenges,
     CustomerSessions,
+    WaitlistDeliveries,
   ],
   globals: [SiteSettings, CommerceSettings, Navigation],
+  // Monthly reports (spec §10). Imported on use: server-only modules can't load in the Payload CLI.
+  endpoints: [
+    {
+      path: '/reports/ca',
+      method: 'get',
+      handler: async (req) => (await import('./lib/reports')).caReportEndpoint(req),
+    },
+    {
+      path: '/reports/leads',
+      method: 'get',
+      handler: async (req) => (await import('./lib/reports')).leadsReportEndpoint(req),
+    },
+  ],
   jobs,
   // Spec §6: field-level localization, English default, fallback on.
   localization: {

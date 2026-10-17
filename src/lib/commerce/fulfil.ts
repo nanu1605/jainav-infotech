@@ -22,23 +22,40 @@ import { getCommerceSettings } from './store'
 export type OrderEvent = {
   at: string
   type: string
-  source?: 'verify' | 'webhook' | 'reconcile'
+  source?: 'verify' | 'webhook' | 'reconcile' | 'admin'
   paymentId?: string
+  /** Phase 9: the Razorpay refund or dispute an entry is about, its amount in paise, and the
+   * admin user who asked for a refund. */
+  refundId?: string
+  disputeId?: string
+  amount?: number
+  by?: number
   detail?: string
 }
 
 const drizzle = (payload: Payload) => (payload.db as unknown as PostgresAdapter).drizzle
 
-/** Appends to an order's history in one statement, so concurrent writers never lose an entry. */
+/**
+ * Appends to an order's history in one statement, so concurrent writers never lose an entry.
+ * With `unless`, nothing is added when the history already holds an entry containing it (a
+ * redelivered webhook); the result says whether the entry was added.
+ */
 export async function addOrderEvent(
   payload: Payload,
   orderId: number,
   event: Omit<OrderEvent, 'at'>,
-) {
+  unless?: Partial<OrderEvent>,
+): Promise<boolean> {
   const entry = JSON.stringify([{ at: new Date().toISOString(), ...event }])
-  await drizzle(payload).execute(sql`
-    UPDATE orders SET events = COALESCE(events, '[]'::jsonb) || ${entry}::jsonb WHERE id = ${orderId}
+  const guard = unless
+    ? sql`AND NOT (COALESCE(events, '[]'::jsonb) @> ${JSON.stringify([unless])}::jsonb)`
+    : sql``
+  const { rows } = await drizzle(payload).execute(sql`
+    UPDATE orders SET events = COALESCE(events, '[]'::jsonb) || ${entry}::jsonb, updated_at = now()
+    WHERE id = ${orderId} ${guard}
+    RETURNING id
   `)
+  return rows.length > 0
 }
 
 export type PaymentCheck = 'ok' | 'pending' | 'failed' | 'mismatch'
@@ -125,6 +142,22 @@ function invoiceData(
       total: order.total,
     },
   }
+}
+
+type Tx = Pick<PostgresAdapter['drizzle'], 'execute'>
+
+/**
+ * The next number of a series (invoices, credit notes) in a financial year, inside the caller's
+ * transaction: consecutive and never repeated, even under concurrent fulfilments.
+ */
+export async function allocateNumber(tx: Tx, prefix: string, fy: string): Promise<string> {
+  const counter = await tx.execute(sql`
+    INSERT INTO invoice_counters (series, financial_year, next) VALUES (${prefix}, ${fy}, 2)
+    ON CONFLICT (series, financial_year)
+    DO UPDATE SET next = invoice_counters.next + 1, updated_at = now()
+    RETURNING next - 1 AS seq
+  `)
+  return invoiceNumber(prefix, fy, Number((counter.rows[0] as { seq: string | number }).seq))
 }
 
 export type FulfilResult = 'fulfilled' | 'already' | 'paid-twice'
@@ -225,16 +258,10 @@ export async function fulfilOrder(
 
     const prefix = settings.invoicePrefix || 'JI'
     const fy = financialYear(paidAt)
-    const counter = await tx.execute(sql`
-      INSERT INTO invoice_counters (series, financial_year, next) VALUES (${prefix}, ${fy}, 2)
-      ON CONFLICT (series, financial_year)
-      DO UPDATE SET next = invoice_counters.next + 1, updated_at = now()
-      RETURNING next - 1 AS seq
-    `)
-    const seq = Number((counter.rows[0] as { seq: string | number }).seq)
+    const number = await allocateNumber(tx, prefix, fy)
     const invoice = await payload.create({
       collection: 'invoices',
-      data: invoiceData(order, site, settings, invoiceNumber(prefix, fy, seq), fy, paidAt),
+      data: invoiceData(order, site, settings, number, fy, paidAt),
       overrideAccess: true,
       depth: 0,
       req,
@@ -255,7 +282,7 @@ export async function fulfilOrder(
 /**
  * Nothing to fulfil: the same payment was handled already, or (spec §11.3 step 9) a second
  * payment was captured on an order another payment paid. That one is flagged once, with an
- * alert; Phase 9 adds the one-click refund.
+ * alert; the Owner refunds it with one click in the admin (src/lib/commerce/refunds.ts).
  */
 async function alreadyPaid(
   payload: Payload,

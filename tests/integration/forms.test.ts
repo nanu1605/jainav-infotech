@@ -333,6 +333,25 @@ describe('waitlist', () => {
     expect(leads[0]?.marketingConsent?.textVersion).toBeTruthy()
     expect(sent).toHaveLength(0)
   })
+
+  it('takes a new tick after a withdrawal as consent again', async () => {
+    const email = address('waitlist-withdrawn')
+    const join = { product: `${run}-app`, email, marketing: true }
+    expect((await post('waitlist', join)).status).toBe(200)
+    const [lead] = await leadsFor(email)
+    // Staff can record a withdrawal but not clear it; ticking the box again does.
+    await payload.update({
+      collection: 'leads',
+      id: lead!.id,
+      data: { marketingConsent: { withdrawnAt: '2026-10-10T10:00:00.000Z' } },
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect((await post('waitlist', join)).status).toBe(200)
+    const leads = await leadsFor(email)
+    expect(leads).toHaveLength(1)
+    expect(leads[0]?.marketingConsent).toMatchObject({ given: true, withdrawnAt: null })
+  })
 })
 
 describe('newsletter double opt-in and unsubscribe', () => {

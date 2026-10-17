@@ -27,10 +27,17 @@ import { MetaDescriptionComponent as MetaDescriptionComponent_a8a977ebc872c5d5ea
 import { MetaImageComponent as MetaImageComponent_a8a977ebc872c5d5ea7ee689724c0860 } from '@payloadcms/plugin-seo/client'
 import { PreviewComponent as PreviewComponent_a8a977ebc872c5d5ea7ee689724c0860 } from '@payloadcms/plugin-seo/client'
 import { SlugField as SlugField_2b8867833a34864a02ddf429b0728a40 } from '@payloadcms/next/client'
+import { OrderActions as OrderActions_bd9a3eb0969675b027902d6a22a18ee7 } from '@/components/admin/OrderActions'
+import { InvoiceActions as InvoiceActions_7bcd56d274d3f39f269c02b27204544c } from '@/components/admin/InvoiceActions'
+import { LicenseActions as LicenseActions_4fedb378ccd4b2c25fe18ad54093fb5e } from '@/components/admin/LicenseActions'
 import { LeadReply as LeadReply_572199583e0959dec94dfd8072f04e24 } from '@/components/admin/LeadReply'
 import { ExportLeads as ExportLeads_800dd0645468dc97bf8dbdd34cb01e71 } from '@/components/admin/ExportLeads'
+import { WaitlistActions as WaitlistActions_01ba60a5213bf4e9dc024277d385357a } from '@/components/admin/WaitlistActions'
+import { StatsInsights as StatsInsights_fb73b51a12b70739fa6812617d17b32c } from '@/components/admin/StatsInsights'
 import { AdminIcon as AdminIcon_d500ae2ad98a0a33d640ae0ac1a3417c } from '@/components/admin/AdminIcon'
 import { AdminLogo as AdminLogo_b80a86fce1072afc84cd6a430a965697 } from '@/components/admin/AdminLogo'
+import { ReportsNav as ReportsNav_9f402ccce46b90df193169c921c2d273 } from '@/components/admin/ReportsNav'
+import { ReportsView as ReportsView_2700296603fedf8ecc35ba27dbf9f33f } from '@/components/admin/ReportsView'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 import { S3ClientUploadHandler as S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24 } from '@payloadcms/storage-s3/client'
 
@@ -65,10 +72,17 @@ export const importMap = {
   "@payloadcms/plugin-seo/client#MetaImageComponent": MetaImageComponent_a8a977ebc872c5d5ea7ee689724c0860,
   "@payloadcms/plugin-seo/client#PreviewComponent": PreviewComponent_a8a977ebc872c5d5ea7ee689724c0860,
   "@payloadcms/next/client#SlugField": SlugField_2b8867833a34864a02ddf429b0728a40,
+  "@/components/admin/OrderActions#OrderActions": OrderActions_bd9a3eb0969675b027902d6a22a18ee7,
+  "@/components/admin/InvoiceActions#InvoiceActions": InvoiceActions_7bcd56d274d3f39f269c02b27204544c,
+  "@/components/admin/LicenseActions#LicenseActions": LicenseActions_4fedb378ccd4b2c25fe18ad54093fb5e,
   "@/components/admin/LeadReply#LeadReply": LeadReply_572199583e0959dec94dfd8072f04e24,
   "@/components/admin/ExportLeads#ExportLeads": ExportLeads_800dd0645468dc97bf8dbdd34cb01e71,
+  "@/components/admin/WaitlistActions#WaitlistActions": WaitlistActions_01ba60a5213bf4e9dc024277d385357a,
+  "@/components/admin/StatsInsights#StatsInsights": StatsInsights_fb73b51a12b70739fa6812617d17b32c,
   "@/components/admin/AdminIcon#AdminIcon": AdminIcon_d500ae2ad98a0a33d640ae0ac1a3417c,
   "@/components/admin/AdminLogo#AdminLogo": AdminLogo_b80a86fce1072afc84cd6a430a965697,
+  "@/components/admin/ReportsNav#ReportsNav": ReportsNav_9f402ccce46b90df193169c921c2d273,
+  "@/components/admin/ReportsView#ReportsView": ReportsView_2700296603fedf8ecc35ba27dbf9f33f,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
   "@payloadcms/storage-s3/client#S3ClientUploadHandler": S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24
 }

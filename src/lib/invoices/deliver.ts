@@ -3,12 +3,14 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 
 import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
-import type { Payload } from 'payload'
+import { APIError, type Payload, type PayloadHandler } from 'payload'
 
-import { orderConfirmationEmail } from '@/emails'
+import { orderConfirmationEmail, refundEmail } from '@/emails'
 import { getClient } from '@/lib/cms'
+import { requireRole, routeId } from '@/lib/commerce/adminEndpoint'
 import { addOrderEvent } from '@/lib/commerce/fulfil'
-import { orderLicenseKey } from '@/lib/licensing/deliver'
+import { errorCode } from '@/lib/commerce/http'
+import { once, orderLicenseKey } from '@/lib/licensing/deliver'
 import { inboxAddress, sendEmail } from '@/lib/notify'
 import { absoluteUrl } from '@/lib/seo'
 import type { Invoice } from '@/payload-types'
@@ -28,6 +30,23 @@ export async function invoicePdf(invoice: Invoice): Promise<Buffer> {
 export const pdfFilename = (invoice: Pick<Invoice, 'number'>) =>
   `${invoice.number.replaceAll('/', '-')}.pdf`
 
+/** A fresh PDF of the invoice in the private bucket, owned by the invoice (not linked yet). */
+async function storePdfFile(payload: Payload, invoice: Invoice) {
+  const pdf = await invoicePdf(invoice)
+  return payload.create({
+    collection: 'private-files',
+    data: { purpose: 'invoice', owner: { relationTo: 'invoices', value: invoice.id } },
+    file: {
+      data: pdf,
+      mimetype: 'application/pdf',
+      name: `${pdfFilename(invoice).slice(0, -4)}-${randomUUID().slice(0, 8)}.pdf`,
+      size: pdf.length,
+    },
+    overrideAccess: true,
+    depth: 0,
+  })
+}
+
 /**
  * The renderInvoicePdf job (spec §11.3 step 8): stores the invoice PDF in the private bucket as
  * the archived original and links it (once: a parallel run's copy is deleted).
@@ -41,19 +60,7 @@ export async function storeInvoicePdf(id: number) {
     overrideAccess: true,
   })
   if (invoice.pdf) return
-  const pdf = await invoicePdf(invoice)
-  const file = await payload.create({
-    collection: 'private-files',
-    data: { purpose: 'invoice', owner: { relationTo: 'invoices', value: id } },
-    file: {
-      data: pdf,
-      mimetype: 'application/pdf',
-      name: `${pdfFilename(invoice).slice(0, -4)}-${randomUUID().slice(0, 8)}.pdf`,
-      size: pdf.length,
-    },
-    overrideAccess: true,
-    depth: 0,
-  })
+  const file = await storePdfFile(payload, invoice)
   const { rows } = await drizzle(payload).execute(sql`
     UPDATE invoices SET pdf_id = ${file.id}, updated_at = now()
     WHERE id = ${id} AND pdf_id IS NULL RETURNING id
@@ -149,4 +156,113 @@ export async function sendOrderEmail(orderId: number) {
     await drizzle(payload).execute(sql`UPDATE orders SET emailed_at = NULL WHERE id = ${orderId}`)
     throw error
   }
+}
+
+const idOf = (value: number | { id: number }) => (typeof value === 'object' ? value.id : value)
+
+/**
+ * The refund email (spec §11.7), sent once per credit note like the license emails: the amount,
+ * whether the whole order is now refunded (its license is then revoked) and the credit note PDF,
+ * in the order's language. Nobody gets it once the customer's account is deleted.
+ */
+export async function sendRefundEmail(creditNoteId: number) {
+  const payload = await getClient()
+  await once(payload, 'invoices', creditNoteId, async () => {
+    const note = await payload.findByID({
+      collection: 'invoices',
+      id: creditNoteId,
+      depth: 1,
+      overrideAccess: true,
+    })
+    const order = await payload.findByID({
+      collection: 'orders',
+      id: idOf(note.order),
+      depth: 0,
+      overrideAccess: true,
+    })
+    const customer = await payload.findByID({
+      collection: 'customers',
+      id: idOf(order.customer),
+      depth: 0,
+      overrideAccess: true,
+    })
+    if (customer.status === 'deleted') return
+    const [product, { docs: notes }] = await Promise.all([
+      payload.findByID({
+        collection: 'products',
+        id: idOf(order.items[0]!.product),
+        depth: 0,
+        locale: order.locale,
+        overrideAccess: true,
+      }),
+      payload.find({
+        collection: 'invoices',
+        where: {
+          and: [
+            { order: { equals: order.id } },
+            { kind: { equals: 'credit-note' } },
+            { id: { less_than_equal: note.id } },
+          ],
+        },
+        pagination: false,
+        depth: 0,
+        overrideAccess: true,
+      }),
+    ])
+    // Up to this note: a retry sent after a later refund still tells this one as it was.
+    const refunded = notes.reduce((sum, n) => sum + n.totals.total, 0)
+    const message = await refundEmail({
+      locale: order.locale,
+      orderNumber: order.orderNumber,
+      amount: note.totals.total,
+      refunded,
+      creditNoteNumber: note.number,
+      full: refunded >= order.total,
+      productName: product.name,
+      accountUrl: absoluteUrl(order.locale, '/account/orders'),
+    })
+    await sendEmail(payload, order.billing.email, message, {
+      replyTo: await inboxAddress(payload, 'support'),
+      attachments: [
+        {
+          filename: pdfFilename(note),
+          content: await invoicePdf(note),
+          contentType: 'application/pdf',
+        },
+      ],
+    })
+  })
+}
+
+/**
+ * POST /api/invoices/:id/render-pdf (spec §10), Owner only: a new archived PDF drawn from the
+ * immutable record (same number, same amounts) replaces the stored one, which is deleted.
+ * Response: `{ ok: true, pdf: <private file id> }`.
+ */
+export const renderPdfEndpoint: PayloadHandler = async (req) => {
+  requireRole(req, 'Only the Owner can re-render an invoice.', 'owner')
+  const id = routeId(req)
+  const payload = req.payload
+  const invoice = await payload
+    .findByID({ collection: 'invoices', id, depth: 1, overrideAccess: true })
+    .catch(() => null)
+  if (!invoice) throw new APIError('Not found.', 404)
+  const file = await storePdfFile(payload, invoice)
+  // The locked subquery reads the link as stored when this runs, so of two re-renders at once
+  // the second deletes the first one's file, never the original twice.
+  const { rows } = await drizzle(payload).execute(sql`
+    UPDATE invoices i SET pdf_id = ${file.id}, updated_at = now()
+    FROM (SELECT id, pdf_id FROM invoices WHERE id = ${id} FOR UPDATE) old
+    WHERE i.id = old.id
+    RETURNING old.pdf_id AS old
+  `)
+  const old = (rows[0] as { old: number | null } | undefined)?.old
+  if (old) {
+    await payload
+      .delete({ collection: 'private-files', id: old, overrideAccess: true, depth: 0 })
+      .catch((error: unknown) =>
+        console.error(`invoices: old PDF ${old} not deleted:`, errorCode(error)),
+      )
+  }
+  return Response.json({ ok: true, pdf: file.id })
 }

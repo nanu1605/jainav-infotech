@@ -114,12 +114,18 @@ export const jobs: JobsConfig = {
       (await import('@/lib/licensing/deliver')).sendDeviceEmail(id),
     ),
     {
-      // Late UPI captures and missed webhooks (spec §11.3 step 10).
+      // Late UPI captures and missed webhooks (spec §11.3 step 10). Also the sweep for license
+      // status emails nobody could send at once (Phase 9): a task of its own would need a
+      // migration, as task slugs are a database enum.
       slug: 'reconcileOrders',
       schedule: [{ cron: '*/15 * * * *', queue: 'default' }],
       retries: 0,
       handler: async () => {
-        await guarded(async () => (await import('@/lib/commerce/reconcile')).reconcileOrders())
+        const [orders, emails] = await Promise.allSettled([
+          guarded(async () => (await import('@/lib/commerce/reconcile')).reconcileOrders()),
+          guarded(async () => (await import('@/lib/licensing/deliver')).sendPendingStatusEmails()),
+        ])
+        for (const result of [orders, emails]) if (result.status === 'rejected') throw result.reason
         return { output: {} }
       },
     },
@@ -133,5 +139,8 @@ export const jobs: JobsConfig = {
         return { output: {} }
       },
     },
+    idTask('sendWaitlistEmail', async (id) =>
+      (await import('@/lib/waitlist')).sendWaitlistEmail(id),
+    ),
   ] as TaskConfig[],
 }

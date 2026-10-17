@@ -14,6 +14,7 @@ export const DailyStats: CollectionConfig = {
     useAsTitle: 'key',
     defaultColumns: ['date', 'kind', 'key', 'count'],
     listSearchableFields: ['key'],
+    components: { beforeListTable: ['@/components/admin/StatsInsights#StatsInsights'] },
   },
   access: {
     read: staff,
