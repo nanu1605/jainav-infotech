@@ -150,6 +150,10 @@ const invoicesFor = async (orderId: number) =>
 
 /** Site settings in SQL: other suites leave values there that a full validation would refuse. */
 async function setSite(storeEnabled: boolean, gstin: string | null) {
+  // A fresh database has no row until the global is first saved.
+  await db().execute(
+    sql`INSERT INTO site_settings (updated_at, created_at) SELECT now(), now() WHERE NOT EXISTS (SELECT 1 FROM site_settings)`,
+  )
   const { rows } = await db().execute(
     sql`SELECT store_enabled, company_gstin FROM site_settings LIMIT 1`,
   )
@@ -264,8 +268,10 @@ beforeEach(async () => {
   await settled()
   sent.length = 0
   telegrams.length = 0
-  // The per-customer checkout limit would trip across tests.
-  await db().execute(sql`DELETE FROM rate_limit.hits`)
+  // The per-customer checkout limit would trip across tests (the table appears on first use).
+  await db()
+    .execute(sql`DELETE FROM rate_limit.hits`)
+    .catch(() => undefined)
 })
 
 afterAll(async () => {
