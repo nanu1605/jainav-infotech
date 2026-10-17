@@ -321,6 +321,27 @@ describe('sending a waitlist email', () => {
     expect(sent.map((m) => m.to)).toEqual(['a', 'b', 'c'].map((n) => address(`retry-${n}`)))
     expect(await emailDoc(email.id)).toMatchObject({ status: 'sent', sent: 3 })
   })
+
+  it('erases a deleted lead’s deliveries with its last lead of the address', async () => {
+    const product = await newProduct()
+    const gone = await lead(product, address('erased'))
+    const older = await lead(product, address('shared'))
+    const newer = await lead(product, address('shared'))
+    await lead(product, address('stays'))
+    const email = await draft(product)
+    expect((await send(email.id)).status).toBe(200)
+    await settled()
+    const hashes = async () => (await deliveries(email.id)).map((r) => r.address_hash).sort()
+    expect(await hashes()).toHaveLength(3)
+
+    await payload.delete({ collection: 'leads', id: gone.id, depth: 0, overrideAccess: true })
+    expect(await hashes()).toEqual([sha256(address('shared')), sha256(address('stays'))].sort())
+    // Another lead still has the address: its row stays, so a running send can't email it again.
+    await payload.delete({ collection: 'leads', id: newer.id, depth: 0, overrideAccess: true })
+    expect(await hashes()).toEqual([sha256(address('shared')), sha256(address('stays'))].sort())
+    await payload.delete({ collection: 'leads', id: older.id, depth: 0, overrideAccess: true })
+    expect(await hashes()).toEqual([sha256(address('stays'))])
+  })
 })
 
 describe('the Owner’s controls', () => {
