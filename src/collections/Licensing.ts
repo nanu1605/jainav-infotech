@@ -248,23 +248,37 @@ const deactivateFromAdmin: CollectionBeforeChangeHook = async ({
   req,
 }) => {
   if (operation !== 'update' || !originalDoc) return data
-  if (!originalDoc.active && data.active) {
-    throw new APIError('A deactivated device activates again from the app.', 400)
+  // Payload read the row before this hook: lock it and decide from what is stored now, so a
+  // deactivation from the app or the account page that committed meanwhile stands. Only Active
+  // comes from staff; leaving everything else out of the write keeps the licensing API's newer
+  // values (last seen, when and by whom) instead of Payload's earlier copy.
+  const adapter = req.payload.db as unknown as PostgresAdapter
+  const tx = adapter.sessions[String(await req.transactionID)]?.db ?? adapter.drizzle
+  const { rows } = await tx.execute(sql`
+    SELECT active, license_id AS license, device_name AS "deviceName",
+           device_id_hash AS "deviceIdHash"
+    FROM activations WHERE id = ${originalDoc.id} FOR UPDATE
+  `)
+  const row = rows[0] as
+    { active: boolean; license: number; deviceName: string; deviceIdHash: string } | undefined
+  const stored = row?.active ?? originalDoc.active
+  const { active } = data
+  for (const key of Object.keys(data)) delete data[key]
+  // Required fields must be present to validate: the stored values, not Payload's copy.
+  if (row)
+    Object.assign(data, {
+      license: row.license,
+      deviceName: row.deviceName,
+      deviceIdHash: row.deviceIdHash,
+    })
+  if (!stored) {
+    if (active) throw new APIError('A deactivated device activates again from the app.', 400)
+    return data
   }
-  delete data.deactivatedAt
-  delete data.deactivatedBy
-  if (originalDoc.active && data.active === false) {
-    // Payload read the row before this hook: lock it and look again, so a deactivation from the
-    // app or the account page that committed meanwhile keeps its own when and by whom.
-    const adapter = req.payload.db as unknown as PostgresAdapter
-    const tx = adapter.sessions[String(await req.transactionID)]?.db ?? adapter.drizzle
-    const { rows } = await tx.execute(
-      sql`SELECT active FROM activations WHERE id = ${originalDoc.id} FOR UPDATE`,
-    )
-    if ((rows[0] as { active: boolean } | undefined)?.active) {
-      data.deactivatedAt = new Date().toISOString()
-      data.deactivatedBy = 'support'
-    }
+  if (active === false) {
+    data.active = false
+    data.deactivatedAt = new Date().toISOString()
+    data.deactivatedBy = 'support'
   }
   return data
 }

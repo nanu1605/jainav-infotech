@@ -908,22 +908,24 @@ describe('housekeeping', () => {
     // Fulfilled, and the email claimed by a run that died before sending.
     await fulfilOrder(payload, order.id, paid.response.razorpay_payment_id, 'verify')
     await db().execute(sql`DELETE FROM payload_jobs WHERE input->>'id' = ${String(order.id)}`)
-    await db().execute(
-      sql`UPDATE orders SET emailed_at = now() - interval '21 minutes' WHERE id = ${order.id}`,
-    )
+    const claim = (minutes: number) =>
+      db().execute(
+        sql`UPDATE orders SET emailed_at = now() - make_interval(mins => ${minutes}) WHERE id = ${order.id}`,
+      )
     const { sendOrderEmail } = await import('@/lib/invoices/deliver')
+    const confirmations = () =>
+      sent.filter((m) => m.to === order.billing.email && /confirmed/.test(String(m.subject)))
+    // A 12-minute lease: a younger claim may still be sending.
+    await claim(5)
+    await expect(sendOrderEmail(order.id)).rejects.toThrow(/claimed by another run/)
+    expect(confirmations()).toHaveLength(0)
+    await claim(13)
     await sendOrderEmail(order.id)
-    expect(
-      sent.filter((m) => m.to === order.billing.email && /confirmed/.test(String(m.subject))),
-    ).toHaveLength(1)
+    expect(confirmations()).toHaveLength(1)
     // Recorded as sent: a later run doesn't send it twice.
-    await db().execute(
-      sql`UPDATE orders SET emailed_at = now() - interval '21 minutes' WHERE id = ${order.id}`,
-    )
+    await claim(13)
     await sendOrderEmail(order.id)
-    expect(
-      sent.filter((m) => m.to === order.billing.email && /confirmed/.test(String(m.subject))),
-    ).toHaveLength(1)
+    expect(confirmations()).toHaveLength(1)
   })
 
   it('releases jobs a crash left processing, and drops webhook payloads after 90 days', async () => {
