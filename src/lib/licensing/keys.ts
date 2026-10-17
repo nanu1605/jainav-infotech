@@ -1,15 +1,10 @@
 import 'server-only'
 
-import {
-  createCipheriv,
-  createDecipheriv,
-  createHash,
-  createPrivateKey,
-  createPublicKey,
-  hkdfSync,
-  randomBytes,
-  type KeyObject,
-} from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
+
+import { licensingConfigFrom, type LicensingConfig } from './keyMaterial'
+
+export type { LicensingConfig }
 
 /** Crockford Base32: no I, L, O or U. */
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
@@ -39,26 +34,6 @@ export const normalizeLicenseKey = (key: string) =>
 export const hashLicenseKey = (key: string) =>
   createHash('sha256').update(normalizeLicenseKey(key)).digest('hex')
 
-export type LicensingConfig = {
-  privateKey: KeyObject
-  publicKey: KeyObject
-  kid: string
-  encryptionKey: Buffer
-  pepper: string
-}
-
-// PKCS#8 DER header of an Ed25519 private key; the 32-byte seed follows.
-const ED25519_PKCS8 = Buffer.from('302e020100300506032b657004220420', 'hex')
-
-function readPrivateKey(value: string): KeyObject {
-  const pem = value.replace(/\\n/g, '\n')
-  const key = pem.includes('BEGIN')
-    ? createPrivateKey(pem)
-    : createPrivateKey({ key: Buffer.from(value, 'base64'), format: 'der', type: 'pkcs8' })
-  if (key.asymmetricKeyType !== 'ed25519') throw new Error('LICENSING_PRIVATE_KEY is not Ed25519')
-  return key
-}
-
 let config: LicensingConfig | null | undefined
 
 /**
@@ -67,42 +42,7 @@ let config: LicensingConfig | null | undefined
  * keys derived from PAYLOAD_SECRET, so the store works locally before anything is generated.
  */
 export function licensingConfig(): LicensingConfig | null {
-  if (config !== undefined) return config
-  const env = process.env
-  const configured =
-    env.LICENSING_PRIVATE_KEY &&
-    env.LICENSING_KEY_ID &&
-    env.LICENSE_KEY_ENCRYPTION_KEY &&
-    env.DEVICE_ID_PEPPER
-  if (configured) {
-    const privateKey = readPrivateKey(env.LICENSING_PRIVATE_KEY!)
-    const encryptionKey = Buffer.from(env.LICENSE_KEY_ENCRYPTION_KEY!, 'base64')
-    if (encryptionKey.length !== 32) throw new Error('LICENSE_KEY_ENCRYPTION_KEY is not 32 bytes')
-    config = {
-      privateKey,
-      publicKey: createPublicKey(privateKey),
-      kid: env.LICENSING_KEY_ID!,
-      encryptionKey,
-      pepper: env.DEVICE_ID_PEPPER!,
-    }
-  } else if (env.NODE_ENV !== 'production' && env.PAYLOAD_SECRET) {
-    const derive = (info: string) =>
-      Buffer.from(hkdfSync('sha256', env.PAYLOAD_SECRET!, 'jainav-dev-licensing', info, 32))
-    const privateKey = createPrivateKey({
-      key: Buffer.concat([ED25519_PKCS8, derive('signing')]),
-      format: 'der',
-      type: 'pkcs8',
-    })
-    config = {
-      privateKey,
-      publicKey: createPublicKey(privateKey),
-      kid: 'dev',
-      encryptionKey: derive('key-copy'),
-      pepper: derive('device-pepper').toString('base64'),
-    }
-  } else {
-    config = null
-  }
+  if (config === undefined) config = licensingConfigFrom(process.env)
   return config
 }
 
