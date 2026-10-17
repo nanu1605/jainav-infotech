@@ -318,6 +318,9 @@ describe('private data', () => {
       'invoice-counters',
       'webhook-events',
       'payload-jobs',
+      'licenses',
+      'activations',
+      'trials',
     ] as const
     for (const collection of store) {
       await expect(payload.find({ collection, ...anonymous }), collection).rejects.toMatchObject(
@@ -331,7 +334,14 @@ describe('private data', () => {
       payload.findGlobal({ slug: 'commerce-settings', ...anonymous }),
     ).rejects.toMatchObject(forbidden)
     // Support reads customers and orders; sign-in plumbing and raw webhooks are the owner's.
-    for (const collection of ['customers', 'orders', 'invoices'] as const) {
+    for (const collection of [
+      'customers',
+      'orders',
+      'invoices',
+      'licenses',
+      'activations',
+      'trials',
+    ] as const) {
       await expect(payload.find({ collection, ...as('support') })).resolves.toBeTruthy()
     }
     for (const collection of ['otp-challenges', 'customer-sessions', 'webhook-events'] as const) {
@@ -357,12 +367,21 @@ describe('private data', () => {
     expect(read('editor')).toEqual({ purpose: { not_equals: 'invoice' } })
   })
 
-  it('never lets the API create or change orders, invoices or customers, even for the owner', async () => {
-    for (const collection of ['orders', 'invoices', 'customers'] as const) {
+  it('never lets the API create orders, invoices, activations or trials, even for the owner', async () => {
+    for (const collection of ['orders', 'invoices', 'activations', 'trials'] as const) {
       await expect(
         payload.create({ collection, data: {} as never, ...as('owner') }),
         collection,
       ).rejects.toMatchObject(forbidden)
+    }
+    // Customers and licenses: the Owner only (a complimentary license for someone new).
+    for (const collection of ['customers', 'licenses'] as const) {
+      for (const role of ['support', 'editor'] as const) {
+        await expect(
+          payload.create({ collection, data: {} as never, ...as(role) }),
+          `${collection} ${role}`,
+        ).rejects.toMatchObject(forbidden)
+      }
     }
   })
 
