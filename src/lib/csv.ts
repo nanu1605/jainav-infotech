@@ -2,11 +2,13 @@
 
 // Spreadsheets run a cell that starts with one of these as a formula (CSV injection).
 const FORMULA_START = /^[=+\-@\t\r]/
+// A plain negative amount ("-999.00", a credit note in the CA report) is no formula: keep it a number.
+const NEGATIVE_NUMBER = /^-\d+(\.\d+)?$/
 
 export function csvCell(value: unknown): string {
   if (value == null) return ''
   let text = String(value)
-  if (FORMULA_START.test(text)) text = `'${text}`
+  if (FORMULA_START.test(text) && !NEGATIVE_NUMBER.test(text)) text = `'${text}`
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
 }
 
