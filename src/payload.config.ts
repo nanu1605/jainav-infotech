@@ -165,6 +165,10 @@ export default buildConfig({
         Logo: '@/components/admin/AdminLogo#AdminLogo',
         Icon: '@/components/admin/AdminIcon#AdminIcon',
       },
+      afterNavLinks: ['@/components/admin/ReportsNav#ReportsNav'],
+      views: {
+        reports: { Component: '@/components/admin/ReportsView#ReportsView', path: '/reports' },
+      },
     },
   },
   // Order sets the admin sidebar: Content · Products · Store · Leads · Settings · System.

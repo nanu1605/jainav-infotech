@@ -29,8 +29,11 @@ import { PreviewComponent as PreviewComponent_a8a977ebc872c5d5ea7ee689724c0860 }
 import { SlugField as SlugField_2b8867833a34864a02ddf429b0728a40 } from '@payloadcms/next/client'
 import { LeadReply as LeadReply_572199583e0959dec94dfd8072f04e24 } from '@/components/admin/LeadReply'
 import { ExportLeads as ExportLeads_800dd0645468dc97bf8dbdd34cb01e71 } from '@/components/admin/ExportLeads'
+import { StatsInsights as StatsInsights_fb73b51a12b70739fa6812617d17b32c } from '@/components/admin/StatsInsights'
 import { AdminIcon as AdminIcon_d500ae2ad98a0a33d640ae0ac1a3417c } from '@/components/admin/AdminIcon'
 import { AdminLogo as AdminLogo_b80a86fce1072afc84cd6a430a965697 } from '@/components/admin/AdminLogo'
+import { ReportsNav as ReportsNav_9f402ccce46b90df193169c921c2d273 } from '@/components/admin/ReportsNav'
+import { ReportsView as ReportsView_2700296603fedf8ecc35ba27dbf9f33f } from '@/components/admin/ReportsView'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 import { S3ClientUploadHandler as S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24 } from '@payloadcms/storage-s3/client'
 
@@ -67,8 +70,11 @@ export const importMap = {
   "@payloadcms/next/client#SlugField": SlugField_2b8867833a34864a02ddf429b0728a40,
   "@/components/admin/LeadReply#LeadReply": LeadReply_572199583e0959dec94dfd8072f04e24,
   "@/components/admin/ExportLeads#ExportLeads": ExportLeads_800dd0645468dc97bf8dbdd34cb01e71,
+  "@/components/admin/StatsInsights#StatsInsights": StatsInsights_fb73b51a12b70739fa6812617d17b32c,
   "@/components/admin/AdminIcon#AdminIcon": AdminIcon_d500ae2ad98a0a33d640ae0ac1a3417c,
   "@/components/admin/AdminLogo#AdminLogo": AdminLogo_b80a86fce1072afc84cd6a430a965697,
+  "@/components/admin/ReportsNav#ReportsNav": ReportsNav_9f402ccce46b90df193169c921c2d273,
+  "@/components/admin/ReportsView#ReportsView": ReportsView_2700296603fedf8ecc35ba27dbf9f33f,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
   "@payloadcms/storage-s3/client#S3ClientUploadHandler": S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24
 }
