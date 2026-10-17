@@ -785,6 +785,27 @@ describe('admin actions (spec §10, §9.3)', () => {
     await sendPendingStatusEmails()
     expect(mailsTo(order, /license/)).toHaveLength(1)
   })
+
+  it('emails a later suspension when the license was reinstated while one was sending', async () => {
+    const { order } = await buy('inflight')
+    const { id } = await licenseOf(order.id)
+    await db().execute(sql`UPDATE licenses SET status = 'suspended' WHERE id = ${id}`)
+    vi.mocked(payload.sendEmail).mockImplementationOnce(async (message) => {
+      sent.push(message as SendEmailOptions)
+      // Reinstated before the send is recorded.
+      await db().execute(sql`UPDATE licenses SET status = 'active' WHERE id = ${id}`)
+    })
+    await sendPendingStatusEmails()
+    expect(mailsTo(order, /license is suspended/)).toHaveLength(1)
+    const reinstated = await licenseOf(order.id)
+    expect(reinstated.status).toBe('active')
+    expect(reinstated.statusNotifiedAs).toBeFalsy()
+    expect(reinstated.statusClaimedAt).toBeFalsy()
+
+    await db().execute(sql`UPDATE licenses SET status = 'suspended' WHERE id = ${id}`)
+    await sendPendingStatusEmails()
+    expect(mailsTo(order, /license is suspended/)).toHaveLength(2)
+  })
 })
 
 describe('credit notes with GST (spec §11.4)', () => {
