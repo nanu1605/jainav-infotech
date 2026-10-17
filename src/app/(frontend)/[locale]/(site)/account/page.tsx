@@ -1,9 +1,10 @@
-import { ArrowRight, LifeBuoy, Settings } from 'lucide-react'
+import { ArrowRight, KeyRound, LifeBuoy, Settings } from 'lucide-react'
 import type { Metadata } from 'next'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import type { ReactNode } from 'react'
 
 import { AccountShell } from '@/components/account/AccountShell'
+import { LicenseBadge } from '@/components/account/LicenseBadge'
 import { OrderStatus } from '@/components/account/OrderStatus'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -13,6 +14,7 @@ import { orderLabel, PAID_STATUSES, requireCustomer } from '@/lib/account/pages'
 import { getClient } from '@/lib/cms'
 import { customerOrders } from '@/lib/commerce/store'
 import { formatDate, formatINR } from '@/lib/format'
+import { customerLicenses } from '@/lib/licensing/account'
 import { pageMetadata } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
@@ -27,19 +29,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 const link = 'font-medium text-fg underline-offset-4 hover:underline'
 
-/** Account overview (spec §11.2): greeting, the latest orders, and where to go next. */
+/** Account overview (spec §11.2): greeting, the latest orders, licenses and where to go next. */
 export default async function AccountPage({ params }: Props) {
   const locale = (await params).locale as Locale
   setRequestLocale(locale)
   const customer = await requireCustomer(locale, '/account')
-  const [orders, t] = await Promise.all([
-    customerOrders(
-      await getClient(),
-      customer,
-      [{ status: { in: [...PAID_STATUSES] } }],
-      3,
-      locale,
-    ),
+  const payload = await getClient()
+  const [orders, licenses, t] = await Promise.all([
+    customerOrders(payload, customer, [{ status: { in: [...PAID_STATUSES] } }], 3, locale),
+    customerLicenses(payload, customer.id, locale),
     getTranslations('account'),
   ])
 
@@ -102,6 +100,35 @@ export default async function AccountPage({ params }: Props) {
           )}
         </section>
         <div className="grid content-start gap-4">
+          <Shortcut icon={<KeyRound aria-hidden />} title={t('nav.licenses')}>
+            {licenses.length ? (
+              <ul className="grid gap-1.5">
+                {licenses.map((license) => (
+                  <li key={license.id} className="flex flex-wrap items-center gap-2">
+                    {t('overview.licenseLine', {
+                      name: t('licenses.name', {
+                        product: license.product.name,
+                        plan: license.plan,
+                      }),
+                      count: license.devices.length,
+                      max: license.maxActivations,
+                    })}
+                    {license.status !== 'active' && <LicenseBadge status={license.status} />}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>{t('overview.licensesText')}</p>
+            )}
+            <Link href="/account/licenses" className={link}>
+              {t('overview.licensesLink')}
+            </Link>
+            {licenses.length > 0 && (
+              <Link href="/account/downloads" className={link}>
+                {t('overview.downloadsLink')}
+              </Link>
+            )}
+          </Shortcut>
           <Shortcut icon={<Settings aria-hidden />} title={t('nav.settings')}>
             <p>{t('overview.settingsText')}</p>
             <Link href="/account/settings" className={link}>

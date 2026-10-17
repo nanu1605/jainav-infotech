@@ -21,6 +21,7 @@ const SKIP = new Set([
   'invoice-counters',
   'webhook-events',
   'payload-jobs',
+  'trials',
 ])
 
 /**
@@ -35,6 +36,7 @@ const PERSONAL = new Set([
   'users',
   'testimonials',
   'customers',
+  'activations',
 ])
 
 type Entry = {

@@ -16,6 +16,7 @@ import { contentEditors, staff } from './access/roles'
 import { AuditLog } from './collections/AuditLog'
 import { Changelog } from './collections/Changelog'
 import { Coupons } from './collections/Coupons'
+import { Activations, Licenses, Trials } from './collections/Licensing'
 import { CustomerSessions, OtpChallenges } from './collections/CustomerAuth'
 import { Customers } from './collections/Customers'
 import { DailyStats } from './collections/DailyStats'
@@ -186,6 +187,9 @@ export default buildConfig({
     Invoices,
     Customers,
     Coupons,
+    Licenses,
+    Activations,
+    Trials,
     Leads,
     DataRequests,
     PrivateFiles,

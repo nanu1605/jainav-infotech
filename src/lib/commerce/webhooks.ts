@@ -22,7 +22,7 @@ import {
   razorpayConfig,
   webhookSignatureValid,
 } from './razorpay'
-import { errorCode } from './http'
+import { errorCode, readText } from './http'
 
 const MAX_BODY = 256 * 1024
 /** Webhook payloads hold the payer's email and phone: kept 90 days (spec §16 logs). */
@@ -65,9 +65,8 @@ export async function receiveWebhook(req: Request): Promise<Response> {
   const cfg = razorpayConfig()
   // 503 makes Razorpay retry for 24 hours, long enough to fix missing keys.
   if (!cfg) return text(503, 'Payments are not configured')
-  if (Number(req.headers.get('content-length')) > MAX_BODY) return text(413, 'Too large')
-  const raw = await req.text()
-  if (raw.length > MAX_BODY) return text(413, 'Too large')
+  const raw = await readText(req, MAX_BODY)
+  if (raw === undefined) return text(413, 'Too large')
   if (!webhookSignatureValid(cfg, raw, req.headers.get('x-razorpay-signature') ?? '')) {
     console.warn('webhooks/razorpay: bad signature')
     return text(400, 'Bad signature')

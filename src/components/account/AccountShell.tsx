@@ -11,6 +11,8 @@ import { SignOutButton } from './SignOutButton'
 const PAGES = [
   { key: 'overview', href: '/account' },
   { key: 'orders', href: '/account/orders' },
+  { key: 'licenses', href: '/account/licenses' },
+  { key: 'downloads', href: '/account/downloads' },
   { key: 'settings', href: '/account/settings' },
 ] as const
 

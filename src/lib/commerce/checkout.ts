@@ -7,6 +7,7 @@ import { after } from 'next/server'
 import type { Payload } from 'payload'
 
 import { getClient } from '@/lib/cms'
+import { licensingConfig } from '@/lib/licensing/keys'
 import { clientIp, hashIp, limit } from '@/lib/rateLimit'
 import { gstinState } from '@/lib/tax/gstin'
 import { GST_STATES, type StateCode } from '@/lib/tax/states'
@@ -175,9 +176,17 @@ export async function createHandler(req: Request) {
   // A tax invoice must name the seller's GSTIN (spec §11.4), and site settings could lose it
   // after GST was turned on.
   const gstReady = !settings.gstEnabled || Boolean(site.company?.gstin)
-  if (!cfg || !settings.currentTermsVersion || !settings.currentEulaVersion || !gstReady) {
+  // Fulfilment creates the license: without the licensing keys a payment could not be fulfilled.
+  const licensing = licensingConfig()
+  if (
+    !cfg ||
+    !licensing ||
+    !settings.currentTermsVersion ||
+    !settings.currentEulaVersion ||
+    !gstReady
+  ) {
     console.error(
-      'checkout: unavailable: set the Razorpay keys, the current Terms and EULA versions and, with GST on, the company GSTIN.',
+      'checkout: unavailable: set the Razorpay and licensing keys, the current Terms and EULA versions and, with GST on, the company GSTIN.',
     )
     return json(409, { error: 'unavailable' })
   }

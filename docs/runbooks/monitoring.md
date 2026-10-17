@@ -10,7 +10,8 @@ It must run outside the VPS, so use UptimeRobot or Better Stack (free tier).
     answer.
   - `https://{{DOMAIN}}/api/v1/updates/vyro/windows/x86_64/0.0.1`: HTTP 200 or 204. The VYRO
     update feed.
-  - From Phase 8: `/api/v1/licensing/health`.
+  - From Phase 8: `https://{{DOMAIN}}/api/v1/licensing/health`: HTTP 200 with `"ok":true`. The
+    licensing keys are set and the database answers ([licensing.md](licensing.md)).
 - Alerts: the provider's Telegram integration, to the same chat as the site's alerts
   (`TELEGRAM_CHAT_ID`). Phase 6 is done only when a test alert has reached Telegram.
 - Status page on `status.{{DOMAIN}}`: create it at the provider, then add the `CNAME` it shows

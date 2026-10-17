@@ -46,6 +46,10 @@ const RULES = {
   /** Account changes, quotes and orders from one IP and by one customer (spec §16). */
   storeIp: { points: 60, duration: 10 * 60, key: ipKey },
   checkoutCustomer: { points: 10, duration: 10 * 60, key: (id: string) => id },
+  /** Licensing API calls from one IP, and per license key or token (spec §12.4): VYRO calls a
+   * handful of times a week per device, offices share an IP. */
+  licensingIp: { points: 60, duration: 10 * 60, key: ipKey },
+  licensingKey: { points: 20, duration: 60 * 60, key: (id: string) => id },
 } as const
 export type Rule = keyof typeof RULES
 

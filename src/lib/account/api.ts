@@ -14,7 +14,12 @@ import {
   sessionToken,
   tooMany,
 } from '@/lib/commerce/http'
-import { otpRequestSchema, otpVerifySchema, profileSchema } from '@/lib/commerce/schemas'
+import {
+  deactivateDeviceSchema,
+  otpRequestSchema,
+  otpVerifySchema,
+  profileSchema,
+} from '@/lib/commerce/schemas'
 import { storeOpen } from '@/lib/commerce/store'
 import { sendEmail } from '@/lib/notify'
 import { clientIp, hashIp, limit } from '@/lib/rateLimit'
@@ -111,6 +116,34 @@ export async function saveProfile(req: Request) {
   }
   await updateProfile(await getClient(), customer, parsed.data)
   return json(200, { ok: true })
+}
+
+/**
+ * POST /api/v1/account/licenses/deactivate: frees one of the customer's device slots (spec §11.2).
+ * It counts toward the license's monthly limit, like a deactivation from the app.
+ */
+export async function deactivateDevice(req: Request) {
+  const refused = await guard(req)
+  if (refused) return refused
+  const wait = await limit('storeIp', clientIp(req.headers))
+  if (wait) return tooMany(wait)
+  const customer = await requestCustomer(req)
+  if (!customer) return json(401, { error: 'signedOut' })
+  const parsed = deactivateDeviceSchema.safeParse(await readJson(req))
+  if (!parsed.success) return json(400, { error: 'invalid' })
+  const payload = await getClient()
+  const { deactivate, licensingSettings } = await import('@/lib/licensing/license')
+  const { getCommerceSettings } = await import('@/lib/commerce/store')
+  const result = await deactivate(payload, licensingSettings(await getCommerceSettings(payload)), {
+    by: 'account',
+    activationId: parsed.data.activationId,
+    customerId: customer.id,
+  })
+  if (result.ok) return json(200, { ok: true })
+  if (result.code === 'deactivation_limit_reached') {
+    return json(409, { error: 'deactivationLimit', resetsAt: result.resetsAt })
+  }
+  return json(404, { error: 'notFound' })
 }
 
 /** POST /api/v1/account/delete: anonymizes the account and signs out everywhere. */

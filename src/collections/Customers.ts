@@ -1,14 +1,14 @@
 import { APIError, type CollectionBeforeDeleteHook, type CollectionConfig } from 'payload'
 
-import { nobody, ownerOnly, ownerOnlyField, storeStaff } from '@/access/roles'
+import { ownerOnly, ownerOnlyField, storeStaff } from '@/access/roles'
 import { routing } from '@/i18n/routing'
 import { gstinState } from '@/lib/tax/gstin'
 import { GST_STATES } from '@/lib/tax/states'
 
 import { normalizeEmail } from './Leads'
 
-/** What the customer agreed to is a record: the API ignores staff edits to it. */
-const record = { update: () => false }
+/** What the customer agreed to is a record: the API ignores staff input to it, on create too. */
+const record = { create: () => false, update: () => false }
 
 /**
  * Orders and invoices must be kept for the tax period (spec §11.2): such customers are anonymized
@@ -26,6 +26,15 @@ const keepBuyers: CollectionBeforeDeleteHook = async ({ id, req }) => {
       'This customer has orders, which tax law requires keeping: anonymize the profile instead of deleting it.',
       400,
     )
+  }
+  const licenses = await req.payload.count({
+    collection: 'licenses',
+    where: { customer: { equals: id } },
+    overrideAccess: true,
+    req,
+  })
+  if (licenses.totalDocs) {
+    throw new APIError('This customer has licenses: revoke or keep them instead of deleting.', 400)
   }
   await req.payload.delete({
     collection: 'customer-sessions',
@@ -50,10 +59,13 @@ export const Customers: CollectionConfig = {
   },
   access: {
     read: storeStaff,
-    create: nobody,
+    // The Owner adds someone new to give them a complimentary license (Store → Licenses).
+    create: ownerOnly,
     update: storeStaff,
     delete: ownerOnly,
   },
+  // A copy would carry the source's consent record (group subfields escape create access).
+  disableDuplicate: true,
   hooks: { beforeDelete: [keepBuyers] },
   fields: [
     {

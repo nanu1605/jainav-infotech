@@ -18,7 +18,7 @@ import { createTranslator } from 'next-intl'
 import type { CSSProperties, ReactElement, ReactNode } from 'react'
 
 import type { Locale } from '@/i18n/routing'
-import { formatINR } from '@/lib/format'
+import { formatDate, formatINR } from '@/lib/format'
 import { tokens } from '@/styles/tokens.generated'
 
 import en from '../../messages/en.json'
@@ -274,6 +274,7 @@ export function orderConfirmationEmail({
   planName,
   total,
   invoiceNumber,
+  licenseKey,
   accountUrl,
 }: {
   locale: Locale
@@ -282,6 +283,8 @@ export function orderConfirmationEmail({
   planName: string
   total: number
   invoiceNumber: string
+  /** Phase 8 (spec §11.7): the key of the license the order created. */
+  licenseKey?: string
   accountUrl: string
 }): Promise<RenderedEmail> {
   const t = translator(locale)
@@ -302,12 +305,152 @@ export function orderConfirmationEmail({
           [t('order.total'), formatINR(locale, total)],
         ]}
       />
-      {/* Phase 8 (spec §11.7): the license key joins this email here. */}
+      {licenseKey && (
+        <LicenseKeySection locale={locale} product={productName} licenseKey={licenseKey} />
+      )}
       <Text style={{ ...bodyText(locale), marginTop: '24px' }}>
         {t('order.invoice', { invoiceNumber })}
       </Text>
       <Button href={accountUrl} style={button}>
         {t('order.button')}
+      </Button>
+      <Text style={bodyText(locale)}>{t('signoff')}</Text>
+    </Layout>,
+  )
+}
+
+const mono = "ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+
+/** A license key, selected whole with one click, and where it goes (spec §11.7). */
+function LicenseKeySection({
+  locale,
+  product,
+  licenseKey,
+}: {
+  locale: Locale
+  product: string
+  licenseKey: string
+}) {
+  const t = translator(locale)
+  return (
+    <>
+      <Text style={{ ...bodyText(locale), marginTop: '24px' }}>
+        {t('license.keyIntro', { product })}
+      </Text>
+      <Text
+        style={{
+          margin: '8px 0 16px',
+          padding: '12px 16px',
+          backgroundColor: c['bg-subtle'],
+          border: `1px solid ${c.border}`,
+          borderRadius: '6px',
+          textAlign: 'center',
+          fontFamily: mono,
+          fontSize: '18px',
+          lineHeight: '28px',
+          fontWeight: 700,
+          userSelect: 'all',
+          wordBreak: 'break-all',
+          color: c.fg,
+        }}
+      >
+        {licenseKey}
+      </Text>
+      <Text style={bodyText(locale)}>{t('license.keyHelp', { product })}</Text>
+    </>
+  )
+}
+
+/**
+ * A complimentary or manually issued license (spec §10, §11.7): its key, plan and update period.
+ * `updatesUntil` null means lifetime updates.
+ */
+export function licenseIssuedEmail({
+  locale,
+  productName,
+  planName,
+  licenseKey,
+  updatesUntil,
+  licensesUrl,
+}: {
+  locale: Locale
+  productName: string
+  planName: string
+  licenseKey: string
+  updatesUntil: string | null
+  licensesUrl: string
+}): Promise<RenderedEmail> {
+  const t = translator(locale)
+  return renderEmail(
+    t('license.subject', { product: productName }),
+    <Layout
+      locale={locale}
+      preview={t('license.body', { product: productName })}
+      footer={<Text style={smallText(locale)}>{t('license.support')}</Text>}
+    >
+      <Text style={bodyText(locale)}>{t('greeting')}</Text>
+      <Text style={bodyText(locale)}>{t('license.body', { product: productName })}</Text>
+      <Fields
+        locale={locale}
+        rows={[
+          [t('order.item'), t('order.itemValue', { product: productName, plan: planName })],
+          [
+            t('license.updates'),
+            updatesUntil ? formatDate(locale, updatesUntil) : t('license.lifetime'),
+          ],
+        ]}
+      />
+      <LicenseKeySection locale={locale} product={productName} licenseKey={licenseKey} />
+      <Button href={licensesUrl} style={button}>
+        {t('license.button')}
+      </Button>
+      <Text style={bodyText(locale)}>{t('signoff')}</Text>
+    </Layout>,
+  )
+}
+
+/**
+ * A license was activated on a new device (spec §11.7). Device names come from the app; React
+ * escapes them. The time is shown in IST.
+ */
+export function deviceActivatedEmail({
+  locale,
+  productName,
+  deviceName,
+  os,
+  activatedAt,
+  licensesUrl,
+}: {
+  locale: Locale
+  productName: string
+  deviceName: string
+  os: string
+  activatedAt: string
+  licensesUrl: string
+}): Promise<RenderedEmail> {
+  const t = translator(locale)
+  return renderEmail(
+    t('device.subject', { product: productName }),
+    <Layout
+      locale={locale}
+      preview={t('device.body', { product: productName })}
+      footer={<Text style={smallText(locale)}>{t('device.notYou')}</Text>}
+    >
+      <Text style={bodyText(locale)}>{t('greeting')}</Text>
+      <Text style={bodyText(locale)}>{t('device.body', { product: productName })}</Text>
+      <Fields
+        locale={locale}
+        rows={[
+          [t('device.name'), deviceName],
+          [t('device.os'), os],
+          [
+            t('device.when'),
+            `${formatDate(locale, activatedAt, { dateStyle: 'medium', timeStyle: 'short' })} IST`,
+          ],
+        ]}
+      />
+      <Button href={licensesUrl} style={button}>
+        {t('device.button')}
       </Button>
       <Text style={bodyText(locale)}>{t('signoff')}</Text>
     </Layout>,

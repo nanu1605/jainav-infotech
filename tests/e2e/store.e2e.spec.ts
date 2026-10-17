@@ -4,94 +4,36 @@
  * other customers, a failed payment, the GSTIN lock, Hindi pages and axe. Needs the dev server:
  * production builds have no stand-in gateway, so the file skips against E2E_BASE_URL.
  */
-import { readdir, readFile } from 'node:fs/promises'
-import path from 'node:path'
-
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Browser, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
+
+import { address, fillCheckout, mailTo, newPage, pay, signIn, useOwnIp } from './helpers/store'
 
 test.skip(!!process.env.E2E_BASE_URL, 'The stand-in gateway exists only in development')
 // Each test signs in through an email (Turnstile, the outbox) and some pay: more than the default
 // 30 seconds when pages compile for the first time under parallel workers.
 test.describe.configure({ timeout: 120_000 })
 
-const OUTBOX = path.resolve('.outbox')
-const run = Date.now()
-const address = (name: string) => `${name}.${run}@example.test`
-
 /** Every test signs in from its own IP: the sign-in and checkout limits never trip across runs. */
-test.beforeEach(async ({ page }, info) => {
-  const ip = `198.19.${(run + info.workerIndex) % 250}.${(info.title.length * 11 + run) % 250}`
-  await page.route(/\/api\/v1\/(account|checkout)\//, (route) =>
-    route.continue({ headers: { ...route.request().headers(), 'cf-connecting-ip': ip } }),
-  )
-})
-
-type Mail = {
-  to: string
-  subject: string
-  text: string
-  attachments?: { filename: string; contentType: string; size: number }[]
-}
-
-/** The newest email to `to` matching `subject`, waiting for the after-response send. */
-async function mailTo(to: string, subject: RegExp): Promise<Mail> {
-  for (let i = 0; i < 60; i++) {
-    const files = await readdir(OUTBOX).catch(() => [] as string[])
-    for (const file of files.sort().reverse()) {
-      const mail = JSON.parse(await readFile(path.join(OUTBOX, file), 'utf8')) as Mail
-      if (mail.to === to && subject.test(mail.subject)) return mail
-    }
-    await new Promise((r) => setTimeout(r, 500))
-  }
-  throw new Error(`No email to ${to} matching ${subject}`)
-}
-
-async function signIn(page: Page, email: string, next = '/account') {
-  await page.goto(`/account/sign-in?next=${encodeURIComponent(next)}`)
-  const main = page.locator('main')
-  await main.getByLabel('Email address').fill(email)
-  await expect(main.locator('input[name="cf-turnstile-response"]')).not.toHaveValue('', {
-    timeout: 20_000,
-  })
-  await main.getByRole('button', { name: 'Send code' }).click()
-  await expect(main.getByLabel('6-digit code')).toBeFocused()
-  const code = (await mailTo(email, /sign-in code/)).text.match(/\b(\d{6})\b/)![1]!
-  await main.getByLabel('6-digit code').fill(code)
-  await main.getByRole('button', { name: 'Sign in', exact: true }).click()
-  await page.waitForURL((url) => url.pathname === next.split('?')[0])
-}
-
-async function fillCheckout(page: Page) {
-  await page.goto('/checkout/vyro/pro')
-  const main = page.locator('main')
-  await main.getByLabel('Full name').fill('Priya Sharma')
-  await main.getByLabel('State').selectOption({ label: 'Maharashtra' })
-  await main.getByRole('checkbox', { name: /I accept the Terms/ }).check()
-  return main
-}
-
-const newPage = async (browser: Browser) => (await browser.newContext()).newPage()
+test.beforeEach(({ page }, info) => useOwnIp(page, info))
 
 test('signs in with an emailed code, pays and gets the invoice', async ({ page, browser }) => {
   const email = address('buyer')
   await signIn(page, email, '/checkout/vyro/pro')
-  const main = await fillCheckout(page)
-  await main.getByRole('button', { name: /^Pay / }).click()
-
-  // The stand-in gateway's checkout dialog (Razorpay's own in test mode on staging).
-  const dialog = page.getByRole('dialog', { name: 'Test payment' })
-  await dialog.getByRole('button', { name: 'Pay', exact: true }).click()
-  await page.waitForURL(/\/checkout\/success\?order=JO-[0-9A-Z]{8}$/)
-  const orderNumber = new URL(page.url()).searchParams.get('order')!
+  await fillCheckout(page)
+  const orderNumber = await pay(page)
   await expect(page.locator('h1')).toHaveText('Thank you for your purchase')
   const invoice = page.getByRole('link', { name: /Download invoice JI\/\d{2}-\d{2}\/\d{5}/ })
   await expect(invoice).toBeVisible({ timeout: 30_000 })
   const pdf = await page.request.get((await invoice.getAttribute('href'))!)
   expect(pdf.headers()['content-type']).toBe('application/pdf')
   expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-')
+  // The license key, as in the email (spec §11.3 step 11).
+  const key = page.getByRole('textbox', { name: 'License key' })
+  await expect(key).toHaveValue(/^VYRO(-[0-9A-HJKMNP-TV-Z]{5}){4}$/)
 
   const confirmation = await mailTo(email, /is confirmed/)
+  expect(confirmation.text).toContain(await key.inputValue())
   expect(confirmation.attachments).toEqual([
     expect.objectContaining({
       contentType: 'application/pdf',

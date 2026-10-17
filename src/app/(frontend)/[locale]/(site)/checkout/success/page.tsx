@@ -2,16 +2,20 @@ import type { Metadata } from 'next'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 
+import { CopyKey } from '@/components/account/Licenses'
 import { OrderPoller } from '@/components/checkout/OrderPoller'
 import { PageHeader } from '@/components/content/PageHeader'
 import { Container } from '@/components/layout/Container'
 import { Button } from '@/components/ui/Button'
 import { Link, redirect } from '@/i18n/navigation'
+import { ClientMessages } from '@/i18n/clientMessages'
 import type { Locale } from '@/i18n/routing'
 import { getCustomer } from '@/lib/account/session'
 import { getClient } from '@/lib/cms'
+import { errorCode } from '@/lib/commerce/http'
 import { customerOrder, storeOpen } from '@/lib/commerce/store'
 import { formatINR } from '@/lib/format'
+import { licenseKeyOf } from '@/lib/licensing/deliver'
 import { pageMetadata } from '@/lib/seo'
 
 type Props = {
@@ -61,6 +65,23 @@ export default async function CheckoutSuccessPage({ params, searchParams }: Prop
         : order.status === 'expired'
           ? 'expired'
           : 'other'
+  // The key the order created (spec §11.3 step 11), scoped to this customer's own license.
+  let licenseKey: string | undefined
+  if (view === 'paid') {
+    // Reading decrypts the key: if that fails, the page still shows the order without it.
+    try {
+      const { docs } = await payload.find({
+        collection: 'licenses',
+        where: { and: [{ order: { equals: order.id } }, { customer: { equals: customer.id } }] },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+      })
+      licenseKey = docs[0] && licenseKeyOf(docs[0])
+    } catch (error) {
+      console.error('checkout/success: license key unavailable:', errorCode(error))
+    }
+  }
 
   return (
     <main id="main" className="scroll-mt-16">
@@ -99,6 +120,28 @@ export default async function CheckoutSuccessPage({ params, searchParams }: Prop
               </p>
             )}
           </div>
+        )}
+        {licenseKey && (
+          <section
+            aria-labelledby="license-key"
+            className="grid gap-4 rounded-xl border border-border bg-surface p-6 shadow-sm"
+          >
+            <h2 id="license-key" className="font-display text-xl font-semibold text-fg">
+              {t('license.title')}
+            </h2>
+            <p className="text-fg-muted">{t('license.text', { product: product?.name ?? '' })}</p>
+            <ClientMessages extra={['checkout', 'account']}>
+              <CopyKey value={licenseKey} />
+            </ClientMessages>
+            <p>
+              <Link
+                href="/account/licenses"
+                className="font-medium text-fg underline underline-offset-4"
+              >
+                {t('license.manage')}
+              </Link>
+            </p>
+          </section>
         )}
         <div className="flex flex-wrap gap-3">
           {view === 'paid' && product && (
