@@ -87,7 +87,23 @@ export const Invoices: CollectionConfig = {
         },
       ],
     },
+    {
+      // A credit note per Razorpay refund: the unique id makes a redelivered webhook a no-op.
+      name: 'razorpayRefundId',
+      type: 'text',
+      unique: true,
+      admin: { readOnly: true, condition: (data) => data?.kind === 'credit-note' },
+    },
     { name: 'pdf', label: 'PDF', type: 'upload', relationTo: 'private-files' },
+    {
+      // The credit note email's claim and sent time (written in SQL, like the order email).
+      type: 'row',
+      admin: { condition: (data) => data?.kind === 'credit-note' },
+      fields: [
+        { name: 'emailClaimedAt', type: 'date', admin: { hidden: true } },
+        { name: 'emailedAt', type: 'date', admin: { readOnly: true } },
+      ],
+    },
     party('seller', [
       {
         type: 'row',

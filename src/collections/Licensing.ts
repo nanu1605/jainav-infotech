@@ -234,6 +234,15 @@ export const Licenses: CollectionConfig = {
     // The license email job's claim and sent time, so parallel runs send it once.
     { name: 'emailClaimedAt', type: 'date', access: fixed, admin: { hidden: true } },
     { name: 'emailedAt', type: 'date', access: fixed, admin: { hidden: true } },
+    // The suspended / revoked email: the status last told to the customer, and the send's claim.
+    {
+      name: 'statusNotifiedAs',
+      type: 'select',
+      options: ['suspended', 'revoked'],
+      access: fixed,
+      admin: { hidden: true },
+    },
+    { name: 'statusClaimedAt', type: 'date', access: fixed, admin: { hidden: true } },
   ],
 }
 

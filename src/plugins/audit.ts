@@ -22,6 +22,7 @@ const SKIP = new Set([
   'webhook-events',
   'payload-jobs',
   'trials',
+  'waitlist-deliveries',
 ])
 
 /**

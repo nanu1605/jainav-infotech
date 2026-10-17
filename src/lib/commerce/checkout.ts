@@ -226,6 +226,7 @@ export async function createHandler(req: Request) {
       subtotal: q.subtotal,
       discount: q.discount,
       total: q.total,
+      amountRefunded: 0,
       coupon: coupon?.id,
       tax: {
         mode: q.tax.mode,

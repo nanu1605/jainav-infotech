@@ -41,6 +41,7 @@ import { ShortLinks } from './collections/ShortLinks'
 import { Team } from './collections/Team'
 import { Testimonials } from './collections/Testimonials'
 import { Users } from './collections/Users'
+import { WaitlistDeliveries, WaitlistEmails } from './collections/WaitlistEmails'
 import { WebhookEvents } from './collections/WebhookEvents'
 import { CommerceSettings } from './globals/CommerceSettings'
 import { Navigation } from './globals/Navigation'
@@ -191,6 +192,7 @@ export default buildConfig({
     Activations,
     Trials,
     Leads,
+    WaitlistEmails,
     DataRequests,
     PrivateFiles,
     ShortLinks,
@@ -201,6 +203,7 @@ export default buildConfig({
     InvoiceCounters,
     OtpChallenges,
     CustomerSessions,
+    WaitlistDeliveries,
   ],
   globals: [SiteSettings, CommerceSettings, Navigation],
   jobs,

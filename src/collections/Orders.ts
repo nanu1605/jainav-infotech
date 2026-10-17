@@ -84,6 +84,15 @@ export const Orders: CollectionConfig = {
     },
     { name: 'paidAt', type: 'date', admin: { position: 'sidebar' } },
     {
+      // Processed refunds of this order's payment (not of a duplicate one), in paise.
+      name: 'amountRefunded',
+      label: 'Refunded',
+      type: 'number',
+      required: true,
+      defaultValue: 0,
+      admin: { position: 'sidebar', step: 1 },
+    },
+    {
       // Claimed in SQL before the confirmation is sent, so two job runs never send it twice.
       name: 'emailedAt',
       label: 'Confirmation emailed at',

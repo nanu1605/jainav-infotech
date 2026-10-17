@@ -7,6 +7,7 @@ import * as migration_20261016_130245_phase5_team_quote from './20261016_130245_
 import * as migration_20261016_190338_phase7_store from './20261016_190338_phase7_store';
 import * as migration_20261017_040434_phase8_licensing from './20261017_040434_phase8_licensing';
 import * as migration_20261017_045458_phase8_email_claims from './20261017_045458_phase8_email_claims';
+import * as migration_20261017_060635_phase9_store_operations from './20261017_060635_phase9_store_operations';
 
 export const migrations = [
   {
@@ -52,6 +53,11 @@ export const migrations = [
   {
     up: migration_20261017_045458_phase8_email_claims.up,
     down: migration_20261017_045458_phase8_email_claims.down,
-    name: '20261017_045458_phase8_email_claims'
+    name: '20261017_045458_phase8_email_claims',
+  },
+  {
+    up: migration_20261017_060635_phase9_store_operations.up,
+    down: migration_20261017_060635_phase9_store_operations.down,
+    name: '20261017_060635_phase9_store_operations'
   },
 ];

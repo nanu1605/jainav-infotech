@@ -102,6 +102,7 @@ export interface Config {
     activations: Activation;
     trials: Trial;
     leads: Lead;
+    'waitlist-emails': WaitlistEmail;
     'data-requests': DataRequest;
     'private-files': PrivateFile;
     'short-links': ShortLink;
@@ -112,6 +113,7 @@ export interface Config {
     'invoice-counters': InvoiceCounter;
     'otp-challenges': OtpChallenge;
     'customer-sessions': CustomerSession;
+    'waitlist-deliveries': WaitlistDelivery;
     redirects: Redirect;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
@@ -151,6 +153,7 @@ export interface Config {
     activations: ActivationsSelect<false> | ActivationsSelect<true>;
     trials: TrialsSelect<false> | TrialsSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
+    'waitlist-emails': WaitlistEmailsSelect<false> | WaitlistEmailsSelect<true>;
     'data-requests': DataRequestsSelect<false> | DataRequestsSelect<true>;
     'private-files': PrivateFilesSelect<false> | PrivateFilesSelect<true>;
     'short-links': ShortLinksSelect<false> | ShortLinksSelect<true>;
@@ -161,6 +164,7 @@ export interface Config {
     'invoice-counters': InvoiceCountersSelect<false> | InvoiceCountersSelect<true>;
     'otp-challenges': OtpChallengesSelect<false> | OtpChallengesSelect<true>;
     'customer-sessions': CustomerSessionsSelect<false> | CustomerSessionsSelect<true>;
+    'waitlist-deliveries': WaitlistDeliveriesSelect<false> | WaitlistDeliveriesSelect<true>;
     redirects: RedirectsSelect<false> | RedirectsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
@@ -1560,6 +1564,7 @@ export interface Order {
   status: 'created' | 'paid' | 'refunded' | 'partially-refunded' | 'disputed' | 'expired';
   flags?: 'paid-twice'[] | null;
   paidAt?: string | null;
+  amountRefunded: number;
   emailedAt?: string | null;
   /**
    * Language of the order emails.
@@ -1766,7 +1771,10 @@ export interface Invoice {
    * Credit notes: the invoice they correct.
    */
   originalInvoice?: (number | null) | Invoice;
+  razorpayRefundId?: string | null;
   pdf?: (number | null) | PrivateFile;
+  emailClaimedAt?: string | null;
+  emailedAt?: string | null;
   seller: {
     stateName: string;
     stateCode: string;
@@ -1973,6 +1981,8 @@ export interface License {
   keyEncrypted?: string | null;
   emailClaimedAt?: string | null;
   emailedAt?: string | null;
+  statusNotifiedAs?: ('suspended' | 'revoked') | null;
+  statusClaimedAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -2009,6 +2019,29 @@ export interface Trial {
   startedAt: string;
   expiresAt: string;
   deviceIdHash: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "waitlist-emails".
+ */
+export interface WaitlistEmail {
+  id: number;
+  product: number | Product;
+  subject?: string | null;
+  /**
+   * Plain text; a blank line starts a new paragraph. The greeting and the unsubscribe link are added.
+   */
+  body?: string | null;
+  status: 'draft' | 'sending' | 'sent';
+  /**
+   * Addresses when sending started.
+   */
+  recipients?: number | null;
+  sent?: number | null;
+  sentAt?: string | null;
+  sentBy?: (number | null) | User;
   updatedAt: string;
   createdAt: string;
 }
@@ -2145,6 +2178,20 @@ export interface CustomerSession {
   expiresAt: string;
   lastSeenAt?: string | null;
   userAgent?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "waitlist-deliveries".
+ */
+export interface WaitlistDelivery {
+  id: number;
+  email: number | WaitlistEmail;
+  lead?: (number | null) | Lead;
+  addressHash: string;
+  claimedAt: string;
+  sentAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -2417,6 +2464,10 @@ export interface PayloadLockedDocument {
         value: number | Lead;
       } | null)
     | ({
+        relationTo: 'waitlist-emails';
+        value: number | WaitlistEmail;
+      } | null)
+    | ({
         relationTo: 'data-requests';
         value: number | DataRequest;
       } | null)
@@ -2455,6 +2506,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'customer-sessions';
         value: number | CustomerSession;
+      } | null)
+    | ({
+        relationTo: 'waitlist-deliveries';
+        value: number | WaitlistDelivery;
       } | null)
     | ({
         relationTo: 'redirects';
@@ -3508,6 +3563,7 @@ export interface OrdersSelect<T extends boolean = true> {
   status?: T;
   flags?: T;
   paidAt?: T;
+  amountRefunded?: T;
   emailedAt?: T;
   locale?: T;
   items?:
@@ -3574,7 +3630,10 @@ export interface InvoicesSelect<T extends boolean = true> {
   order?: T;
   issuedAt?: T;
   originalInvoice?: T;
+  razorpayRefundId?: T;
   pdf?: T;
+  emailClaimedAt?: T;
+  emailedAt?: T;
   seller?:
     | T
     | {
@@ -3697,6 +3756,8 @@ export interface LicensesSelect<T extends boolean = true> {
   keyEncrypted?: T;
   emailClaimedAt?: T;
   emailedAt?: T;
+  statusNotifiedAs?: T;
+  statusClaimedAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3783,6 +3844,22 @@ export interface LeadsSelect<T extends boolean = true> {
   confirmTokenHash?: T;
   confirmedAt?: T;
   unsubscribedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "waitlist-emails_select".
+ */
+export interface WaitlistEmailsSelect<T extends boolean = true> {
+  product?: T;
+  subject?: T;
+  body?: T;
+  status?: T;
+  recipients?: T;
+  sent?: T;
+  sentAt?: T;
+  sentBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3942,6 +4019,19 @@ export interface CustomerSessionsSelect<T extends boolean = true> {
   expiresAt?: T;
   lastSeenAt?: T;
   userAgent?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "waitlist-deliveries_select".
+ */
+export interface WaitlistDeliveriesSelect<T extends boolean = true> {
+  email?: T;
+  lead?: T;
+  addressHash?: T;
+  claimedAt?: T;
+  sentAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }
