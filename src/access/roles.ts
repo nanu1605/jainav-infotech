@@ -19,6 +19,8 @@ export const ownerOnly: Access = ({ req: { user } }) => hasRole(user, 'owner')
 export const contentEditors: Access = ({ req: { user } }) => hasRole(user, 'owner', 'editor')
 /** Leads and data requests: owner + support handle them; editors only read leads. */
 export const leadHandlers: Access = ({ req: { user } }) => hasRole(user, 'owner', 'support')
+/** Customers, orders, invoices and coupons (spec §9.3): owner + support read; editors don't. */
+export const storeStaff: Access = leadHandlers
 
 /** Anonymous requests see published documents only; staff see drafts too. */
 export const publishedOrStaff: Access = ({ req: { user } }) =>

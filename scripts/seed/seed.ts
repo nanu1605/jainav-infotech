@@ -311,6 +311,23 @@ export async function seed(payload: Payload): Promise<SeedSummary> {
     summary.created.push('site-settings')
   } else summary.skipped.push('site-settings')
 
+  // Checkout records the Terms and EULA versions a buyer accepts: start with the seeded drafts'.
+  const commerce = await payload.findGlobal({
+    slug: 'commerce-settings',
+    depth: 0,
+    overrideAccess: true,
+  })
+  if (!commerce.updatedAt) {
+    await payload.updateGlobal({
+      slug: 'commerce-settings',
+      data: content.commerceSettings,
+      depth: 0,
+      context,
+      overrideAccess: true,
+    })
+    summary.created.push('commerce-settings')
+  } else summary.skipped.push('commerce-settings')
+
   const nav = await payload.findGlobal({ slug: 'navigation', depth: 0, overrideAccess: true })
   if (!nav.header?.length && !nav.footer?.length) {
     const en = await payload.updateGlobal({

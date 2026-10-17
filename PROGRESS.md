@@ -90,12 +90,19 @@ On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/la
 
 ### Phase 7 — Accounts, checkout and invoices (Razorpay test mode)
 
-- [ ] First: write `docs/licensing-api.md` (§12.4) so VYRO app work can start in parallel.
-- [ ] `customers`, `otpChallenges`, `customerSessions`; OTP sign-in and sessions (§11.2); account shell (overview, orders & invoices, settings); add `customer` to `dataRequests`.
-- [ ] `orders`, `invoices`, `invoiceCounters`, `webhookEvents`, `coupons`; `commerceSettings`.
-- [ ] Checkout flow (§11.3) incl. acceptance checkbox, verify, webhook, fulfilment transaction, post-commit jobs, paid-twice flagging, reconciliation job, success / failure pages.
-- [ ] Tax engine, invoice numbering and PDF (§11.4); emails for this phase (§11.7).
-- [ ] Refund and dispute events recorded (effects in Phase 9).
+In the repository (done; tested locally against the stand-in gateway, see docs/decisions.md):
+
+- [x] First: `docs/licensing-api.md` (§12.4), so VYRO app work can start in parallel.
+- [x] `customers`, `otpChallenges`, `customerSessions`; email-code sign-in and sessions (§11.2); account pages (overview, orders & invoices, settings with account deletion); `customer` on `dataRequests`.
+- [x] `orders`, `invoices`, `invoiceCounters`, `webhookEvents`, `coupons`; `commerceSettings`.
+- [x] Checkout flow (§11.3): acceptance checkbox, verify, webhook, fulfilment transaction, post-commit jobs, paid-twice flagging, reconciliation job, success / failure pages; a local stand-in for Razorpay while no keys are set.
+- [x] Tax engine, invoice numbering and PDF (§11.4); OTP and order-confirmation emails in English and Hindi (§11.7).
+- [x] Refund and dispute events recorded on the order (effects in Phase 9).
+
+With Tanishq's inputs (steps in docs/runbooks/store.md):
+
+- [ ] Razorpay test keys and webhook on staging; a test-mode purchase end to end, including the webhook; CSP checked in the browser.
+- [ ] VYRO plans and prices; from the CA: GST status, SAC code, export treatment, invoice prefix and format, signature line, how long orders and invoices are kept.
 
 ### Phase 8 — Licensing
 

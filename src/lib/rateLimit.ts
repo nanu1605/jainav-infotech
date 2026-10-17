@@ -38,6 +38,14 @@ const RULES = {
   /** Submissions naming one inbox: also caps auto-replies sent to someone else. */
   formEmail: { points: 5, duration: 60 * 60, key: inboxKey },
   goClick: { points: 60, duration: 60, key: ipKey },
+  /** Sign-in codes requested from one IP, and sent to one address (spec §11.2). */
+  otpRequestIp: { points: 10, duration: 10 * 60, key: ipKey },
+  otpRequestEmail: { points: 5, duration: 60 * 60, key: inboxKey },
+  /** Code guesses from one IP (each code also allows only 5). */
+  otpVerifyIp: { points: 30, duration: 10 * 60, key: ipKey },
+  /** Account changes, quotes and orders from one IP and by one customer (spec §16). */
+  storeIp: { points: 60, duration: 10 * 60, key: ipKey },
+  checkoutCustomer: { points: 10, duration: 10 * 60, key: (id: string) => id },
 } as const
 export type Rule = keyof typeof RULES
 

@@ -9,15 +9,33 @@ import type {
 
 import { isDraftWrite, liveBefore } from './liveDoc'
 
-/** Collections whose writes are not audited: the log itself and high-volume counters. */
-const SKIP = new Set(['audit-log', 'daily-stats'])
+/**
+ * Collections whose writes are not audited: the log itself, high-volume counters, sign-in
+ * plumbing, raw webhooks and the job queue. Store records keep their own event history.
+ */
+const SKIP = new Set([
+  'audit-log',
+  'daily-stats',
+  'otp-challenges',
+  'customer-sessions',
+  'invoice-counters',
+  'webhook-events',
+  'payload-jobs',
+])
 
 /**
  * Their titles are personal data (emails, a customer's name). The log can't be edited or deleted,
  * so it must not hold them, or erasure requests could never be completed (spec §3, §16).
  * The id is enough. Team names are public staff bios and stay.
  */
-const PERSONAL = new Set(['leads', 'data-requests', 'private-files', 'users', 'testimonials'])
+const PERSONAL = new Set([
+  'leads',
+  'data-requests',
+  'private-files',
+  'users',
+  'testimonials',
+  'customers',
+])
 
 type Entry = {
   action: 'create' | 'update' | 'delete'

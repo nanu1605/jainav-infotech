@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { nobody, ownerOnly, staff } from '@/access/roles'
+import { hasRole, isStaff, nobody, ownerOnly } from '@/access/roles'
 
 /**
  * Personal files (spec §9.1): CVs now, invoices in Phase 7. Only server code writes them
@@ -15,7 +15,13 @@ export const PrivateFiles: CollectionConfig = {
     defaultColumns: ['filename', 'purpose', 'owner', 'filesize', 'createdAt'],
   },
   access: {
-    read: staff,
+    // Editors read leads (and so CVs), not the store: invoices are Owner and Support only.
+    read: ({ req: { user } }) =>
+      hasRole(user, 'owner', 'support')
+        ? true
+        : isStaff(user)
+          ? { purpose: { not_equals: 'invoice' } }
+          : false,
     create: nobody,
     update: nobody,
     delete: ownerOnly,
@@ -40,10 +46,10 @@ export const PrivateFiles: CollectionConfig = {
       index: true,
     },
     {
-      // Polymorphic so Phase 7 can add invoices (orders) without a schema rewrite.
+      // A lead (CVs) or an invoice (its PDF).
       name: 'owner',
       type: 'relationship',
-      relationTo: ['leads'],
+      relationTo: ['leads', 'invoices'],
       admin: { readOnly: true },
     },
   ],

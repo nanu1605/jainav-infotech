@@ -173,7 +173,9 @@
       "waitlist": "Join the waitlist",
       "buy": "Buy {plan}",
       "soon": "Available soon",
-      "fullPricing": "See full pricing"
+      "fullPricing": "See full pricing",
+      "inclGst": "incl. GST",
+      "plusGst": "+ GST"
     },
     "release": {
       "version": "Version {version}",
@@ -383,6 +385,109 @@
     "proofIntro": "Products we design, build and run ourselves with the same skills.",
     "start": "Start a project"
   },
+  "checkout": {
+    "title": "Checkout",
+    "intro": "You're buying {product} {plan}.",
+    "summary": {
+      "title": "Order summary",
+      "item": "{product} {plan}",
+      "quantity": "Quantity: 1",
+      "inclGst": "incl. GST",
+      "plusGst": "+ GST"
+    },
+    "coupon": {
+      "label": "Coupon code",
+      "apply": "Apply",
+      "applied": "Coupon {code} applied.",
+      "errors": {
+        "invalid": "This coupon code isn't valid.",
+        "expired": "This coupon has expired.",
+        "not_applicable": "This coupon can't be used for this plan.",
+        "used_up": "This coupon can't be used any more.",
+        "too_large": "This coupon would bring the total below ₹1, so it can't be used here."
+      }
+    },
+    "breakdown": {
+      "title": "Price breakdown",
+      "price": "Price",
+      "discount": "Coupon {code}",
+      "taxable": "Taxable value",
+      "cgst": "CGST ({rate}%)",
+      "sgst": "SGST ({rate}%)",
+      "igst": "IGST ({rate}%)",
+      "total": "Total",
+      "totalInclGst": "Total (incl. GST)"
+    },
+    "billing": {
+      "title": "Billing details",
+      "email": "Your receipt and invoice go to {email}.",
+      "latinHint": "Please use English (Latin) letters: invoices are printed in a Latin font.",
+      "name": "Full name",
+      "phone": "Phone",
+      "state": "State",
+      "chooseState": "Choose your state",
+      "stateLocked": "Set by your GSTIN: the place of supply is the state it's registered in.",
+      "businessName": "Business name",
+      "gstin": "GSTIN",
+      "gstinHint": "For a GST invoice in your business's name."
+    },
+    "accept": "I accept the <terms>Terms</terms> and the <eula>{product} EULA</eula>.",
+    "newTab": "(opens in a new tab)",
+    "pay": "Pay {total}",
+    "paying": "Processing your payment…",
+    "errors": {
+      "latinOnly": "Use English (Latin) letters only.",
+      "gstin": "Enter a valid 15-character GSTIN.",
+      "accept": "Accept the Terms and the EULA to continue.",
+      "invalid": "Please check this field."
+    },
+    "problems": {
+      "cancelled": "Payment cancelled. You can try again.",
+      "failed": "The payment didn't go through. You can try again, or choose another payment method.",
+      "mismatch": "We couldn't confirm this payment. If money was taken from your account, please contact support.",
+      "unavailable": "This plan can't be bought right now. Please try again later.",
+      "rateLimited": "Too many attempts. Please wait a few minutes and try again.",
+      "invalid": "Some details were not accepted. Please check the form and try again.",
+      "coupon": "Your coupon can't be used any more, so the price has been updated. Check the total and pay again.",
+      "server": "Something went wrong on our side. Please try again."
+    },
+    "success": {
+      "title": "Order confirmation",
+      "order": "Order number",
+      "total": "Total",
+      "receipt": "Your receipt and invoice go to {email}.",
+      "invoice": "Download invoice {number} (PDF)",
+      "download": "Download {product}",
+      "orders": "View your orders",
+      "confirming": "Confirming your payment…",
+      "stillConfirming": "Your payment is still being confirmed. You'll get an email as soon as it's done; you can close this page.",
+      "paid": {
+        "title": "Thank you for your purchase",
+        "intro": "Your payment was successful."
+      },
+      "pending": {
+        "title": "Confirming your payment",
+        "intro": "This usually takes a few seconds. Please keep this page open."
+      },
+      "expired": {
+        "title": "This order has expired",
+        "intro": "The payment wasn't completed in time.",
+        "next": "What to do next"
+      },
+      "other": {
+        "title": "Order {number}",
+        "intro": "See this order's details in your account."
+      }
+    },
+    "failed": {
+      "title": "Payment not completed",
+      "intro": "Your payment didn't go through.",
+      "order": "Order {number}",
+      "noCharge": "No money was taken. If an amount was deducted from your account, your bank or Razorpay refunds it automatically.",
+      "retry": "Try again",
+      "support": "Contact support"
+    }
+  },
   "contact": {
     "title": "Contact",
     "intro": "Tell us what you need. A person reads every message.",
@@ -449,6 +554,134 @@
     "share": "Share",
     "newTab": "(opens in a new tab)",
     "related": "Related posts"
+  },
+  "account": {
+    "nav": {
+      "label": "Account",
+      "account": "Account",
+      "overview": "Overview",
+      "orders": "Orders & invoices",
+      "settings": "Settings"
+    },
+    "signOut": {
+      "label": "Sign out",
+      "pending": "Signing out…",
+      "failed": "We couldn't sign you out. Please try again."
+    },
+    "signIn": {
+      "title": "Sign in",
+      "intro": "Sign in with your email address. We'll email you a 6-digit code, so there's no password to remember.",
+      "email": "Email address",
+      "sendCode": "Send code",
+      "code": "6-digit code",
+      "sent": "We sent a 6-digit code to {email}. It works for 10 minutes.",
+      "resent": "We sent a new code to {email}.",
+      "verify": "Sign in",
+      "signedIn": "Signed in. Taking you on…",
+      "invalidCode": "That code isn't right. {count, plural, =0 {Please ask for a new code.} one {You can try # more time.} other {You can try # more times.}}",
+      "noCode": "No email? Check your spam folder, or ask for a new code.",
+      "resend": "Send a new code",
+      "resendIn": "{count, plural, one {Send a new code in # second} other {Send a new code in # seconds}}",
+      "changeEmail": "Use a different email",
+      "firstTime": "New here? Signing in for the first time creates your account. Our <privacy>privacy policy</privacy> explains how we use your details."
+    },
+    "wait": {
+      "seconds": "{count, plural, one {# second} other {# seconds}}",
+      "minutes": "{count, plural, one {# minute} other {# minutes}}"
+    },
+    "problems": {
+      "invalid": "Please check the highlighted fields.",
+      "verification": "The spam check didn't pass. Please try again.",
+      "verificationPending": "Please wait a moment for the spam check to finish.",
+      "rateLimited": "Too many attempts. Please try again in {wait}.",
+      "cooldown": "We sent a code a moment ago. You can ask for another in {wait}.",
+      "codeExpired": "This code has expired or was entered wrongly too many times. Please ask for a new code.",
+      "signedOut": "You've been signed out.",
+      "server": "Something went wrong on our side. Please try again in a moment."
+    },
+    "errors": {
+      "required": "This field is required.",
+      "tooLong": "This is too long.",
+      "latinOnly": "Please use Latin letters only (A–Z): invoices are printed in a Latin font.",
+      "phone": "Enter a valid phone number.",
+      "choose": "Choose an option.",
+      "gstin": "Enter a valid 15-character GSTIN.",
+      "email": "Enter a valid email address.",
+      "code": "Enter the 6 digits from the email.",
+      "invalid": "Please check this field."
+    },
+    "status": {
+      "created": "Awaiting payment",
+      "expired": "Expired",
+      "paid": "Paid",
+      "refunded": "Refunded",
+      "partially-refunded": "Partly refunded",
+      "disputed": "Disputed"
+    },
+    "overview": {
+      "greeting": "Hello, {name}",
+      "signedInAs": "Signed in as {email}",
+      "recent": "Recent orders",
+      "orderLine": "Order {number} · {date}",
+      "allOrders": "All orders and invoices",
+      "settingsText": "Your name, billing details, GSTIN and email preferences.",
+      "settingsLink": "Edit settings",
+      "helpTitle": "Need help?",
+      "helpText": "Questions about an order, an invoice or a product? We're happy to help.",
+      "helpLink": "Contact support"
+    },
+    "orders": {
+      "intro": "Every purchase, with its invoice to download.",
+      "caption": "Your orders",
+      "number": "Order",
+      "date": "Date",
+      "product": "Product",
+      "total": "Total",
+      "status": "Status",
+      "invoice": "Invoice",
+      "invoiceLink": "{number} (PDF)",
+      "noInvoice": "Not issued yet",
+      "emptyTitle": "No orders yet",
+      "emptyText": "When you buy a product, its order and invoice appear here.",
+      "browse": "Browse products"
+    },
+    "settings": {
+      "intro": "You sign in with {email}.",
+      "title": "Your details",
+      "name": "Name",
+      "phone": "Phone",
+      "latinHint": "In Latin letters (A–Z), as it should appear on invoices.",
+      "language": "Language for emails",
+      "languageHint": "We send sign-in codes, receipts and other emails in this language.",
+      "locales": {
+        "en": "English",
+        "hi": "हिंदी"
+      },
+      "billing": "Billing details",
+      "billingHint": "Printed on your invoices.",
+      "businessName": "Business name",
+      "gstin": "GSTIN",
+      "gstinHint": "Optional: add it to claim input tax credit. It sets your state.",
+      "state": "State",
+      "stateHint": "Your place of supply, printed on invoices.",
+      "stateLocked": "Set from your GSTIN.",
+      "chooseState": "Choose your state",
+      "marketing": "Email me occasional news about Jainav products and offers. You can turn this off here at any time.",
+      "signInAgain": "Sign in again",
+      "save": "Save changes",
+      "saved": "Your changes are saved."
+    },
+    "delete": {
+      "title": "Delete account",
+      "text": "Deleting your account anonymizes your profile (your name, phone and billing details are removed) and signs you out on every device. Your orders and invoices are kept for the period tax law requires.",
+      "button": "Delete account",
+      "confirmTitle": "Delete your account?",
+      "confirmText": "Your profile will be anonymized and every session ends. Orders and invoices are kept for the period tax law requires. This can't be undone.",
+      "cancel": "Keep my account",
+      "confirm": "Delete account",
+      "pending": "Deleting…",
+      "done": "Your account has been deleted."
+    }
   },
   "changelog": {
     "title": "Changelog",
@@ -656,6 +889,23 @@
       "button": "Confirm subscription",
       "expiry": "This link works for 7 days. If you didn't sign up, ignore this email and you won't be subscribed.",
       "unsubscribe": "Unsubscribe"
+    },
+    "otp": {
+      "subject": "Your sign-in code for Jainav Infotech",
+      "body": "Use this code to sign in to your Jainav Infotech account:",
+      "expiry": "It expires in 10 minutes.",
+      "ignore": "If you didn't ask for it, ignore this email: nobody can sign in without the code."
+    },
+    "order": {
+      "subject": "Your order {orderNumber} is confirmed",
+      "thanks": "Thank you for your order. We've received your payment.",
+      "number": "Order number",
+      "item": "Product",
+      "itemValue": "{product} {plan}",
+      "total": "Total paid",
+      "invoice": "Your invoice {invoiceNumber} is attached as a PDF.",
+      "button": "View your orders",
+      "support": "Questions about your order? Reply to this email and we'll help."
     }
   }
 }

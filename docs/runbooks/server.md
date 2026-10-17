@@ -74,7 +74,9 @@ On the server, in `/srv/jainav`:
   - `DATABASE_URL=postgres://jainav:<APP_DB_PASSWORD>@postgres:5432/jainav`; staging uses
     `jainav_staging` with `STAGING_DB_PASSWORD`.
   - R2 (`S3_*`, `NEXT_PUBLIC_CDN_URL`, `DOWNLOADS_BASE_URL`), Resend, Turnstile, Telegram, Sentry.
-  - Staging only: `STAGING_BASIC_AUTH=1`, Razorpay test keys, its own R2 buckets.
+  - `OTP_PEPPER` (customer sign-in codes; `openssl rand -hex 32`, one per environment).
+  - Staging only: `STAGING_BASIC_AUTH=1`, Razorpay test keys and webhook secret
+    ([store.md](store.md)), its own R2 buckets.
   - `chmod 600 .env production.env staging.env`.
 - `certs/origin.pem` and `certs/origin-key.pem`: the Cloudflare Origin CA certificate
   ([cloudflare.md](cloudflare.md#ssl)); `chmod 600 certs/origin-key.pem`.

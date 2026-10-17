@@ -1,6 +1,6 @@
 // Umami custom events sent from code (spec §17). cta_click, chip_click and download are
 // data-umami-event attributes in the markup instead.
-type AnalyticsEvent = 'form_submit' | 'language_switch' | 'theme_switch'
+type AnalyticsEvent = 'form_submit' | 'language_switch' | 'theme_switch' | 'checkout_start'
 
 declare global {
   interface Window {
