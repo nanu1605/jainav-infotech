@@ -122,12 +122,19 @@ With Tanishq's inputs (steps in docs/runbooks/licensing.md):
 
 ### Phase 9 — Store operations
 
-- [ ] Refunds (Owner endpoint) and the `refund.processed` path: credit notes, license revocation, emails; `refund.failed` alerts.
-- [ ] Disputes: order `disputed`, license suspended, alert.
-- [ ] Resend license email; re-render invoice PDF; one-click refund for paid-twice orders.
-- [ ] Monthly CA report (invoices + credit notes + SAC summary); leads report.
-- [ ] "Email this waitlist" (consented leads only).
-- [ ] Simple insights: `dailyStats` views + Umami link.
+In the repository (done; tested locally with the stand-in gateway, see docs/decisions.md):
+
+- [x] Refunds (Owner endpoint) and the `refund.processed` path: credit notes, license revocation, emails; `refund.failed` alerts.
+- [x] Disputes: order `disputed`, license suspended, alert.
+- [x] Resend license email; re-render invoice PDF; one-click refund for paid-twice orders.
+- [x] Monthly CA report (invoices + credit notes + SAC summary); leads report. CSV only (XLSX needs a new dependency).
+- [x] "Email this waitlist" (consented leads only).
+- [x] Simple insights: `dailyStats` views + Umami link.
+
+With Tanishq's inputs (steps in docs/runbooks/store.md):
+
+- [ ] A test-mode refund from the admin and from Razorpay's dashboard on staging; the dispute and paid-twice paths if Razorpay's test mode can raise them.
+- [ ] From the CA: the credit note layout, the CA report's columns (CSV or XLSX, rate-wise or B2B/B2C splits) and the refund window.
 
 ### Phase 10 — Store go-live
 
