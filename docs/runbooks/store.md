@@ -16,7 +16,7 @@ How to switch on accounts and checkout on staging with Razorpay's test mode. Pro
 
    Restart the staging app so it reads them: in `/srv/jainav`, `docker compose -f compose.prod.yml up -d --force-recreate app-staging`.
 
-2. **Webhook** (Razorpay Dashboard, test mode → Webhooks → Add): URL `https://staging.{{DOMAIN}}/api/v1/webhooks/razorpay` (Caddy lets it past basic auth), the secret from step 1, events `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid`, `refund.created`, `refund.processed`, `refund.failed`, `payment.dispute.created`.
+2. **Webhook** (Razorpay Dashboard, test mode → Webhooks → Add): URL `https://staging.{{DOMAIN}}/api/v1/webhooks/razorpay` (Caddy lets it past basic auth), the secret from step 1, events `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid`, `refund.created`, `refund.processed`, `refund.failed`, and the six dispute events `payment.dispute.created`, `.won`, `.lost`, `.closed`, `.under_review`, `.action_required`.
 3. **Capture:** Dashboard → Account & Settings → Payment capture: automatic.
 4. **Admin** (staging, as Owner):
    - Settings → Commerce settings: the SAC code, invoice prefixes and, once the CA confirms, "Charge GST" (needs the company GSTIN in Site settings first); the current Terms and EULA versions (they are recorded with every order).
@@ -34,6 +34,26 @@ How to switch on accounts and checkout on staging with Razorpay's test mode. Pro
    - the invoice PDF has every field of spec §11.4.
 8. Failure path: pay with `failure@razorpay`; the checkout says the payment failed and lets you retry; the order gets a `payment-failed` event.
 9. Late capture: Razorpay's test mode can't delay a capture; the reconciliation job (every 15 minutes) is covered by the integration tests.
+
+## Refunds, disputes and reports (Phase 9 "done when")
+
+10. **Refund from the admin:** as Owner, Store → Orders → the paid test order → **Refund…**. Enter part of the amount and a reason → **Review refund** → **Refund**. Within a few seconds of Razorpay's `refund.processed` webhook (reload the order):
+    - the order is `partially-refunded`, its Refunded amount set, with a `JC/…` credit note under Credit notes;
+    - the credit note PDF says "Against invoice JI/… dated …";
+    - the customer gets the refund email with the credit note attached, and their Orders page lists it.
+      Refund the rest: the order is `refunded`, the credit notes add up to the invoice, and the license is revoked (the refund email says so; no separate email).
+11. **Refund from Razorpay's dashboard:** buy again, then Dashboard → Payments → the payment → Issue refund. The same effects follow, because they all come from the webhook.
+12. **Failed refund:** Razorpay's test mode can't fail a refund on request; the `refund.failed` path (a Telegram alert, no credit note) is covered by the integration tests.
+13. **Dispute:** if Razorpay's test mode offers a way to raise a test dispute on a payment, use it; otherwise the path is covered by the integration tests and the stand-in gateway (below). The order becomes `disputed`, the license `suspended`, the customer gets the suspended email and Telegram an alert with the respond-by date. Won, lost or closed disputes only alert: reinstate (Support or Owner) or revoke (Owner) the license by hand.
+14. **Paid twice:** an order flagged "Paid twice" shows **Refund duplicate** for each extra payment in **Refund…**. It issues no credit note and leaves the order and license alone; the flag goes once every extra payment is refunded.
+15. **Other actions:** Licenses → a license → **Resend license email**; Invoices → an invoice → **Re-render PDF** (same number, new file).
+16. **Reports:** sidebar Reports → Reports, pick the month: the CA report (Owner) lists the month's invoices and credit notes (credit notes negative) and a SAC summary; its Total is the month's paid orders minus its refunds. The leads report counts the month's leads by type, product and status. Daily stats shows 7- and 30-day totals above the list, and the Umami link once `NEXT_PUBLIC_UMAMI_URL` is set.
+
+Locally the stand-in gateway takes the dashboard's place: `POST /api/v1/dev/razorpay/refund` with `{"payment_id": "pay_dev…", "amount": 10000, "outcome": "processed"}` (or `"failed"`), and `POST /api/v1/dev/razorpay/dispute` with `{"payment_id": "pay_dev…"}` (then `"event": "won"` and the `dispute_id` it returned).
+
+## Email a waitlist (Phase 9)
+
+Leads → Waitlist emails → Create new: the product, the English subject and message (switch the language to add Hindi). Save, then **Send a test to me** (the English and the Hindi version arrive), then **Send to N people…**. It goes once per address, only to waitlist leads with marketing consent that wasn't withdrawn or unsubscribed, about two a second; the email shows "Sending: x of N", then "Sent". Sent emails can't be changed or deleted.
 
 ## Turning it off
 
