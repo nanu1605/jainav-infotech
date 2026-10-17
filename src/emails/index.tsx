@@ -492,3 +492,62 @@ export function newsletterConfirmEmail({
     </Layout>,
   )
 }
+
+/** A waitlist email's plain text: a blank line starts a paragraph, a single newline breaks a line. */
+const paragraphs = (body: string) =>
+  body
+    .split(/\r?\n[ \t]*\r?\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+
+/**
+ * "Email this waitlist" (spec §10, §13): the Owner's message to one product's waitlist, with the
+ * reason it was sent and an unsubscribe link. `test` marks the Owner's preview of the version
+ * people who signed up in `signedUpIn` get; its link goes to the privacy policy, not to a lead.
+ */
+export function waitlistEmail({
+  locale,
+  subject,
+  body,
+  productName,
+  unsubscribeUrl,
+  test,
+}: {
+  locale: Locale
+  subject: string
+  body: string
+  productName: string
+  unsubscribeUrl: string
+  test?: { signedUpIn: Locale }
+}): Promise<RenderedEmail> {
+  const t = translator(locale)
+  const parts = paragraphs(body)
+  return renderEmail(
+    test ? `[Test] ${subject}` : subject,
+    <Layout
+      locale={locale}
+      preview={parts[0]?.replace(/\s+/g, ' ') ?? subject}
+      footer={
+        <>
+          <Text style={smallText(locale)}>{t('waitlist.why', { product: productName })}</Text>
+          <Link href={unsubscribeUrl} style={{ ...smallText(locale), textDecoration: 'underline' }}>
+            {t('waitlist.unsubscribe')}
+          </Link>
+        </>
+      }
+    >
+      {test && (
+        <Text style={{ ...smallText(locale), margin: '0 0 24px' }}>
+          {t('waitlist.testNote', { audience: test.signedUpIn })}
+        </Text>
+      )}
+      <Text style={bodyText(locale)}>{t('greeting')}</Text>
+      {parts.map((part, i) => (
+        <Text key={i} style={bodyText(locale)}>
+          {part.split(/\r?\n/).flatMap((line, j) => (j ? [<br key={j} />, line] : [line]))}
+        </Text>
+      ))}
+      <Text style={bodyText(locale)}>{t('signoff')}</Text>
+    </Layout>,
+  )
+}

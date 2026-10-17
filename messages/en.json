@@ -982,6 +982,11 @@
       "when": "Activated",
       "button": "Manage your devices",
       "notYou": "If this wasn't you, deactivate the device from your account and reply to this email."
+    },
+    "waitlist": {
+      "why": "You're getting this because you joined the {product} waitlist.",
+      "unsubscribe": "Unsubscribe",
+      "testNote": "Test email: {audience, select, hi {people who joined the waitlist in Hindi} other {people who joined the waitlist in English}} get this version. In this test, the unsubscribe link goes to our privacy policy."
     }
   }
 }
