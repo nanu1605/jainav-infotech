@@ -497,12 +497,14 @@ export function newsletterConfirmEmail({
 
 /**
  * A refund of the order's payment (spec §11.6), sent with its credit note attached. `amount` is
- * in paise; `full` says the whole order is refunded, which revokes its license.
+ * in paise, `refunded` all of the order refunded so far (this refund included); `full` says the
+ * whole order is refunded, which revokes its license.
  */
 export function refundEmail({
   locale,
   orderNumber,
   amount,
+  refunded,
   creditNoteNumber,
   full,
   productName,
@@ -511,14 +513,22 @@ export function refundEmail({
   locale: Locale
   orderNumber: string
   amount: number
+  refunded: number
   creditNoteNumber: string
   full: boolean
   productName: string
   accountUrl: string
 }): Promise<RenderedEmail> {
   const t = translator(locale)
-  const values = { orderNumber, amount: formatINR(locale, amount) }
-  const body = t(full ? 'refund.full' : 'refund.partial', values)
+  const values = {
+    orderNumber,
+    amount: formatINR(locale, amount),
+    total: formatINR(locale, refunded),
+  }
+  const body = t(
+    !full ? 'refund.partial' : amount < refunded ? 'refund.fullRest' : 'refund.full',
+    values,
+  )
   return renderEmail(
     t('refund.subject', { orderNumber }),
     <Layout

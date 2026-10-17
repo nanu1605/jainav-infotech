@@ -512,7 +512,9 @@ describe('refunds (spec §11.6)', () => {
     expect(license).toMatchObject({ status: 'revoked', statusNotifiedAs: 'revoked' })
     const full = mailsTo(order, /^Refund for order/)
     expect(full).toHaveLength(1)
-    expect(full[0]!.text).toContain('in full')
+    // The last part, and the whole order refunded so far.
+    expect(full[0]!.text).toContain('the remaining ₹599 of your order')
+    expect(full[0]!.text).toContain('refunded in full (₹999)')
     expect(full[0]!.text).toContain('revoked')
     // The refund email said it: no separate revoked email, now or from the sweep.
     await sendPendingStatusEmails()

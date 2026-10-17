@@ -69,6 +69,7 @@ describe('refund and license status emails (spec §11.7)', () => {
         locale,
         orderNumber: 'JO-ABCD2345',
         amount: 40_000,
+        refunded: 40_000,
         creditNoteNumber: 'JC/26-27/00001',
         full: true,
         productName: 'VYRO',
@@ -104,4 +105,29 @@ describe('refund and license status emails (spec §11.7)', () => {
     expect(emails[1]!.text).toContain('₹999')
     expect(emails[2]!.subject).toContain('VYRO')
   })
+
+  it.each([
+    ['en', 'in full: ₹999.', 'remaining ₹599 of your order JO-ABCD2345', 'in full (₹999)'],
+    ['hi', 'पूरा रिफ़ंड कर दिया है: ₹999।', 'के बाक़ी ₹599 भी रिफ़ंड', '(कुल ₹999)'],
+  ] as const)(
+    'tells a full refund at once or its last part in %s',
+    async (locale, once, rest, total) => {
+      const email = (amount: number) =>
+        refundEmail({
+          locale,
+          orderNumber: 'JO-ABCD2345',
+          amount,
+          refunded: 99_900,
+          creditNoteNumber: 'JC/26-27/00002',
+          full: true,
+          productName: 'VYRO',
+          accountUrl: 'https://example.test/account/orders',
+        })
+      expect((await email(99_900)).text).toContain(once)
+      const last = (await email(59_900)).text
+      expect(last).toContain(rest)
+      expect(last).toContain(total)
+      expect(last).not.toContain(once)
+    },
+  )
 })
