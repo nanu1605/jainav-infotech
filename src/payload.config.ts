@@ -206,6 +206,19 @@ export default buildConfig({
     WaitlistDeliveries,
   ],
   globals: [SiteSettings, CommerceSettings, Navigation],
+  // Monthly reports (spec §10). Imported on use: server-only modules can't load in the Payload CLI.
+  endpoints: [
+    {
+      path: '/reports/ca',
+      method: 'get',
+      handler: async (req) => (await import('./lib/reports')).caReportEndpoint(req),
+    },
+    {
+      path: '/reports/leads',
+      method: 'get',
+      handler: async (req) => (await import('./lib/reports')).leadsReportEndpoint(req),
+    },
+  ],
   jobs,
   // Spec §6: field-level localization, English default, fallback on.
   localization: {
