@@ -607,6 +607,34 @@ describe('refunds (spec §11.6)', () => {
       status: 409,
     })
   })
+
+  it('leaves the order and license alone when the duplicate payment is disputed', async () => {
+    const { order } = await buy('twicedisputed')
+    const second = await gw('pay', { order_id: order.razorpayOrderId, outcome: 'success' })
+    await settled()
+    const duplicate = second.response.razorpay_payment_id as string
+    sent.length = 0
+    telegrams.length = 0
+
+    const opened = await gw('dispute', { payment_id: duplicate })
+    await settled()
+    const fresh = await orderById(order.id)
+    expect(fresh.status).toBe('paid')
+    expect(fresh.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'payment.dispute.created',
+          paymentId: duplicate,
+          disputeId: opened.dispute.id,
+        }),
+      ]),
+    )
+    expect((await licenseOf(order.id)).status).toBe('active')
+    expect(sent).toHaveLength(0)
+    expect(telegrams).toEqual([
+      `Dispute ${opened.dispute.id} is on a duplicate payment ${duplicate} of order ${order.orderNumber}: refund that payment; the order and license are unchanged.\n${SITE_URL}/admin/collections/orders/${order.id}`,
+    ])
+  })
 })
 
 describe('disputes (spec §11.6)', () => {
@@ -640,6 +668,26 @@ describe('disputes (spec §11.6)', () => {
     expect((await licenseOf(order.id)).status).toBe('suspended')
     expect(telegrams[1]).toContain(`on order ${order.orderNumber}: won. Nothing changes by itself`)
     expect(sent).toHaveLength(1)
+  })
+
+  it('says nothing was changed when a dispute comes after a full refund', async () => {
+    const { order, paymentId } = await buy('disputerefunded')
+    await gw('refund', { payment_id: paymentId, amount: 99_900, outcome: 'processed' })
+    await settled()
+    sent.length = 0
+    telegrams.length = 0
+
+    const opened = await gw('dispute', { payment_id: paymentId })
+    await settled()
+    expect((await orderById(order.id)).status).toBe('refunded')
+    expect((await licenseOf(order.id)).status).toBe('revoked')
+    expect(sent).toHaveLength(0)
+    expect(telegrams).toHaveLength(1)
+    expect(telegrams[0]).toMatch(
+      new RegExp(
+        `^Payment dispute ${opened.dispute.id} on order ${order.orderNumber} .*\\. The order is already refunded; nothing was changed\\.\\n`,
+      ),
+    )
   })
 })
 
