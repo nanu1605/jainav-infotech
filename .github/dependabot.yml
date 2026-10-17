@@ -26,8 +26,16 @@ updates:
     directories: [/docker, /docker/backup]
     schedule: { interval: weekly, day: monday }
     cooldown: { default-days: 14 }
+    # Postgres stays on 17 (docs/decisions.md): a new major can't open the old data directory.
+    ignore:
+      - dependency-name: postgres
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: docker-compose
     directory: /docker
     schedule: { interval: weekly, day: monday }
     cooldown: { default-days: 14 }
+    # Postgres stays on 17 (docs/decisions.md): a new major can't open the old data directory.
+    ignore:
+      - dependency-name: postgres
+        update-types: ['version-update:semver-major']
