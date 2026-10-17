@@ -19,6 +19,9 @@ export const dynamic = 'force-dynamic'
 
 type Props = { params: Promise<{ locale: string }> }
 
+const pdfLink =
+  'inline-flex items-center gap-1.5 font-medium text-fg underline-offset-4 hover:underline'
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const locale = (await params).locale as Locale
   const t = await getTranslations({ locale, namespace: 'account.nav' })
@@ -59,6 +62,10 @@ export default async function OrdersPage({ params }: Props) {
           <tbody>
             {orders.map((order) => {
               const invoice = typeof order.invoice === 'object' ? order.invoice : null
+              // Phase 9: refunds issue credit notes against the invoice (spec §11.6).
+              const creditNotes = (order.creditNotes ?? []).flatMap((note) =>
+                typeof note === 'object' ? [note] : [],
+              )
               return (
                 <tr key={order.id}>
                   <th scope="row" className="font-mono whitespace-nowrap">
@@ -73,20 +80,34 @@ export default async function OrdersPage({ params }: Props) {
                   </td>
                   <td>
                     <OrderStatus status={order.status} />
+                    {order.status === 'partially-refunded' && order.amountRefunded > 0 && (
+                      <p className="mt-1 text-sm whitespace-nowrap">
+                        {t('orders.refunded', { amount: formatINR(locale, order.amountRefunded) })}
+                      </p>
+                    )}
                   </td>
                   <td className="whitespace-nowrap">
-                    {invoice ? (
-                      // A plain link: the browser downloads or opens the PDF itself.
-                      <a
-                        href={`/api/v1/account/invoices/${invoice.id}`}
-                        className="inline-flex items-center gap-1.5 font-medium text-fg underline-offset-4 hover:underline"
-                      >
-                        <FileDown aria-hidden className="size-4" />
-                        {t('orders.invoiceLink', { number: invoice.number })}
-                      </a>
-                    ) : (
-                      t('orders.noInvoice')
-                    )}
+                    <div className="flex flex-col items-start gap-1.5">
+                      {invoice ? (
+                        // Plain links: the browser downloads or opens the PDF itself.
+                        <a href={`/api/v1/account/invoices/${invoice.id}`} className={pdfLink}>
+                          <FileDown aria-hidden className="size-4" />
+                          {t('orders.invoiceLink', { number: invoice.number })}
+                        </a>
+                      ) : (
+                        t('orders.noInvoice')
+                      )}
+                      {creditNotes.map((note) => (
+                        <a
+                          key={note.id}
+                          href={`/api/v1/account/invoices/${note.id}`}
+                          className={pdfLink}
+                        >
+                          <FileDown aria-hidden className="size-4" />
+                          {t('orders.creditNoteLink', { number: note.number })}
+                        </a>
+                      ))}
+                    </div>
                   </td>
                 </tr>
               )

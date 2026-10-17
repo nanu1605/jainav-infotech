@@ -52,10 +52,21 @@ export const Invoices: CollectionConfig = {
     listSearchableFields: ['number'],
     description:
       'Amounts are in paise. Issued invoices are read-only: correct them with a credit note.',
+    components: {
+      edit: { beforeDocumentControls: ['@/components/admin/InvoiceActions#InvoiceActions'] },
+    },
   },
   defaultSort: '-issuedAt',
   access: { read: storeStaff, create: nobody, update: nobody, delete: nobody },
   hooks: { beforeChange: [immutable] },
+  endpoints: [
+    {
+      path: '/:id/render-pdf',
+      method: 'post',
+      // Imported on use: server-only code can't load in the Payload CLI, which reads this config.
+      handler: async (req) => (await import('@/lib/invoices/deliver')).renderPdfEndpoint(req),
+    },
+  ],
   fields: [
     {
       type: 'row',

@@ -12,17 +12,21 @@ import { z } from 'zod'
 
 import { deleteExpired } from '@/lib/account/session'
 import { getClient } from '@/lib/cms'
+import { sendTelegram } from '@/lib/notify'
 import { sha256 } from '@/lib/rateLimit'
 
 import { addOrderEvent, checkPayment, fulfilOrder, runQueuedJobs } from './fulfil'
 import {
+  disputeSchema,
   fetchPayment,
   paymentSchema,
   RazorpayError,
   razorpayConfig,
+  refundSchema,
   webhookSignatureValid,
 } from './razorpay'
 import { errorCode, readText } from './http'
+import { disputeWebhook, refundWebhook } from './refunds'
 
 const MAX_BODY = 256 * 1024
 /** Webhook payloads hold the payer's email and phone: kept 90 days (spec §16 logs). */
@@ -35,23 +39,19 @@ const envelope = z.object({
   event: z.string().max(100),
   payload: z.object({
     payment: entity(paymentSchema.passthrough()),
-    refund: entity(
-      z
-        .object({ id: z.string(), payment_id: z.string(), amount: z.number(), status: z.string() })
-        .passthrough(),
-    ),
-    dispute: entity(
-      z
-        .object({
-          id: z.string(),
-          payment_id: z.string(),
-          amount: z.number(),
-          reason_code: z.string().nullish(),
-        })
-        .passthrough(),
-    ),
+    refund: entity(refundSchema),
+    dispute: entity(disputeSchema),
   }),
 })
+
+const DISPUTE_EVENTS = [
+  'payment.dispute.created',
+  'payment.dispute.won',
+  'payment.dispute.lost',
+  'payment.dispute.closed',
+  'payment.dispute.under_review',
+  'payment.dispute.action_required',
+]
 
 const text = (status: number, body: string) =>
   new Response(body, { status, headers: { 'Cache-Control': 'no-store' } })
@@ -125,14 +125,14 @@ export async function receiveWebhook(req: Request): Promise<Response> {
 
 const orderBy = async (
   payload: Payload,
-  field: 'razorpayOrderId' | 'razorpayPaymentId',
+  field: 'id' | 'razorpayOrderId' | 'razorpayPaymentId',
   value: string | null | undefined,
 ) =>
-  value
+  value && (field !== 'id' || /^\d{1,10}$/.test(value))
     ? ((
         await payload.find({
           collection: 'orders',
-          where: { [field]: { equals: value } },
+          where: { [field]: { equals: field === 'id' ? Number(value) : value } },
           limit: 1,
           depth: 0,
           overrideAccess: true,
@@ -142,8 +142,8 @@ const orderBy = async (
 
 /**
  * The processWebhook job. Payment events re-fetch the payment and pass the same checks as
- * verify before fulfilling (spec §11.3 step 6). Failures, refunds and disputes are recorded on
- * the order; their effects (credit notes, license changes, alerts) come in Phase 9.
+ * verify before fulfilling (spec §11.3 step 6). Failed payments are recorded on the order;
+ * refunds and disputes have their effects in src/lib/commerce/refunds.ts (spec §11.6).
  */
 export async function processWebhookEvent(id: number) {
   const payload = await getClient()
@@ -197,33 +197,38 @@ export async function processWebhookEvent(id: number) {
       case 'refund.processed':
       case 'refund.failed': {
         const refund = entities.refund?.entity
+        if (!refund) break
+        // A duplicate payment isn't the order's razorpayPaymentId, but it is on its Razorpay order;
+        // our own refunds also name the order in their notes.
         const order =
-          (await orderBy(payload, 'razorpayPaymentId', refund?.payment_id)) ??
-          (await orderBy(payload, 'razorpayOrderId', payment?.order_id))
-        if (!order || !refund) break
-        await addOrderEvent(payload, order.id, {
-          type: event,
-          source: 'webhook',
-          paymentId: refund.payment_id,
-          detail: `${refund.id}: ${refund.amount} paise, ${refund.status}`,
-        })
+          (await orderBy(payload, 'razorpayPaymentId', refund.payment_id)) ??
+          (await orderBy(payload, 'razorpayOrderId', payment?.order_id)) ??
+          (await orderBy(payload, 'id', String(refund.notes.orderId ?? '')))
+        if (!order) {
+          if (event === 'refund.processed') {
+            await sendTelegram(`Refund ${refund.id} matches no order: check it in Razorpay.`).catch(
+              (error: unknown) =>
+                console.error(
+                  'webhooks: alert failed:',
+                  error instanceof Error ? error.message : error,
+                ),
+            )
+          }
+          break
+        }
+        await refundWebhook(payload, event, order, refund)
         status = 'processed'
         break
       }
-      case 'payment.dispute.created': {
+      default: {
+        if (!DISPUTE_EVENTS.includes(event)) break
         const dispute = entities.dispute?.entity
         const order =
           (await orderBy(payload, 'razorpayPaymentId', dispute?.payment_id)) ??
           (await orderBy(payload, 'razorpayOrderId', payment?.order_id))
         if (!order || !dispute) break
-        await addOrderEvent(payload, order.id, {
-          type: event,
-          source: 'webhook',
-          paymentId: dispute.payment_id,
-          detail: `${dispute.id}: ${dispute.amount} paise${dispute.reason_code ? `, ${dispute.reason_code}` : ''}`,
-        })
+        await disputeWebhook(payload, event, order, dispute)
         status = 'processed'
-        break
       }
     }
   } catch (error) {

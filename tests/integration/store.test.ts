@@ -777,7 +777,7 @@ describe('checkout (spec §11.3)', () => {
     ).toEqual(expect.arrayContaining(['created', 'expired', 'paid:reconcile']))
   })
 
-  it('records failed payments, refunds and disputes on the order (effects in Phase 9)', async () => {
+  it('records failed payments, and acts on refunds and disputes (refunds.test.ts)', async () => {
     const { body } = await createOrder(cookie)
     await gw('pay', { order_id: body.razorpay.order_id, outcome: 'failure' })
     await settled()
@@ -816,12 +816,13 @@ describe('checkout (spec §11.3)', () => {
       expect.arrayContaining([
         'payment-failed',
         'paid',
-        'refund.processed',
+        'refund-processed',
         'payment.dispute.created',
       ]),
     )
-    // Recorded only: the order stays paid until Phase 9 acts on them.
-    expect(order.status).toBe('paid')
+    // Phase 9: the full refund refunded the order (a dispute after it changes nothing more).
+    expect(order).toMatchObject({ status: 'refunded', amountRefunded: 99_900 })
+    expect(order.creditNotes).toHaveLength(1)
   })
 
   it('numbers concurrent invoices consecutively, without gaps or repeats', async () => {

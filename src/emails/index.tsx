@@ -492,3 +492,124 @@ export function newsletterConfirmEmail({
     </Layout>,
   )
 }
+
+// Phase 9 (spec §11.7): refunds and license status.
+
+/**
+ * A refund of the order's payment (spec §11.6), sent with its credit note attached. `amount` is
+ * in paise; `full` says the whole order is refunded, which revokes its license.
+ */
+export function refundEmail({
+  locale,
+  orderNumber,
+  amount,
+  creditNoteNumber,
+  full,
+  productName,
+  accountUrl,
+}: {
+  locale: Locale
+  orderNumber: string
+  amount: number
+  creditNoteNumber: string
+  full: boolean
+  productName: string
+  accountUrl: string
+}): Promise<RenderedEmail> {
+  const t = translator(locale)
+  const values = { orderNumber, amount: formatINR(locale, amount) }
+  const body = t(full ? 'refund.full' : 'refund.partial', values)
+  return renderEmail(
+    t('refund.subject', { orderNumber }),
+    <Layout
+      locale={locale}
+      preview={body}
+      footer={<Text style={smallText(locale)}>{t('refund.support')}</Text>}
+    >
+      <Text style={bodyText(locale)}>{t('greeting')}</Text>
+      <Text style={bodyText(locale)}>{body}</Text>
+      <Fields
+        locale={locale}
+        rows={[
+          [t('order.number'), orderNumber],
+          [t('refund.amount'), formatINR(locale, amount)],
+          [t('refund.creditNote'), creditNoteNumber],
+        ]}
+      />
+      <Text style={{ ...bodyText(locale), marginTop: '24px' }}>{t('refund.timing')}</Text>
+      {full && (
+        <Text style={bodyText(locale)}>{t('refund.licenseRevoked', { product: productName })}</Text>
+      )}
+      <Text style={bodyText(locale)}>{t('refund.attached', { creditNoteNumber })}</Text>
+      <Button href={accountUrl} style={button}>
+        {t('order.button')}
+      </Button>
+      <Text style={bodyText(locale)}>{t('signoff')}</Text>
+    </Layout>,
+  )
+}
+
+/** A second payment for an already paid order was refunded (spec §11.3 step 9). */
+export function duplicateRefundEmail({
+  locale,
+  orderNumber,
+  amount,
+  accountUrl,
+}: {
+  locale: Locale
+  orderNumber: string
+  amount: number
+  accountUrl: string
+}): Promise<RenderedEmail> {
+  const t = translator(locale)
+  const body = t('duplicateRefund.body', { orderNumber, amount: formatINR(locale, amount) })
+  return renderEmail(
+    t('duplicateRefund.subject', { orderNumber }),
+    <Layout
+      locale={locale}
+      preview={body}
+      footer={<Text style={smallText(locale)}>{t('refund.support')}</Text>}
+    >
+      <Text style={bodyText(locale)}>{t('greeting')}</Text>
+      <Text style={bodyText(locale)}>{body}</Text>
+      <Text style={bodyText(locale)}>{t('refund.timing')}</Text>
+      <Button href={accountUrl} style={button}>
+        {t('order.button')}
+      </Button>
+      <Text style={bodyText(locale)}>{t('signoff')}</Text>
+    </Layout>,
+  )
+}
+
+/** A license was suspended (a dispute or a support review) or revoked (spec §11.7). */
+export function licenseStatusEmail({
+  locale,
+  status,
+  productName,
+  licensesUrl,
+}: {
+  locale: Locale
+  status: 'suspended' | 'revoked'
+  productName: string
+  licensesUrl: string
+}): Promise<RenderedEmail> {
+  const t = translator(locale)
+  const values = { product: productName }
+  const body = t(`licenseStatus.${status}.body`, values)
+  return renderEmail(
+    t(`licenseStatus.${status}.subject`, values),
+    <Layout
+      locale={locale}
+      preview={body}
+      footer={<Text style={smallText(locale)}>{t('licenseStatus.support')}</Text>}
+    >
+      <Text style={bodyText(locale)}>{t('greeting')}</Text>
+      <Text style={bodyText(locale)}>{body}</Text>
+      <Text style={bodyText(locale)}>{t(`licenseStatus.${status}.next`, values)}</Text>
+      <Button href={licensesUrl} style={button}>
+        {t('license.button')}
+      </Button>
+      <Text style={bodyText(locale)}>{t('signoff')}</Text>
+    </Layout>,
+  )
+}

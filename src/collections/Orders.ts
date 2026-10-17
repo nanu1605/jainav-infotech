@@ -31,8 +31,8 @@ export const TAX_MODES = [
 
 /**
  * Store orders (spec §9.1, §11.3). Written only by the checkout, webhook and job code through the
- * Local API (and raw SQL inside the fulfilment transaction); Owner + Support read them. Refunds and
- * other admin actions arrive as role-checked endpoints in Phase 9.
+ * Local API (and raw SQL inside the fulfilment transaction); Owner + Support read them. The
+ * Owner's refund is a role-checked endpoint (spec §9.3) with its form above the document.
  */
 export const Orders: CollectionConfig = {
   slug: 'orders',
@@ -42,9 +42,20 @@ export const Orders: CollectionConfig = {
     defaultColumns: ['orderNumber', 'customer', 'status', 'total', 'paidAt', 'createdAt'],
     listSearchableFields: ['orderNumber', 'razorpayOrderId', 'razorpayPaymentId'],
     description: 'Amounts are in paise: 99900 = ₹999.',
+    components: {
+      edit: { beforeDocumentControls: ['@/components/admin/OrderActions#OrderActions'] },
+    },
   },
   defaultSort: '-createdAt',
   access: { read: storeStaff, create: nobody, update: nobody, delete: nobody },
+  endpoints: [
+    {
+      path: '/:id/refund',
+      method: 'post',
+      // Imported on use: server-only code can't load in the Payload CLI, which reads this config.
+      handler: async (req) => (await import('@/lib/commerce/refunds')).refundEndpoint(req),
+    },
+  ],
   fields: [
     {
       type: 'row',

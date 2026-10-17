@@ -12,8 +12,11 @@ import { SITE_URL } from '@/lib/seo'
  * webhooks like Razorpay does. Every route 404s once real keys are set, and in production.
  *
  * Test-only endpoints: POST /pay {order_id, outcome: success|authorized|failure, webhooks?}
- * (what the stand-in checkout calls), POST /capture {payment_id} (a late capture) and
- * POST /replay {event_id} (redelivers a webhook with the same event id).
+ * (what the stand-in checkout calls), POST /capture {payment_id} (a late capture),
+ * POST /replay {event_id} (redelivers a webhook with the same event id), POST /refund
+ * {payment_id, amount, outcome: processed|failed, webhooks?} (a refund made in Razorpay's
+ * dashboard) and POST /dispute {payment_id, event?: created|won|lost|closed|under_review|
+ * action_required, dispute_id?, amount?, reason_code?, webhooks?} (a chargeback and its outcome).
  */
 
 type DevOrder = {
@@ -39,6 +42,32 @@ type DevPayment = {
   captured: boolean
   method: 'upi'
   error_code: string | null
+  amount_refunded: number
+  refund_status: 'partial' | 'full' | null
+  created_at: number
+}
+type DevRefund = {
+  id: string
+  entity: 'refund'
+  amount: number
+  currency: string
+  payment_id: string
+  notes: Record<string, string> | []
+  receipt: string | null
+  status: 'processed' | 'failed'
+  created_at: number
+}
+type DevDispute = {
+  id: string
+  entity: 'dispute'
+  payment_id: string
+  amount: number
+  currency: string
+  amount_deducted: number
+  reason_code: string
+  respond_by: number
+  status: string
+  phase: 'chargeback'
   created_at: number
 }
 type DevEvent = { id: string; body: string }
@@ -52,7 +81,10 @@ const state = ((globalThis as { __devGateway?: object }).__devGateway ??= {
   orders: Map<string, DevOrder>
   payments: Map<string, DevPayment>
   events: Map<string, DevEvent>
+  disputes?: Map<string, DevDispute>
 }
+// Added in Phase 9: a dev server running since before has no map yet.
+const disputes = (state.disputes ??= new Map<string, DevDispute>())
 
 const id = (prefix: string) =>
   `${prefix}_dev${randomBytes(10).toString('base64url').replace(/[-_]/g, 'x')}`
@@ -88,10 +120,11 @@ async function deliver(eventId: string) {
   }
 }
 
-function emit(event: string, payment: DevPayment, withOrder = false): string {
-  const order = state.orders.get(payment.order_id)
-  const entityPayload: Record<string, { entity: unknown }> = { payment: { entity: payment } }
-  if (withOrder && order) entityPayload.order = { entity: order }
+/** Stores an event with these entities (payment, order, refund, dispute) as they are now. */
+function emit(event: string, entities: Record<string, object | undefined>): string {
+  const entityPayload = Object.fromEntries(
+    Object.entries(entities).flatMap(([name, entity]) => (entity ? [[name, { entity }]] : [])),
+  )
   const eventId = id('evt')
   state.events.set(eventId, {
     id: eventId,
@@ -116,7 +149,55 @@ function capture(payment: DevPayment): string[] {
     order.amount_paid = order.amount
     order.amount_due = 0
   }
-  return [emit('payment.captured', payment), emit('order.paid', payment, true)]
+  return [emit('payment.captured', { payment }), emit('order.paid', { payment, order })]
+}
+
+/** Delivers events after the response, like Razorpay (unless a test turns webhooks off). */
+function later(events: string[], webhooks: unknown) {
+  if (webhooks !== false)
+    after(async () => {
+      for (const eventId of events) await deliver(eventId)
+    })
+}
+
+/** A processed or failed refund on a captured payment, and its webhooks. */
+function refundPayment(
+  payment: DevPayment,
+  amount: number,
+  outcome: 'processed' | 'failed',
+  notes = {},
+) {
+  const entity: DevRefund = {
+    id: id('rfnd'),
+    entity: 'refund',
+    amount,
+    currency: payment.currency,
+    payment_id: payment.id,
+    notes: Object.keys(notes).length ? notes : [],
+    receipt: null,
+    status: outcome,
+    created_at: now(),
+  }
+  const created = emit('refund.created', { refund: entity, payment })
+  if (outcome === 'processed') {
+    payment.amount_refunded += amount
+    payment.refund_status = payment.amount_refunded >= payment.amount ? 'full' : 'partial'
+  }
+  return {
+    refund: entity,
+    events: [created, emit(`refund.${outcome}`, { refund: entity, payment })],
+  }
+}
+
+/** Razorpay's checks before a refund: captured, at least ₹1, not more than is left. */
+function refundable(payment: DevPayment | undefined, amount: number) {
+  if (!payment || payment.status !== 'captured') return 'The payment is not captured'
+  if (!Number.isInteger(amount) || amount < 100) return 'The amount must be atleast INR 1.00'
+  if (payment.amount_refunded >= payment.amount)
+    return 'The payment has been fully refunded already'
+  if (amount > payment.amount - payment.amount_refunded)
+    return 'The refund amount provided is greater than amount captured'
+  return null
 }
 
 const CHECKOUT_JS = `(() => {
@@ -233,17 +314,16 @@ export async function POST(req: Request, { params }: Ctx) {
       captured: false,
       method: 'upi',
       error_code: outcome === 'failure' ? 'BAD_REQUEST_ERROR' : null,
+      amount_refunded: 0,
+      refund_status: null,
       created_at: now(),
     }
     state.payments.set(payment.id, payment)
     const events =
       outcome === 'success'
         ? capture(payment)
-        : [emit(outcome === 'failure' ? 'payment.failed' : 'payment.authorized', payment)]
-    if (data.webhooks !== false)
-      after(async () => {
-        for (const eventId of events) await deliver(eventId)
-      })
+        : [emit(outcome === 'failure' ? 'payment.failed' : 'payment.authorized', { payment })]
+    later(events, data.webhooks)
     if (outcome === 'failure') {
       return json(200, {
         error: {
@@ -269,11 +349,62 @@ export async function POST(req: Request, { params }: Ctx) {
     const payment = state.payments.get(String(data.payment_id))
     if (!payment || payment.status !== 'authorized') return apiError(400, 'Not capturable')
     const events = capture(payment)
-    if (data.webhooks !== false)
-      after(async () => {
-        for (const eventId of events) await deliver(eventId)
-      })
+    later(events, data.webhooks)
     return json(200, { payment, events })
+  }
+
+  // The Refunds API: what the Owner's refund calls. Processed at once, webhooks after.
+  const refundPath = path.match(/^payments\/([^/]+)\/refund$/)
+  if (refundPath) {
+    if (!authorized(req)) return apiError(401, 'Authentication failed')
+    const payment = state.payments.get(refundPath[1]!)
+    const amount =
+      data.amount === undefined && payment
+        ? payment.amount - payment.amount_refunded
+        : Number(data.amount)
+    const refused = refundable(payment, amount)
+    if (refused) return apiError(400, refused)
+    const done = refundPayment(payment!, amount, 'processed', (data.notes as object) ?? {})
+    later(done.events, true)
+    return json(200, { ...done.refund, events: done.events })
+  }
+
+  // A refund made in Razorpay's dashboard: no API call from the store, only webhooks.
+  if (path === 'refund') {
+    const payment = state.payments.get(String(data.payment_id))
+    const amount = Number(data.amount)
+    const refused = refundable(payment, amount)
+    if (refused) return apiError(400, refused)
+    const done = refundPayment(payment!, amount, data.outcome === 'failed' ? 'failed' : 'processed')
+    later(done.events, data.webhooks)
+    return json(200, done)
+  }
+
+  if (path === 'dispute') {
+    const payment = state.payments.get(String(data.payment_id))
+    if (!payment || payment.status !== 'captured') return apiError(400, 'Not disputable')
+    const event = String(data.event ?? 'created')
+    if (!['created', 'won', 'lost', 'closed', 'under_review', 'action_required'].includes(event))
+      return apiError(400, 'Unknown dispute event')
+    const dispute = disputes.get(String(data.dispute_id)) ?? {
+      id: id('disp'),
+      entity: 'dispute' as const,
+      payment_id: payment.id,
+      amount: Number(data.amount ?? payment.amount),
+      currency: payment.currency,
+      amount_deducted: 0,
+      reason_code: String(data.reason_code ?? 'goods_or_services_not_received'),
+      respond_by: now() + 7 * 86_400,
+      status: 'open',
+      phase: 'chargeback' as const,
+      created_at: now(),
+    }
+    disputes.set(dispute.id, dispute)
+    if (event !== 'created') dispute.status = event
+    if (event === 'lost') dispute.amount_deducted = dispute.amount
+    const events = [emit(`payment.dispute.${event}`, { payment, dispute })]
+    later(events, data.webhooks)
+    return json(200, { dispute, events })
   }
 
   if (path === 'replay') {
