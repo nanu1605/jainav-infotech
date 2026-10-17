@@ -791,4 +791,53 @@ describe('credit notes with GST (spec §11.4)', () => {
       totals: { taxable: 25_424, cgst: 0, sgst: 0, igst: 4_576, total: 30_000 },
     })
   })
+
+  it('splits the last note’s CGST and SGST again after several small refunds', async () => {
+    const { order, paymentId } = await buy('gstsmall')
+    const invoice = await invoiceOf(order)
+    for (let i = 0; i < 4; i++) {
+      await gw('refund', { payment_id: paymentId, amount: 100, outcome: 'processed' })
+      await settled()
+    }
+    await refund(order.id, { reason: 'The rest' })
+    await settled()
+    const notes = await creditNotes(order.id)
+    expect(notes).toHaveLength(5)
+    expect(notes[0]!.totals).toMatchObject({ taxable: 85, cgst: 8, sgst: 7, total: 100 })
+    // Left as the sums would leave it: CGST 7,588, SGST 7,591.
+    expect(notes[4]!.totals).toMatchObject({ cgst: 7_590, sgst: 7_589, total: 99_500 })
+    for (const { totals } of notes) {
+      expect(totals.cgst).toBe(Math.ceil((totals.cgst + totals.sgst) / 2))
+    }
+    const total = sums(notes)
+    expect(total).toMatchObject({
+      subtotal: invoice.totals.subtotal,
+      discount: invoice.totals.discount,
+      taxable: invoice.totals.taxable,
+      total: invoice.totals.total,
+    })
+    expect(total.cgst! + total.sgst!).toBe(invoice.totals.cgst + invoice.totals.sgst)
+  })
+
+  it('credits prices before GST from the taxable value, never below zero', async () => {
+    await setCommerce({ pricesIncludeGst: false })
+    const { order } = await buy('gstplus')
+    const invoice = await invoiceOf(order)
+    expect(invoice.totals).toMatchObject({ subtotal: 99_900, taxable: 99_900, total: 117_882 })
+    // More than the subtotal before tax: the rest's subtotal would go negative.
+    await refund(order.id, { amount: 100_000, reason: 'Most of it back' })
+    await settled()
+    await refund(order.id, { reason: 'The rest' })
+    await settled()
+    const notes = await creditNotes(order.id)
+    expect(notes).toHaveLength(2)
+    expect(notes[0]!.totals).toMatchObject({ subtotal: 84_746, taxable: 84_746, total: 100_000 })
+    for (const note of notes) {
+      for (const value of Object.values(note.totals)) expect(value).toBeGreaterThanOrEqual(0)
+      const line = note.lines[0]!
+      expect(line.unitPrice - line.discount).toBe(note.totals.taxable)
+    }
+    expect(sums(notes)).toEqual(invoice.totals)
+    await setCommerce({ pricesIncludeGst: true })
+  })
 })

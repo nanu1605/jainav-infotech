@@ -248,11 +248,20 @@ export async function refundWebhook(
 type Totals = Invoice['totals']
 const TOTALS = ['subtotal', 'discount', 'taxable', 'cgst', 'sgst', 'igst', 'total'] as const
 
-/** What the invoice still holds after earlier credit notes, field by field: they add up exactly. */
-const remainder = (invoice: Invoice, earlier: Invoice[]): Totals =>
-  Object.fromEntries(
+/**
+ * What the invoice still holds after earlier credit notes, field by field: they add up exactly.
+ * At home its tax is split again (CGST = half rounded up, spec §11.4), as each partial note's was:
+ * per head the notes can then differ from the invoice by a paisa or two, the tax never does.
+ */
+function remainder(invoice: Invoice, earlier: Invoice[]): Totals {
+  const rest = Object.fromEntries(
     TOTALS.map((f) => [f, invoice.totals[f] - earlier.reduce((n, note) => n + note.totals[f], 0)]),
   ) as Totals
+  if (invoice.taxMode !== 'cgst_sgst') return rest
+  const tax = rest.cgst + rest.sgst
+  const cgst = Math.ceil(tax / 2)
+  return { ...rest, cgst, sgst: tax - cgst }
+}
 
 /**
  * A partial refund's tax, from the original invoice as issued (its mode and rate), never from
@@ -266,7 +275,10 @@ function partial(invoice: Invoice, amount: number): Totals {
     homeStateCode: invoice.taxMode === 'cgst_sgst' ? invoice.buyer.stateCode : '',
   })
   const { taxable, cgst, sgst, igst, total } = tax
-  return { subtotal: amount, discount: 0, taxable, cgst, sgst, igst, total }
+  // Prices before GST: the invoice's subtotal is net of tax, so the refund's is its taxable value.
+  const t = invoice.totals
+  const exclusive = t.cgst + t.sgst + t.igst > 0 && t.subtotal - t.discount === t.taxable
+  return { subtotal: exclusive ? taxable : amount, discount: 0, taxable, cgst, sgst, igst, total }
 }
 
 /** The credit note: the original's seller and buyer snapshots, one refund line (spec §11.4). */
