@@ -21,6 +21,13 @@ describe('csv', () => {
     expect(csvCell('a=b')).toBe('a=b')
   })
 
+  it('keeps plain negative numbers as numbers', () => {
+    expect(csvCell('-999.00')).toBe('-999.00')
+    expect(csvCell(-5)).toBe('-5')
+    expect(csvCell('-1+1')).toBe(`'-1+1`)
+    expect(csvCell('-2.5e3')).toBe(`'-2.5e3`)
+  })
+
   it('starts with a BOM and ends rows with CRLF', () => {
     expect(
       toCsv([
