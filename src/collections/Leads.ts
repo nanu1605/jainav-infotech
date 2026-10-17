@@ -1,6 +1,7 @@
 import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 import {
   APIError,
+  type CollectionAfterDeleteHook,
   type CollectionBeforeDeleteHook,
   type CollectionConfig,
   type FieldAccess,
@@ -70,18 +71,17 @@ const deleteOwnFiles: CollectionBeforeDeleteHook = async ({ id, req }) => {
 /**
  * A deleted lead's waitlist deliveries go too (spec §16): they hold its address's sha256 (as
  * lib/waitlist.ts computes it). Not while another lead has the address: the rows stop a running
- * send from emailing it again, and they go with the last such lead.
+ * send from emailing it again, and they go with the last such lead. After the delete, so in a bulk
+ * delete (whose hooks all run before any row goes) the last lead deleted still finds no other.
  */
-const deleteDeliveries: CollectionBeforeDeleteHook = async ({ id, req }) => {
+const deleteDeliveries: CollectionAfterDeleteHook = async ({ doc, req }) => {
   const adapter = req.payload.db as unknown as PostgresAdapter
   const tx = adapter.sessions[String(await req.transactionID)]?.db ?? adapter.drizzle
+  const email = String(doc.email ?? '')
   await tx.execute(sql`
-    DELETE FROM waitlist_deliveries d USING leads l
-    WHERE l.id = ${id}
-      AND d.address_hash = encode(sha256(convert_to(lower(btrim(l.email)), 'UTF8')), 'hex')
-      AND NOT EXISTS (
-        SELECT 1 FROM leads o WHERE o.id <> l.id AND lower(btrim(o.email)) = lower(btrim(l.email))
-      )
+    DELETE FROM waitlist_deliveries
+    WHERE address_hash = encode(sha256(convert_to(lower(btrim(${email})), 'UTF8')), 'hex')
+      AND NOT EXISTS (SELECT 1 FROM leads WHERE lower(btrim(email)) = lower(btrim(${email})))
   `)
 }
 
@@ -188,7 +188,7 @@ export const Leads: CollectionConfig = {
     update: leadHandlers,
     delete: ownerOnly,
   },
-  hooks: { beforeDelete: [deleteOwnFiles, deleteDeliveries] },
+  hooks: { beforeDelete: [deleteOwnFiles], afterDelete: [deleteDeliveries] },
   endpoints: [{ path: '/export', method: 'get', handler: exportLeads }],
   fields: [
     {

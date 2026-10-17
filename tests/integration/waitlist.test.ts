@@ -388,6 +388,27 @@ describe('sending a waitlist email', () => {
     await payload.delete({ collection: 'leads', id: older.id, depth: 0, overrideAccess: true })
     expect(await hashes()).toEqual([sha256(address('stays'))])
   })
+
+  it('erases an address’s deliveries when all its leads go in one bulk delete', async () => {
+    const product = await newProduct()
+    const first = await lead(product, address('bulk'))
+    const second = await lead(product, address('bulk'))
+    await lead(product, address('bulkstays'))
+    const email = await draft(product)
+    expect((await send(email.id)).status).toBe(200)
+    await settled()
+    const hashes = async () => (await deliveries(email.id)).map((r) => r.address_hash).sort()
+    expect(await hashes()).toHaveLength(2)
+
+    const { docs, errors } = await payload.delete({
+      collection: 'leads',
+      where: { id: { in: [first.id, second.id] } },
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect([docs.length, errors.length]).toEqual([2, 0])
+    expect(await hashes()).toEqual([sha256(address('bulkstays'))])
+  })
 })
 
 describe('the Owner’s controls', () => {
