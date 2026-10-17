@@ -133,5 +133,8 @@ export const jobs: JobsConfig = {
         return { output: {} }
       },
     },
+    idTask('sendWaitlistEmail', async (id) =>
+      (await import('@/lib/waitlist')).sendWaitlistEmail(id),
+    ),
   ] as TaskConfig[],
 }
