@@ -11,6 +11,8 @@ export const LICENSE_STATUSES = ['active', 'suspended', 'revoked', 'expired'] as
 export type LicenseStatus = (typeof LICENSE_STATUSES)[number]
 
 const readOnly = { readOnly: true } as const
+/** Written only by server code: staff can't change it through the admin or REST. */
+const fixed = { update: () => false }
 
 /**
  * A new license gets its key here (spec §12.2), whoever creates it: fulfilment, or the Owner
@@ -68,6 +70,8 @@ export const Licenses: CollectionConfig = {
       'Create new issues a complimentary license: the key is generated on save and emailed to the customer.',
   },
   defaultSort: '-issuedAt',
+  // A copy would carry the source's email state and update period: licenses come from Create new.
+  disableDuplicate: true,
   access: { read: storeStaff, create: ownerOnly, update: storeStaff, delete: nobody },
   hooks: { beforeChange: [prepareLicense], afterChange: [emailNewKey] },
   fields: [
@@ -135,6 +139,7 @@ export const Licenses: CollectionConfig = {
           type: 'relationship',
           relationTo: 'orders',
           unique: true,
+          access: fixed,
           admin: { ...readOnly, width: '50%', condition: (data) => Boolean(data?.order) },
         },
       ],
@@ -190,11 +195,17 @@ export const Licenses: CollectionConfig = {
         },
       ],
     },
-    { name: 'issuedAt', type: 'date', admin: { ...readOnly, position: 'sidebar' } },
+    {
+      name: 'issuedAt',
+      type: 'date',
+      access: fixed,
+      admin: { ...readOnly, position: 'sidebar' },
+    },
     {
       name: 'keyLast4',
       label: 'Key ends with',
       type: 'text',
+      access: fixed,
       admin: { ...readOnly, position: 'sidebar' },
     },
     { name: 'notes', type: 'textarea', admin: { description: 'Internal only.' } },
@@ -210,20 +221,33 @@ export const Licenses: CollectionConfig = {
         allowCreate: false,
       },
     },
-    { name: 'keyHash', type: 'text', unique: true, index: true, admin: { hidden: true } },
-    { name: 'keyEncrypted', type: 'text', admin: { hidden: true } },
-    // Claimed by the license email job, so parallel runs send it once.
-    { name: 'emailedAt', type: 'date', admin: { hidden: true } },
+    {
+      name: 'keyHash',
+      type: 'text',
+      unique: true,
+      index: true,
+      access: fixed,
+      admin: { hidden: true },
+    },
+    { name: 'keyEncrypted', type: 'text', access: fixed, admin: { hidden: true } },
+    // The license email job's claim and sent time, so parallel runs send it once.
+    { name: 'emailClaimedAt', type: 'date', access: fixed, admin: { hidden: true } },
+    { name: 'emailedAt', type: 'date', access: fixed, admin: { hidden: true } },
   ],
 }
 
-/** Support deactivates a device by unticking Active; the app can then use the slot elsewhere. */
+/**
+ * Support deactivates a device by unticking Active; the app can then use the slot elsewhere. When
+ * and by whom are set here, never taken from the request (the licensing API writes them in SQL).
+ */
 const deactivateFromAdmin: CollectionBeforeChangeHook = ({ data, originalDoc, operation }) => {
   if (operation !== 'update' || !originalDoc) return data
   if (!originalDoc.active && data.active) {
     throw new APIError('A deactivated device activates again from the app.', 400)
   }
-  if (originalDoc.active && data.active === false && !data.deactivatedAt) {
+  delete data.deactivatedAt
+  delete data.deactivatedBy
+  if (originalDoc.active && data.active === false) {
     data.deactivatedAt = new Date().toISOString()
     data.deactivatedBy = 'support'
   }
@@ -249,22 +273,35 @@ export const Activations: CollectionConfig = {
       relationTo: 'licenses',
       required: true,
       index: true,
+      access: fixed,
       admin: readOnly,
     },
     { name: 'active', type: 'checkbox', defaultValue: true, index: true },
     {
       type: 'row',
       fields: [
-        { name: 'deviceName', type: 'text', required: true, admin: { ...readOnly, width: '33%' } },
-        { name: 'os', label: 'OS', type: 'text', admin: { ...readOnly, width: '33%' } },
-        { name: 'appVersion', type: 'text', admin: { ...readOnly, width: '33%' } },
+        {
+          name: 'deviceName',
+          type: 'text',
+          required: true,
+          access: fixed,
+          admin: { ...readOnly, width: '33%' },
+        },
+        {
+          name: 'os',
+          label: 'OS',
+          type: 'text',
+          access: fixed,
+          admin: { ...readOnly, width: '33%' },
+        },
+        { name: 'appVersion', type: 'text', access: fixed, admin: { ...readOnly, width: '33%' } },
       ],
     },
     {
       type: 'row',
       fields: [
-        { name: 'firstSeenAt', type: 'date', admin: { ...readOnly, width: '50%' } },
-        { name: 'lastSeenAt', type: 'date', admin: { ...readOnly, width: '50%' } },
+        { name: 'firstSeenAt', type: 'date', access: fixed, admin: { ...readOnly, width: '50%' } },
+        { name: 'lastSeenAt', type: 'date', access: fixed, admin: { ...readOnly, width: '50%' } },
       ],
     },
     {
@@ -288,10 +325,12 @@ export const Activations: CollectionConfig = {
       type: 'text',
       required: true,
       index: true,
+      access: fixed,
       admin: { hidden: true },
     },
-    // Claimed by the new-device email job.
-    { name: 'notifiedAt', type: 'date', admin: { hidden: true } },
+    // The new-device email job's claim and sent time.
+    { name: 'notifyClaimedAt', type: 'date', access: fixed, admin: { hidden: true } },
+    { name: 'notifiedAt', type: 'date', access: fixed, admin: { hidden: true } },
   ],
 }
 

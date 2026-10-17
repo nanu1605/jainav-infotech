@@ -28,8 +28,12 @@ test('signs in with an emailed code, pays and gets the invoice', async ({ page, 
   const pdf = await page.request.get((await invoice.getAttribute('href'))!)
   expect(pdf.headers()['content-type']).toBe('application/pdf')
   expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-')
+  // The license key, as in the email (spec §11.3 step 11).
+  const key = page.getByRole('textbox', { name: 'License key' })
+  await expect(key).toHaveValue(/^VYRO(-[0-9A-HJKMNP-TV-Z]{5}){4}$/)
 
   const confirmation = await mailTo(email, /is confirmed/)
+  expect(confirmation.text).toContain(await key.inputValue())
   expect(confirmation.attachments).toEqual([
     expect.objectContaining({
       contentType: 'application/pdf',

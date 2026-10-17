@@ -78,6 +78,9 @@ export async function prepareNewLicense(
     keyHash: hashLicenseKey(key),
     keyEncrypted: encryptLicenseKey(key, cfg),
     keyLast4: key.slice(-4),
+    // Never inherited from the request: the new key must be emailed.
+    emailClaimedAt: null,
+    emailedAt: null,
     issuedAt: issuedAt.toISOString(),
     maxActivations:
       data.maxActivations ??
@@ -370,13 +373,15 @@ export async function deactivate(
         resetsAt: istMonthStart(now, 1).toISOString(),
       }
     }
-    await tx.execute(sql`
+    // Support may have unticked it meanwhile (the admin takes no license lock): theirs stands.
+    const { rows: done } = await tx.execute(sql`
       UPDATE activations
       SET active = false, deactivated_at = ${now.toISOString()}, deactivated_by = ${target.by},
           updated_at = now()
-      WHERE id = ${activationId}
+      WHERE id = ${activationId} AND active
+      RETURNING id
     `)
-    return { ok: true }
+    return done.length ? { ok: true } : { ok: false, code: 'activation_not_found' }
   })
 }
 

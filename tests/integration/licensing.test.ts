@@ -32,6 +32,7 @@ const { createSession, SESSION_COOKIE } = await import('@/lib/account/session')
 const { anonymizeCustomer } = await import('@/lib/account/profile')
 const { limit } = await import('@/lib/rateLimit')
 const { SITE_URL } = await import('@/lib/seo')
+const { ACCOUNT_MARKETING_VERSION } = await import('@/lib/commerce/schemas')
 
 let payload: Payload
 // Lowercase (a product slug), and with a 0 and a 1 so every key's prefix has both (O / I typing).
@@ -872,5 +873,97 @@ describe('admin rules', () => {
     await expect(set('revoked', 'support')).rejects.toMatchObject({ status: 403 })
     expect((await set('revoked', 'owner')).status).toBe('revoked')
     await expect(set('active', 'support')).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('keeps key material and device records out of staff edits', async () => {
+    const customer = await newCustomer('fixed')
+    const license = await newLicense(customer.id)
+    const other = await newLicense(customer.id)
+    const before = await payload.findByID({
+      collection: 'licenses',
+      id: license.id,
+      depth: 0,
+      overrideAccess: true,
+    })
+    for (const role of ['owner', 'support'] as const) {
+      await payload.update({
+        collection: 'licenses',
+        id: license.id,
+        data: {
+          keyHash: hashLicenseKey('VYRO-00000-00000-00000-00000'),
+          keyEncrypted: other.keyEncrypted,
+          keyLast4: 'XXXX',
+          issuedAt: '2020-01-01T00:00:00.000Z',
+          emailedAt: null,
+          notes: `edited by ${role}`,
+        },
+        depth: 0,
+        ...as(role),
+      })
+    }
+    const after = await payload.findByID({
+      collection: 'licenses',
+      id: license.id,
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(after).toMatchObject({
+      keyHash: before.keyHash,
+      keyEncrypted: before.keyEncrypted,
+      keyLast4: before.keyLast4,
+      issuedAt: before.issuedAt,
+      licenseKey: license.key,
+      notes: 'edited by support',
+    })
+    expect((await activate(license.key, device())).status).toBe(200)
+
+    const deviceId = device()
+    await activate(license.key, deviceId, { deviceName: 'REAL-NAME' })
+    const activation = (await activationFor(license.id, deviceId))!
+    const edited = await payload.update({
+      collection: 'activations',
+      id: activation.id,
+      data: {
+        deviceName: 'RENAMED',
+        lastSeenAt: '2020-01-01T00:00:00.000Z',
+        deactivatedBy: 'device',
+        deactivatedAt: '2020-01-01T00:00:00.000Z',
+      },
+      depth: 0,
+      ...as('support'),
+    })
+    expect(edited).toMatchObject({ deviceName: 'REAL-NAME', active: true })
+    expect(edited.deactivatedAt ?? null).toBeNull()
+    expect(edited.deactivatedBy ?? null).toBeNull()
+  })
+
+  it('refuses to duplicate a license', async () => {
+    const customer = await newCustomer('duplicate')
+    const license = await newLicense(customer.id)
+    await expect(
+      payload.duplicate({ collection: 'licenses', id: license.id, ...as('owner') }),
+    ).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('never takes a customer’s consent or deletion from staff, on create either', async () => {
+    const created = await payload.create({
+      collection: 'customers',
+      data: {
+        email: email('consent'),
+        preferredLocale: 'en',
+        status: 'active',
+        deletedAt: '2026-01-01T00:00:00.000Z',
+        marketingConsent: {
+          given: true,
+          at: '2026-01-01T00:00:00.000Z',
+          textVersion: ACCOUNT_MARKETING_VERSION,
+        },
+      },
+      depth: 0,
+      ...as('owner'),
+    })
+    ids.customers.push(created.id)
+    expect(created.deletedAt ?? null).toBeNull()
+    expect(created.marketingConsent?.given ?? false).toBe(false)
   })
 })

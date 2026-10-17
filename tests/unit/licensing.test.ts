@@ -163,3 +163,13 @@ describe('licensing dates in India time', () => {
     )
   })
 })
+
+describe('key prefixes', () => {
+  it('keeps every key within the API’s 40-character limit, however long the product slug', () => {
+    const prefix = keyPrefix('jainav-accounting-professional-edition-2027')
+    expect(prefix).toHaveLength(20)
+    const key = generateLicenseKey(prefix)
+    expect(normalizeLicenseKey(key)).toMatch(/^[0-9A-Z]{5,40}$/)
+    expect(key.length).toBeLessThanOrEqual(64)
+  })
+})

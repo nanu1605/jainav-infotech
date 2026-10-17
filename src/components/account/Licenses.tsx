@@ -88,6 +88,7 @@ export function DeactivateDevice({
   const [pending, setPending] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const confirmRef = useRef<HTMLButtonElement>(null)
+  const promptId = useId()
   const triggerRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -134,7 +135,9 @@ export function DeactivateDevice({
       )}
       {confirming ? (
         <div className="grid gap-3 rounded-md border border-danger/40 p-4">
-          <p className="text-sm text-fg">{t('confirm', { device, product })}</p>
+          <p id={promptId} className="text-sm text-fg">
+            {t('confirm', { device, product })}
+          </p>
           <span role="status" className="sr-only">
             {pending ? t('pending') : null}
           </span>
@@ -143,6 +146,7 @@ export function DeactivateDevice({
               ref={confirmRef}
               size="sm"
               className={DANGER}
+              aria-describedby={promptId}
               aria-disabled={pending || undefined}
               onClick={deactivate}
             >

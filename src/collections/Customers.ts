@@ -7,8 +7,8 @@ import { GST_STATES } from '@/lib/tax/states'
 
 import { normalizeEmail } from './Leads'
 
-/** What the customer agreed to is a record: the API ignores staff edits to it. */
-const record = { update: () => false }
+/** What the customer agreed to is a record: the API ignores staff input to it, on create too. */
+const record = { create: () => false, update: () => false }
 
 /**
  * Orders and invoices must be kept for the tax period (spec §11.2): such customers are anonymized

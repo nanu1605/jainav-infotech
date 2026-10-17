@@ -6,6 +6,7 @@ import * as migration_20261016_112233_phase5_voice_sample_lang from './20261016_
 import * as migration_20261016_130245_phase5_team_quote from './20261016_130245_phase5_team_quote';
 import * as migration_20261016_190338_phase7_store from './20261016_190338_phase7_store';
 import * as migration_20261017_040434_phase8_licensing from './20261017_040434_phase8_licensing';
+import * as migration_20261017_045458_phase8_email_claims from './20261017_045458_phase8_email_claims';
 
 export const migrations = [
   {
@@ -46,6 +47,11 @@ export const migrations = [
   {
     up: migration_20261017_040434_phase8_licensing.up,
     down: migration_20261017_040434_phase8_licensing.down,
-    name: '20261017_040434_phase8_licensing'
+    name: '20261017_040434_phase8_licensing',
+  },
+  {
+    up: migration_20261017_045458_phase8_email_claims.up,
+    down: migration_20261017_045458_phase8_email_claims.down,
+    name: '20261017_045458_phase8_email_claims'
   },
 ];

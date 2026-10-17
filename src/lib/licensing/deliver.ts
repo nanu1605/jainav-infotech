@@ -33,27 +33,46 @@ export async function orderLicenseKey(payload: Payload, orderId: number) {
   return docs[0] ? licenseKeyOf(docs[0]) : undefined
 }
 
-/** Sends once: the claim column is set in SQL first and cleared again if sending fails. */
+const COLUMNS = {
+  licenses: { claimed: 'email_claimed_at', sent: 'emailed_at' },
+  activations: { claimed: 'notify_claimed_at', sent: 'notified_at' },
+} as const
+
+/**
+ * Sends once, like the order email: a 20-minute claim in SQL first (shorter than the 30 minutes
+ * after which src/jobs releases a job a dead process left running), the sent time after sending.
+ * A failed send releases the claim; a claim still held without the email sent fails the run, so
+ * Payload retries and then alerts instead of ending silently without an email.
+ */
 async function once(
   payload: Payload,
-  table: 'licenses' | 'activations',
-  column: 'emailed_at' | 'notified_at',
+  table: keyof typeof COLUMNS,
   id: number,
   send: () => Promise<void>,
 ) {
+  const t = sql.identifier(table)
+  const claimed = sql.identifier(COLUMNS[table].claimed)
+  const sent = sql.identifier(COLUMNS[table].sent)
   const { rows } = await drizzle(payload).execute(sql`
-    UPDATE ${sql.identifier(table)} SET ${sql.identifier(column)} = now()
-    WHERE id = ${id} AND ${sql.identifier(column)} IS NULL RETURNING id
+    UPDATE ${t} SET ${claimed} = now()
+    WHERE id = ${id} AND ${sent} IS NULL
+      AND (${claimed} IS NULL OR ${claimed} < now() - interval '20 minutes')
+    RETURNING id
   `)
-  if (!rows.length) return
+  if (!rows.length) {
+    const { rows: done } = await drizzle(payload).execute(
+      sql`SELECT 1 FROM ${t} WHERE id = ${id} AND ${sent} IS NOT NULL`,
+    )
+    if (done.length) return
+    throw new Error(`The ${table} email is claimed by another run`)
+  }
   try {
     await send()
   } catch (error) {
-    await drizzle(payload).execute(
-      sql`UPDATE ${sql.identifier(table)} SET ${sql.identifier(column)} = NULL WHERE id = ${id}`,
-    )
+    await drizzle(payload).execute(sql`UPDATE ${t} SET ${claimed} = NULL WHERE id = ${id}`)
     throw error
   }
+  await drizzle(payload).execute(sql`UPDATE ${t} SET ${sent} = now() WHERE id = ${id}`)
 }
 
 /** Who gets a license's emails, in their language; nobody once the account is deleted. */
@@ -65,7 +84,7 @@ const recipient = (customer: number | Customer) =>
 /** The sendLicenseEmail job: a complimentary or manual license's key (spec §11.7). */
 export async function sendLicenseEmail(id: number) {
   const payload = await getClient()
-  await once(payload, 'licenses', 'emailed_at', id, async () => {
+  await once(payload, 'licenses', id, async () => {
     const license = await payload.findByID({
       collection: 'licenses',
       id,
@@ -92,7 +111,7 @@ export async function sendLicenseEmail(id: number) {
 /** The sendDeviceEmail job: a license was activated on a new device (spec §11.7). */
 export async function sendDeviceEmail(id: number) {
   const payload = await getClient()
-  await once(payload, 'activations', 'notified_at', id, async () => {
+  await once(payload, 'activations', id, async () => {
     const activation = await payload.findByID({
       collection: 'activations',
       id,

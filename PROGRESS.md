@@ -106,11 +106,19 @@ With Tanishq's inputs (steps in docs/runbooks/store.md):
 
 ### Phase 8 — Licensing
 
-- [ ] `licenses`, `activations`, `trials`.
-- [ ] Key generation, normalization and storage; licensing API (§12.4); JWT signing + JWKS; grace re-issue.
-- [ ] Fulfilment creates real licenses; the license key goes into the order email; new-device email.
-- [ ] Account: Licenses page with device deactivation; Downloads page.
-- [ ] Complimentary license issuing (admin endpoint); `license-test-client`.
+In the repository (done; tested locally with development keys, see docs/decisions.md):
+
+- [x] `licenses`, `activations`, `trials`.
+- [x] Key generation, normalization and storage; licensing API (§12.4); JWT signing + JWKS; grace re-issue.
+- [x] Fulfilment creates real licenses; the license key goes into the order email; new-device email.
+- [x] Account: Licenses page with device deactivation; Downloads page.
+- [x] Complimentary license issuing (the admin's Create form); `license-test-client`; `gen:licensing-keys`.
+
+With Tanishq's inputs (steps in docs/runbooks/licensing.md):
+
+- [ ] Licensing keys generated and installed on staging and production; the public key embedded in VYRO.
+- [ ] Confirm the activation limit (2), monthly deactivations (3), trial length (14 days) and updates policy (12 months, builds in that window stay Pro).
+- [ ] The test client run against staging.
 
 ### Phase 9 — Store operations
 

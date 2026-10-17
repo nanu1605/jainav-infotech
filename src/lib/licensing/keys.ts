@@ -9,9 +9,15 @@ export type { LicensingConfig }
 /** Crockford Base32: no I, L, O or U. */
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 
-/** A key's prefix: the product slug in capitals, e.g. `VYRO` (spec §12.2). */
+/**
+ * A key's prefix: the product slug in capitals, e.g. `VYRO` (spec §12.2), at most 20 characters so
+ * every key fits the API's 40-character limit on a normalized key.
+ */
 export const keyPrefix = (productSlug: string) =>
-  productSlug.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  productSlug
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 20)
 
 /** `VYRO-XXXXX-XXXXX-XXXXX-XXXXX`: 20 Crockford characters, 100 random bits. */
 export function generateLicenseKey(prefix: string, bytes = randomBytes(13)): string {

@@ -25,7 +25,7 @@ import { licensingConfigFrom } from '../src/lib/licensing/keyMaterial'
 const HELP = `Usage: pnpm license-test-client <command> [options]
 
 Behaves like VYRO: every token it receives is verified offline the way the app must.
-State per device (license key, current token): .license-client/<product>-<device>.json
+State per server and device (license key, current token): .license-client/<host>-<product>-<device>.json
 
 Commands
   activate --key KEY   activate this device; stores the key and the token
@@ -43,8 +43,8 @@ Commands
                        spec §20 Phase 8 "done when" on fresh device names, PASS/FAIL per step:
                        device limit, deactivation, validate (also 100 days past expiry), the
                        monthly deactivation limit, trial start and resume. It USES UP the
-                       license's deactivations for this month (India time) and leaves two devices
-                       active, so use a key issued for testing; --yes confirms. It needs a key
+                       license's deactivations for this month (India time) and leaves devices
+                       active (listed at the end), so use a key issued for testing; --yes confirms. It needs a key
                        with no active devices and stays under the server's 20 calls per key and
                        hour (Retry-After otherwise). The 100-days step is skipped without the
                        server's signing key (staging, production).
@@ -178,7 +178,9 @@ function writeJson(file: string, value: unknown) {
 }
 
 type Device = { name: string; id: string; state: State }
-const stateFile = (d: Device) => path.join(STATE_DIR, `${product}-${d.name}.json`)
+// Per server too: the same device name against staging and locally holds different keys.
+const stateFile = (d: Device) =>
+  path.join(STATE_DIR, `${base.host.replace(/[^\w.-]/g, '_')}-${product}-${d.name}.json`)
 const device = (name: string): Device => ({
   name,
   id: createHash('sha256').update(`license-test-client:${name}vyro-device-v1`).digest('hex'),
@@ -388,8 +390,8 @@ async function scenario(key: string) {
     throw new Error(`expected ${code}, got 200`)
   }
 
+  let fillers: Device[] = []
   try {
-    let fillers: Device[] = []
     await step(`activate ${A.name}`, async () => {
       const { license } = await act(A)
       if (license.activeDevices !== 1) {
@@ -465,7 +467,7 @@ async function scenario(key: string) {
   )
   if (!failed) {
     console.log(
-      `${A.name} and ${C.name} stay active and this month's deactivations are used up: Support can untick Active on them (Store → Activations).`,
+      `${[A, C, ...fillers.slice(1)].map((d) => d.name).join(', ')} stay active and this month's deactivations are used up: Support can untick Active on them (Store → Activations).`,
     )
   }
   return failed === 0

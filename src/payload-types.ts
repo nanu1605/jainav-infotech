@@ -1971,6 +1971,7 @@ export interface License {
   };
   keyHash?: string | null;
   keyEncrypted?: string | null;
+  emailClaimedAt?: string | null;
   emailedAt?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -1993,6 +1994,7 @@ export interface Activation {
   deactivatedAt?: string | null;
   deactivatedBy?: ('device' | 'account' | 'support') | null;
   deviceIdHash: string;
+  notifyClaimedAt?: string | null;
   notifiedAt?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -3693,6 +3695,7 @@ export interface LicensesSelect<T extends boolean = true> {
   activations?: T;
   keyHash?: T;
   keyEncrypted?: T;
+  emailClaimedAt?: T;
   emailedAt?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3712,6 +3715,7 @@ export interface ActivationsSelect<T extends boolean = true> {
   deactivatedAt?: T;
   deactivatedBy?: T;
   deviceIdHash?: T;
+  notifyClaimedAt?: T;
   notifiedAt?: T;
   updatedAt?: T;
   createdAt?: T;

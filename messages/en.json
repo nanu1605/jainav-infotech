@@ -477,6 +477,11 @@
       "other": {
         "title": "Order {number}",
         "intro": "See this order's details in your account."
+      },
+      "license": {
+        "title": "Your license key",
+        "text": "Open {product}, choose Activate Pro and paste this key. It is also in your confirmation email and on your account’s Licenses page.",
+        "manage": "Manage your licenses and devices"
       }
     },
     "failed": {

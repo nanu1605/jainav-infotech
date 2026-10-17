@@ -88,7 +88,7 @@ pnpm license-test-client --base https://staging.{{DOMAIN}} activate --key <key>
 pnpm license-test-client --base https://staging.{{DOMAIN}} scenario --key <another key> --yes
 ```
 
-`scenario` runs spec §20 Phase 8's "done when" on fresh device names and prints PASS/FAIL per step: both device slots, the device limit, a deactivation, validation, the monthly deactivation limit, trial start and resume. It needs a license with no active devices, uses up that license's deactivations for the month and leaves two devices active, so issue a license just for it (Support can untick its devices afterwards). It stays under the server's limit of 20 calls per key and hour. The "100 days past exp" step needs the server's signing key on your machine, so it runs locally only and shows SKIP against staging; never copy staging's or production's private key to do it.
+`scenario` runs spec §20 Phase 8's "done when" on fresh device names and prints PASS/FAIL per step: both device slots, the device limit, a deactivation, validation, the monthly deactivation limit, trial start and resume. It needs a license with no active devices, uses up that license's deactivations for the month and leaves its devices active (it lists them at the end), so issue a license just for it (Support can untick them afterwards). It stays under the server's limit of 20 calls per key and hour. The "100 days past exp" step needs the server's signing key on your machine, so it runs locally only and shows SKIP against staging; never copy staging's or production's private key to do it.
 
 Still checked by hand: suspend the test license in the admin, then `validate` answers `license_suspended` (`license_revoked` after the Owner revokes it); the account's Licenses page shows the devices and frees one.
 

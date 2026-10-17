@@ -135,12 +135,15 @@ export default async function LicensesPage({ params }: Props) {
                             </p>
                           )}
                         </div>
-                        <DeactivateDevice
-                          activationId={device.id}
-                          device={device.deviceName}
-                          product={product}
-                          focusAfter={devicesId}
-                        />
+                        {/* None left this month: the note below says when they reset. */}
+                        {license.deactivationsLeft > 0 && (
+                          <DeactivateDevice
+                            activationId={device.id}
+                            device={device.deviceName}
+                            product={product}
+                            focusAfter={devicesId}
+                          />
+                        )}
                       </li>
                     ))}
                   </ul>
