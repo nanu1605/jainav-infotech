@@ -506,6 +506,7 @@ export async function disputeWebhook(
   const duplicate = dispute.payment_id !== order.razorpayPaymentId
   let disputed = false
   let suspended = 0
+  let licenseSuspended = false
   if (created && !duplicate) {
     const { rows } = await drizzle(payload).execute(sql`
       UPDATE orders SET status = 'disputed', updated_at = now()
@@ -529,6 +530,7 @@ export async function disputeWebhook(
       depth: 0,
       overrideAccess: true,
     })
+    licenseSuspended = docs.some((license) => license.status === 'suspended')
     // A no-op for licenses whose customer was told already.
     for (const license of docs) await sendLicenseStatusEmail(license.id)
   }
@@ -561,9 +563,12 @@ export async function disputeWebhook(
     const by = dispute.respond_by
       ? `, respond by ${formatDate('en', new Date(dispute.respond_by * 1000))}`
       : ''
-    const done = disputed
-      ? `The order is disputed${suspended ? ' and its license suspended' : '; it had no active license to suspend'}.`
-      : `The order is already ${order.status}${suspended ? '; its license was suspended' : '; nothing was changed'}.`
+    // The state this dispute leaves, not this run's changes: a retry after a failed email finds
+    // the order disputed and the license suspended by the first run.
+    const done =
+      disputed || order.status === 'disputed'
+        ? `The order is disputed${licenseSuspended ? ' and its license suspended' : '; it has no active license to suspend'}.`
+        : `The order is already ${order.status}${suspended ? '; its license was suspended' : '; nothing was changed'}.`
     await alert(
       `Payment dispute ${dispute.id} on order ${order.orderNumber}${reason}${by}. ${done}\n${link}`,
     )

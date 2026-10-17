@@ -672,6 +672,27 @@ describe('disputes (spec §11.6)', () => {
     expect(sent).toHaveLength(1)
   })
 
+  it('alerts the state a dispute left when its first run failed after the suspension', async () => {
+    const { order, paymentId } = await buy('disputeretry')
+    vi.mocked(payload.sendEmail).mockImplementationOnce(async () => {
+      throw new Error('Email provider down')
+    })
+    const opened = await gw('dispute', { payment_id: paymentId })
+    await settled()
+    expect((await orderById(order.id)).status).toBe('disputed')
+    expect((await licenseOf(order.id)).status).toBe('suspended')
+    expect(telegrams).toHaveLength(0)
+
+    // The job's retry: the first run already disputed the order and suspended the license.
+    const event = await delivered('payment.dispute.created', opened.dispute.id)
+    expect(event.status).toBe('failed')
+    const { processWebhookEvent } = await import('@/lib/commerce/webhooks')
+    await processWebhookEvent(event.id)
+    expect(mailsTo(order, /license is suspended/)).toHaveLength(1)
+    expect(telegrams).toHaveLength(1)
+    expect(telegrams[0]).toContain('The order is disputed and its license suspended.')
+  })
+
   it('says nothing was changed when a dispute comes after a full refund', async () => {
     const { order, paymentId } = await buy('disputerefunded')
     await gw('refund', { payment_id: paymentId, amount: 99_900, outcome: 'processed' })
