@@ -26,6 +26,13 @@ const noFieldAccess: FieldAccess = () => false
  * (admin readOnly only hides the inputs). Server code writes it with overrideAccess.
  */
 const record = { update: noFieldAccess }
+/**
+ * An opt-out staff may record but never undo: only the person can consent again (spec §13, §16),
+ * through a form, which writes with overrideAccess. `doc` is the whole stored lead.
+ */
+const optOut = (stored: (lead: Lead) => unknown) => ({
+  update: (({ doc }) => !doc || !stored(doc)) as FieldAccess<Lead>,
+})
 
 const SEARCHABLE = ['email', 'name', 'company']
 
@@ -191,7 +198,7 @@ export const Leads: CollectionConfig = {
     { name: 'notes', type: 'textarea', admin: { position: 'sidebar' } },
     {
       // What the visitor submitted and agreed to is a record: those fields deny updates (and so
-      // render read-only); withdrawnAt and unsubscribedAt stay editable for staff.
+      // render read-only); staff may set withdrawnAt and unsubscribedAt, but not clear them.
       type: 'collapsible',
       label: 'Submission',
       fields: [
@@ -272,7 +279,11 @@ export const Leads: CollectionConfig = {
             { name: 'at', type: 'date', access: record },
             { name: 'textVersion', type: 'text', access: record },
             // Staff may record a withdrawal (spec §16: withdrawing is as easy as giving).
-            { name: 'withdrawnAt', type: 'date' },
+            {
+              name: 'withdrawnAt',
+              type: 'date',
+              access: optOut((l) => l.marketingConsent?.withdrawnAt),
+            },
           ],
         },
         {
@@ -283,7 +294,7 @@ export const Leads: CollectionConfig = {
           admin: { hidden: true },
         },
         { name: 'confirmedAt', type: 'date', access: record },
-        { name: 'unsubscribedAt', type: 'date' },
+        { name: 'unsubscribedAt', type: 'date', access: optOut((l) => l.unsubscribedAt) },
       ],
     },
   ],
