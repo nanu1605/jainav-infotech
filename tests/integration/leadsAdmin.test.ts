@@ -1,11 +1,12 @@
 /**
- * Phase 4 Leads admin (spec §10, §16): the CSV export, private files (CVs) and their cleanup.
+ * Phase 4 Leads admin (spec §10, §16): the CSV export, private files (CVs) and their cleanup,
+ * and opt-outs staff can record but not undo.
  * Local API calls with `overrideAccess: false` apply the same access rules as REST.
  */
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 
-import { REST_GET, REST_POST } from '@payloadcms/next/routes'
+import { REST_GET, REST_PATCH, REST_POST } from '@payloadcms/next/routes'
 import { createLocalReq, getPayload, type Payload, type PayloadHandler } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -15,6 +16,7 @@ import config from '@/payload.config'
 
 let payload: Payload
 let owner: User
+let support: User | undefined
 let exportLeads: PayloadHandler
 const run = `la${Date.now()}`
 const leads: Lead[] = []
@@ -74,6 +76,7 @@ afterAll(async () => {
   for (const lead of leads)
     await payload.delete({ collection: 'leads', id: lead.id }).catch(() => undefined)
   if (owner) await payload.delete({ collection: 'users', id: owner.id })
+  if (support) await payload.delete({ collection: 'users', id: support.id })
 })
 
 describe('leads CSV export', () => {
@@ -208,6 +211,51 @@ describe('private files', () => {
     // Only that lead's files: another lead's CV stays (and goes with leads[1] in afterAll).
     const others = await payload.findByID({ collection: 'private-files', id: othersFile.id })
     expect(others.filename).toBe(othersFile.filename)
+  })
+})
+
+describe('opt-outs', () => {
+  it('can be recorded by staff but never cleared or changed', async () => {
+    support = await payload.create({
+      collection: 'users',
+      data: { email: `support-${run}@jainav.test`, password: `pw-${run}`, roles: ['support'] },
+    })
+    const { token } = await payload.login({
+      collection: 'users',
+      data: { email: support.email, password: `pw-${run}` },
+    })
+    const lead = await payload.create({
+      collection: 'leads',
+      data: {
+        type: 'waitlist',
+        status: 'new',
+        email: `optout-${run}@jainav.test`,
+        marketingConsent: { given: true, at: '2026-10-01T10:00:00.000Z' },
+      },
+    })
+    leads.push(lead)
+    const patch = (data: object) =>
+      rest(REST_PATCH, `/leads/${lead.id}`, {
+        method: 'PATCH',
+        headers: { Authorization: `JWT ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+    const stored = () =>
+      payload.findByID({ collection: 'leads', id: lead.id, depth: 0, overrideAccess: true })
+
+    const at = '2026-10-05T10:00:00.000Z'
+    const optedOut = { unsubscribedAt: at, marketingConsent: { given: true, withdrawnAt: at } }
+    expect(
+      (await patch({ unsubscribedAt: at, marketingConsent: { withdrawnAt: at } })).status,
+    ).toBe(200)
+    expect(await stored()).toMatchObject(optedOut)
+    // Only the person can consent again (a form, spec §13): staff edits are ignored.
+    const later = '2026-10-09T10:00:00.000Z'
+    for (const value of [null, later]) {
+      const res = await patch({ unsubscribedAt: value, marketingConsent: { withdrawnAt: value } })
+      expect(res.status).toBe(200)
+      expect(await stored()).toMatchObject(optedOut)
+    }
   })
 })
 

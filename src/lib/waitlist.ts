@@ -137,9 +137,10 @@ const productName = async (payload: Payload, id: number) =>
 
 /**
  * The sendWaitlistEmail job: up to BATCH addresses per run, each claimed, sent and recorded in
- * SQL. A failed send releases its claim and fails the run; the retry carries on where it stopped.
- * A claim whose send never finished (the process died) is never retried: at most one email per
- * address. When nothing is left, the email is marked sent.
+ * SQL. A failed send releases its claim and fails the run, naming the lead (never the address,
+ * as job errors are stored and logged); the retry carries on where it stopped. A claim whose send
+ * never finished (the process died) is never retried: at most one email per address. When nothing
+ * is left, the email is marked sent.
  */
 export async function sendWaitlistEmail(id: number, batch = BATCH) {
   const payload = await getClient()
@@ -182,11 +183,13 @@ export async function sendWaitlistEmail(id: number, batch = BATCH) {
         replyTo,
         headers: unsubscribeHeaders(claim.lead),
       })
-    } catch (error) {
+    } catch {
       await drizzle(payload).execute(
         sql`DELETE FROM waitlist_deliveries WHERE id = ${claim.delivery}`,
       )
-      throw error
+      // The provider's own message may quote the address. With the lead's id, the Owner can mark
+      // a lead the provider keeps refusing as spam (skipped) and resume the email.
+      throw new Error(`Waitlist email ${id}: sending to lead ${claim.lead} failed`)
     }
     await drizzle(payload).execute(sql`
       WITH d AS (
@@ -230,9 +233,33 @@ export const recipientsHandler: PayloadHandler = async (req) => {
 }
 
 /**
+ * Resumes an email left "sending" when its job ran out of retries: a fresh job carries on where
+ * the claims stopped, so nobody gets it twice. Refused while a job for it is queued, running or
+ * waiting to retry.
+ */
+async function resume(payload: Payload, id: number) {
+  const { totalDocs } = await payload.count({
+    collection: 'payload-jobs',
+    where: {
+      taskSlug: { equals: 'sendWaitlistEmail' },
+      'input.id': { equals: id },
+      completedAt: { exists: false },
+      hasError: { not_equals: true },
+    },
+    overrideAccess: true,
+  })
+  if (totalDocs)
+    throw new APIError('This email is still sending. Resume it only after its job has failed.', 409)
+  await payload.jobs.queue({ task: 'sendWaitlistEmail', input: { id } })
+  after(() => runQueuedJobs(payload))
+  return Response.json({ ok: true, resumed: true })
+}
+
+/**
  * POST /api/waitlist-emails/:id/send (Owner), body {test?: boolean}. A test goes to the Owner
  * only, once per version (English and Hindi), and changes nothing. Otherwise the draft becomes
- * "sending" and the job is queued in one transaction, so a started email always has its job.
+ * "sending" and the job is queued in one transaction, so a started email always has its job; an
+ * email already "sending" is resumed.
  */
 export const sendHandler: PayloadHandler = async (req) => {
   const email = await ownersEmail(req)
@@ -262,6 +289,7 @@ export const sendHandler: PayloadHandler = async (req) => {
     return Response.json({ ok: true, recipients: 1 })
   }
 
+  if (email.status === 'sending') return resume(payload, email.id)
   if (email.status !== 'draft') throw new APIError('This email has already been sent.', 409)
   const recipients = await countRecipients(payload, productId)
   if (!recipients) throw new APIError('Nobody on this waitlist can receive it yet.', 400)

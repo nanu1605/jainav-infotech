@@ -1,3 +1,4 @@
+import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 import {
   APIError,
   type CollectionBeforeDeleteHook,
@@ -26,6 +27,13 @@ const noFieldAccess: FieldAccess = () => false
  * (admin readOnly only hides the inputs). Server code writes it with overrideAccess.
  */
 const record = { update: noFieldAccess }
+/**
+ * An opt-out staff may record but never undo: only the person can consent again (spec §13, §16),
+ * through a form, which writes with overrideAccess. `doc` is the whole stored lead.
+ */
+const optOut = (stored: (lead: Lead) => unknown) => ({
+  update: (({ doc }) => !doc || !stored(doc)) as FieldAccess<Lead>,
+})
 
 const SEARCHABLE = ['email', 'name', 'company']
 
@@ -57,6 +65,24 @@ const deleteOwnFiles: CollectionBeforeDeleteHook = async ({ id, req }) => {
     req,
   })
   if (errors.length) throw new APIError('Could not delete the lead’s files.', 500)
+}
+
+/**
+ * A deleted lead's waitlist deliveries go too (spec §16): they hold its address's sha256 (as
+ * lib/waitlist.ts computes it). Not while another lead has the address: the rows stop a running
+ * send from emailing it again, and they go with the last such lead.
+ */
+const deleteDeliveries: CollectionBeforeDeleteHook = async ({ id, req }) => {
+  const adapter = req.payload.db as unknown as PostgresAdapter
+  const tx = adapter.sessions[String(await req.transactionID)]?.db ?? adapter.drizzle
+  await tx.execute(sql`
+    DELETE FROM waitlist_deliveries d USING leads l
+    WHERE l.id = ${id}
+      AND d.address_hash = encode(sha256(convert_to(lower(btrim(l.email)), 'UTF8')), 'hex')
+      AND NOT EXISTS (
+        SELECT 1 FROM leads o WHERE o.id <> l.id AND lower(btrim(o.email)) = lower(btrim(l.email))
+      )
+  `)
 }
 
 // The list view's own query string: where (qs-parsed by Payload), search and sort.
@@ -162,7 +188,7 @@ export const Leads: CollectionConfig = {
     update: leadHandlers,
     delete: ownerOnly,
   },
-  hooks: { beforeDelete: [deleteOwnFiles] },
+  hooks: { beforeDelete: [deleteOwnFiles, deleteDeliveries] },
   endpoints: [{ path: '/export', method: 'get', handler: exportLeads }],
   fields: [
     {
@@ -191,7 +217,7 @@ export const Leads: CollectionConfig = {
     { name: 'notes', type: 'textarea', admin: { position: 'sidebar' } },
     {
       // What the visitor submitted and agreed to is a record: those fields deny updates (and so
-      // render read-only); withdrawnAt and unsubscribedAt stay editable for staff.
+      // render read-only); staff may set withdrawnAt and unsubscribedAt, but not clear them.
       type: 'collapsible',
       label: 'Submission',
       fields: [
@@ -272,7 +298,11 @@ export const Leads: CollectionConfig = {
             { name: 'at', type: 'date', access: record },
             { name: 'textVersion', type: 'text', access: record },
             // Staff may record a withdrawal (spec §16: withdrawing is as easy as giving).
-            { name: 'withdrawnAt', type: 'date' },
+            {
+              name: 'withdrawnAt',
+              type: 'date',
+              access: optOut((l) => l.marketingConsent?.withdrawnAt),
+            },
           ],
         },
         {
@@ -283,7 +313,7 @@ export const Leads: CollectionConfig = {
           admin: { hidden: true },
         },
         { name: 'confirmedAt', type: 'date', access: record },
-        { name: 'unsubscribedAt', type: 'date' },
+        { name: 'unsubscribedAt', type: 'date', access: optOut((l) => l.unsubscribedAt) },
       ],
     },
   ],

@@ -62,4 +62,13 @@ test('the Owner sends a waitlist email test to themselves', async ({ page }) => 
   // A test changes nothing: the email is still a draft.
   await page.reload()
   await expect(page.getByRole('button', { name: 'Send a test to me' })).toBeVisible()
+
+  // A failed count says so and still allows a test; the real send waits for a count.
+  await page.route(`**/api/waitlist-emails/${id}/recipients`, (route) =>
+    route.fulfill({ status: 500, json: { errors: [{ message: 'Something went wrong.' }] } }),
+  )
+  await page.reload()
+  await expect(page.getByText('Couldn’t count recipients. Reload to try again.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Send a test to me' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Send…', exact: true })).toBeDisabled()
 })

@@ -307,12 +307,18 @@ describe('sending a waitlist email', () => {
 
   it('retries a failed send without emailing anyone twice', async () => {
     const product = await newProduct()
-    for (const name of ['a', 'b', 'c']) await lead(product, address(`retry-${name}`))
+    const leads = []
+    for (const name of ['a', 'b', 'c']) leads.push(await lead(product, address(`retry-${name}`)))
     const email = await draft(product)
     await db().execute(sql`UPDATE waitlist_emails SET status = 'sending' WHERE id = ${email.id}`)
-    // Addresses go in order: the first is sent, the second fails and stops the run.
+    // Addresses go in order: the first is sent, the second fails and stops the run, naming the
+    // lead (the error is stored and logged) and never the address.
     failFor = address('retry-b')
-    await expect(sendWaitlistEmail(email.id)).rejects.toThrow('Mail API unavailable')
+    const error = await sendWaitlistEmail(email.id).catch((e: unknown) => e as Error)
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error).message).toBe(
+      `Waitlist email ${email.id}: sending to lead ${leads[1]!.id} failed`,
+    )
     expect(sent.map((m) => m.to)).toEqual([address('retry-a')])
     expect(await deliveries(email.id)).toHaveLength(1)
 
@@ -320,6 +326,67 @@ describe('sending a waitlist email', () => {
     await sendWaitlistEmail(email.id)
     expect(sent.map((m) => m.to)).toEqual(['a', 'b', 'c'].map((n) => address(`retry-${n}`)))
     expect(await emailDoc(email.id)).toMatchObject({ status: 'sent', sent: 3 })
+  })
+
+  it('resumes an email whose job gave up, once that job has stopped', async () => {
+    const product = await newProduct()
+    for (const name of ['a', 'b', 'c']) await lead(product, address(`resume-${name}`))
+    const email = await draft(product)
+    failFor = address('resume-b')
+    expect((await send(email.id)).status).toBe(200)
+    await settled()
+    expect(sent.map((m) => m.to)).toEqual([address('resume-a')])
+    const jobs = async () =>
+      (
+        await payload.find({
+          collection: 'payload-jobs',
+          where: { taskSlug: { equals: 'sendWaitlistEmail' }, 'input.id': { equals: email.id } },
+          sort: 'createdAt',
+          depth: 0,
+          overrideAccess: true,
+        })
+      ).docs
+    const [job] = await jobs()
+    expect(job?.log?.[0]?.error).toMatchObject({ message: expect.stringContaining('to lead ') })
+    expect(JSON.stringify(job)).not.toContain('@example.test')
+
+    // Waiting to retry: resuming would only start a second job, so it is refused.
+    expect(await send(email.id)).toMatchObject({ status: 409 })
+    // Its retries run out (as Payload leaves a job after the last one).
+    await payload.update({
+      collection: 'payload-jobs',
+      id: job!.id,
+      data: { hasError: true, processing: false },
+      depth: 0,
+      overrideAccess: true,
+    })
+    failFor = null
+    expect(await send(email.id)).toEqual({ status: 200, body: { ok: true, resumed: true } })
+    await settled()
+    expect(sent.map((m) => m.to)).toEqual(['a', 'b', 'c'].map((n) => address(`resume-${n}`)))
+    expect(await emailDoc(email.id)).toMatchObject({ status: 'sent', sent: 3 })
+    expect(await send(email.id)).toMatchObject({ status: 409 })
+  })
+
+  it('erases a deleted lead’s deliveries with its last lead of the address', async () => {
+    const product = await newProduct()
+    const gone = await lead(product, address('erased'))
+    const older = await lead(product, address('shared'))
+    const newer = await lead(product, address('shared'))
+    await lead(product, address('stays'))
+    const email = await draft(product)
+    expect((await send(email.id)).status).toBe(200)
+    await settled()
+    const hashes = async () => (await deliveries(email.id)).map((r) => r.address_hash).sort()
+    expect(await hashes()).toHaveLength(3)
+
+    await payload.delete({ collection: 'leads', id: gone.id, depth: 0, overrideAccess: true })
+    expect(await hashes()).toEqual([sha256(address('shared')), sha256(address('stays'))].sort())
+    // Another lead still has the address: its row stays, so a running send can't email it again.
+    await payload.delete({ collection: 'leads', id: newer.id, depth: 0, overrideAccess: true })
+    expect(await hashes()).toEqual([sha256(address('shared')), sha256(address('stays'))].sort())
+    await payload.delete({ collection: 'leads', id: older.id, depth: 0, overrideAccess: true })
+    expect(await hashes()).toEqual([sha256(address('stays'))])
   })
 })
 
