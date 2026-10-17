@@ -561,6 +561,8 @@
       "account": "Account",
       "overview": "Overview",
       "orders": "Orders & invoices",
+      "licenses": "Licenses",
+      "downloads": "Downloads",
       "settings": "Settings"
     },
     "signOut": {
@@ -628,7 +630,11 @@
       "settingsLink": "Edit settings",
       "helpTitle": "Need help?",
       "helpText": "Questions about an order, an invoice or a product? We're happy to help.",
-      "helpLink": "Contact support"
+      "helpLink": "Contact support",
+      "licensesText": "Keys for the products you buy appear here, with the devices they are active on.",
+      "licenseLine": "{name}: {count} of {max} devices",
+      "licensesLink": "Manage licenses and devices",
+      "downloadsLink": "Download your products"
     },
     "orders": {
       "intro": "Every purchase, with its invoice to download.",
@@ -644,6 +650,52 @@
       "emptyTitle": "No orders yet",
       "emptyText": "When you buy a product, its order and invoice appear here.",
       "browse": "Browse products"
+    },
+    "licenses": {
+      "intro": "Your license keys and the devices they are active on.",
+      "name": "{product} {plan}",
+      "status": {
+        "active": "Active",
+        "suspended": "Suspended",
+        "revoked": "Revoked",
+        "expired": "Expired"
+      },
+      "statusText": {
+        "suspended": "This license is paused, for example while a payment is disputed. The app runs as the free version until it is reinstated. Contact support if you think this is a mistake.",
+        "revoked": "This license was cancelled, for example after a refund. It can no longer be activated, and the app runs as the free version.",
+        "expired": "This license has expired, so the app runs as the free version."
+      },
+      "key": "License key",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFailed": "Couldn't copy. Select the key and copy it yourself.",
+      "updatesUntil": "Updates until",
+      "lifetime": "Lifetime",
+      "devices": "Devices used",
+      "devicesUsed": "{count} of {max}",
+      "devicesTitle": "Active devices",
+      "noDevices": "Not active on any device yet. Open {product}, choose Activate Pro and paste the key.",
+      "appVersion": "version {version}",
+      "lastSeen": "Last seen {date} IST",
+      "deactivate": "Deactivate",
+      "confirm": "Deactivate {device}? {product} on that device runs as the free version until it is activated again.",
+      "confirmButton": "Yes, deactivate",
+      "cancel": "Cancel",
+      "pending": "Deactivating…",
+      "deactivated": "{device} was deactivated. You can now activate {product} on another device.",
+      "help": "Deactivating a device frees its slot, so you can activate {product} on another device.",
+      "deactivationsLeft": "Deactivations left this month: {count}. The count resets on {date}.",
+      "limitReached": "You've used this month's deactivations. You can deactivate a device again from {date}.",
+      "notFound": "This device is no longer active.",
+      "emptyTitle": "No licenses yet",
+      "emptyText": "When you buy a product, its license key appears here."
+    },
+    "downloads": {
+      "intro": "Installers for the products you have a license for. After installing, activate the app with the key from your <licenses>Licenses</licenses> page.",
+      "platform": "{os} · {arch}",
+      "noRelease": "There's no release to download yet.",
+      "emptyTitle": "No downloads yet",
+      "emptyText": "When you buy a product, its installers appear here."
     },
     "settings": {
       "intro": "You sign in with {email}.",

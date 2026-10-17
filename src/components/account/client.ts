@@ -10,6 +10,8 @@ export type AccountReply = {
   retryAfter?: number
   attemptsLeft?: number
   field?: string
+  /** `deactivationLimit`: when the monthly count starts again. */
+  resetsAt?: string
 }
 
 /** POSTs JSON to /api/v1/account/{path}. Never throws: a network failure is `server`. */
