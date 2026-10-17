@@ -32,6 +32,7 @@ import { InvoiceActions as InvoiceActions_7bcd56d274d3f39f269c02b27204544c } fro
 import { LicenseActions as LicenseActions_4fedb378ccd4b2c25fe18ad54093fb5e } from '@/components/admin/LicenseActions'
 import { LeadReply as LeadReply_572199583e0959dec94dfd8072f04e24 } from '@/components/admin/LeadReply'
 import { ExportLeads as ExportLeads_800dd0645468dc97bf8dbdd34cb01e71 } from '@/components/admin/ExportLeads'
+import { WaitlistActions as WaitlistActions_01ba60a5213bf4e9dc024277d385357a } from '@/components/admin/WaitlistActions'
 import { StatsInsights as StatsInsights_fb73b51a12b70739fa6812617d17b32c } from '@/components/admin/StatsInsights'
 import { AdminIcon as AdminIcon_d500ae2ad98a0a33d640ae0ac1a3417c } from '@/components/admin/AdminIcon'
 import { AdminLogo as AdminLogo_b80a86fce1072afc84cd6a430a965697 } from '@/components/admin/AdminLogo'
@@ -76,6 +77,7 @@ export const importMap = {
   "@/components/admin/LicenseActions#LicenseActions": LicenseActions_4fedb378ccd4b2c25fe18ad54093fb5e,
   "@/components/admin/LeadReply#LeadReply": LeadReply_572199583e0959dec94dfd8072f04e24,
   "@/components/admin/ExportLeads#ExportLeads": ExportLeads_800dd0645468dc97bf8dbdd34cb01e71,
+  "@/components/admin/WaitlistActions#WaitlistActions": WaitlistActions_01ba60a5213bf4e9dc024277d385357a,
   "@/components/admin/StatsInsights#StatsInsights": StatsInsights_fb73b51a12b70739fa6812617d17b32c,
   "@/components/admin/AdminIcon#AdminIcon": AdminIcon_d500ae2ad98a0a33d640ae0ac1a3417c,
   "@/components/admin/AdminLogo#AdminLogo": AdminLogo_b80a86fce1072afc84cd6a430a965697,

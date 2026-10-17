@@ -202,6 +202,7 @@ export interface Config {
       sendDeviceEmail: TaskSendDeviceEmail;
       reconcileOrders: TaskReconcileOrders;
       cleanup: TaskCleanup;
+      sendWaitlistEmail: TaskSendWaitlistEmail;
       inline: {
         input: unknown;
         output: unknown;
@@ -2023,6 +2024,8 @@ export interface Trial {
   createdAt: string;
 }
 /**
+ * A message to one product’s waitlist. It goes once per address, only to people who ticked the box for launch emails and haven’t withdrawn or unsubscribed. People who signed up in Hindi get the Hindi version when its subject and message are both written, else the English one. Save, send yourself a test, then send.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "waitlist-emails".
  */
@@ -2304,7 +2307,8 @@ export interface PayloadJob {
           | 'sendLicenseEmail'
           | 'sendDeviceEmail'
           | 'reconcileOrders'
-          | 'cleanup';
+          | 'cleanup'
+          | 'sendWaitlistEmail';
         taskID: string;
         input?:
           | {
@@ -2347,6 +2351,7 @@ export interface PayloadJob {
         | 'sendDeviceEmail'
         | 'reconcileOrders'
         | 'cleanup'
+        | 'sendWaitlistEmail'
       )
     | null;
   queue?: string | null;
@@ -4524,6 +4529,16 @@ export interface TaskReconcileOrders {
  */
 export interface TaskCleanup {
   input?: unknown;
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskSendWaitlistEmail".
+ */
+export interface TaskSendWaitlistEmail {
+  input: {
+    id: number;
+  };
   output?: unknown;
 }
 /**
