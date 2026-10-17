@@ -123,6 +123,9 @@ export interface Config {
     products: {
       plans: 'plans';
     };
+    licenses: {
+      activations: 'activations';
+    };
   };
   collectionsSelect: {
     pages: PagesSelect<false> | PagesSelect<true>;
@@ -1961,6 +1964,11 @@ export interface License {
    * Internal only.
    */
   notes?: string | null;
+  activations?: {
+    docs?: (number | Activation)[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
   keyHash?: string | null;
   keyEncrypted?: string | null;
   emailedAt?: string | null;
@@ -3682,6 +3690,7 @@ export interface LicensesSelect<T extends boolean = true> {
   issuedAt?: T;
   keyLast4?: T;
   notes?: T;
+  activations?: T;
   keyHash?: T;
   keyEncrypted?: T;
   emailedAt?: T;

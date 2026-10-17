@@ -75,7 +75,11 @@ export const Licenses: CollectionConfig = {
       name: 'licenseKey',
       type: 'text',
       virtual: true,
-      admin: { ...readOnly, description: 'Shown to the customer on their Licenses page.' },
+      admin: {
+        ...readOnly,
+        description: 'Shown to the customer on their Licenses page.',
+        condition: (data) => Boolean(data?.keyEncrypted),
+      },
       hooks: {
         afterRead: [
           async ({ siblingData }) => {
@@ -105,6 +109,8 @@ export const Licenses: CollectionConfig = {
           relationTo: 'plans',
           required: true,
           access: { update: ownerOnlyField },
+          filterOptions: ({ data }) =>
+            data?.product ? { product: { equals: data.product } } : true,
           admin: { width: '50%' },
         },
       ],
@@ -192,6 +198,18 @@ export const Licenses: CollectionConfig = {
       admin: { ...readOnly, position: 'sidebar' },
     },
     { name: 'notes', type: 'textarea', admin: { description: 'Internal only.' } },
+    {
+      name: 'activations',
+      label: 'Devices (activation history)',
+      type: 'join',
+      collection: 'activations',
+      on: 'license',
+      defaultSort: '-lastSeenAt',
+      admin: {
+        defaultColumns: ['deviceName', 'active', 'firstSeenAt', 'lastSeenAt', 'deactivatedBy'],
+        allowCreate: false,
+      },
+    },
     { name: 'keyHash', type: 'text', unique: true, index: true, admin: { hidden: true } },
     { name: 'keyEncrypted', type: 'text', admin: { hidden: true } },
     // Claimed by the license email job, so parallel runs send it once.
