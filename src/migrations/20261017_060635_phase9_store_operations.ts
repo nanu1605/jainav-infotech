@@ -41,6 +41,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   ALTER TABLE "invoices" ADD COLUMN "emailed_at" timestamp(3) with time zone;
   ALTER TABLE "licenses" ADD COLUMN "status_notified_as" "enum_licenses_status_notified_as";
   ALTER TABLE "licenses" ADD COLUMN "status_claimed_at" timestamp(3) with time zone;
+  UPDATE "licenses" SET "status_notified_as" = "status"::text::"enum_licenses_status_notified_as" WHERE "status" IN ('suspended', 'revoked');
   ALTER TABLE "payload_locked_documents_rels" ADD COLUMN "waitlist_emails_id" integer;
   ALTER TABLE "payload_locked_documents_rels" ADD COLUMN "waitlist_deliveries_id" integer;
   ALTER TABLE "waitlist_emails" ADD CONSTRAINT "waitlist_emails_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE set null ON UPDATE no action;
