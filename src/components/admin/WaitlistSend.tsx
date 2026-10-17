@@ -14,7 +14,7 @@ import { useEffect, useState } from 'react'
 const MODAL = 'waitlist-send'
 const people = (n: number) => `${n} ${n === 1 ? 'person' : 'people'}`
 
-/** Test and send buttons for a draft; progress once sending has started. */
+/** Test and send buttons for a draft; progress (and resuming a stopped job) once it has started. */
 export function WaitlistSend({
   id,
   status,
@@ -58,14 +58,6 @@ export function WaitlistSend({
     return () => clearInterval(timer)
   }, [status, router])
 
-  if (status !== 'draft') {
-    return (
-      <span>
-        {status === 'sending' ? 'Sending' : 'Sent'}: {sent} of {recipients}
-      </span>
-    )
-  }
-
   async function send(test: boolean) {
     setBusy(true)
     try {
@@ -77,6 +69,7 @@ export function WaitlistSend({
       })
       const body = (await res.json().catch(() => ({}))) as {
         recipients?: number
+        resumed?: boolean
         errors?: { message?: string }[]
       }
       if (!res.ok) {
@@ -86,7 +79,9 @@ export function WaitlistSend({
       toast.success(
         test
           ? 'Test sent to your email: the English and the Hindi version.'
-          : `Sending to ${people(body.recipients ?? 0)}.`,
+          : body.resumed
+            ? 'Sending resumed.'
+            : `Sending to ${people(body.recipients ?? 0)}.`,
       )
       router.refresh()
     } catch {
@@ -94,6 +89,28 @@ export function WaitlistSend({
     } finally {
       setBusy(false)
     }
+  }
+
+  if (status !== 'draft') {
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+        <span>
+          {status === 'sending' ? 'Sending' : 'Sent'}: {sent} of {recipients}
+        </span>
+        {/* For a job that gave up (its errors are under System, Payload Jobs). */}
+        {status === 'sending' && (
+          <Button
+            buttonStyle="secondary"
+            size="small"
+            margin={false}
+            disabled={busy}
+            onClick={() => void send(false)}
+          >
+            Resume sending
+          </Button>
+        )}
+      </div>
+    )
   }
 
   return (
