@@ -78,3 +78,14 @@ export async function pay(page: Page) {
 }
 
 export const newPage = async (browser: Browser) => (await browser.newContext()).newPage()
+
+/** Signs in to the admin as the Owner that `pnpm seed` creates from DEV_ADMIN_* in .env. */
+export async function signInToAdmin(admin: Page) {
+  await admin.goto('/admin/login')
+  await admin.getByLabel(/^Email/).fill(process.env.DEV_ADMIN_EMAIL!)
+  await admin.getByLabel(/^Password/).fill(process.env.DEV_ADMIN_PASSWORD!)
+  await admin.getByRole('button', { name: 'Login' }).click()
+  await admin.waitForURL(
+    (url) => url.pathname.startsWith('/admin') && !url.pathname.endsWith('/login'),
+  )
+}

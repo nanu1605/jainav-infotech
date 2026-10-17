@@ -7,29 +7,30 @@
  * the Owner that `pnpm seed` creates from DEV_ADMIN_EMAIL and DEV_ADMIN_PASSWORD.
  */
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
-import { address, fillCheckout, mailTo, newPage, pay, signIn, useOwnIp } from './helpers/store'
+import {
+  address,
+  fillCheckout,
+  mailTo,
+  newPage,
+  pay,
+  signIn,
+  signInToAdmin,
+  useOwnIp,
+} from './helpers/store'
 
-const { DEV_ADMIN_EMAIL, DEV_ADMIN_PASSWORD } = process.env
 const CREDIT_NOTE = /JC\/\d{2}-\d{2}\/\d{5}/
 
 test.skip(!!process.env.E2E_BASE_URL, 'The stand-in gateway exists only in development')
-test.skip(!DEV_ADMIN_EMAIL || !DEV_ADMIN_PASSWORD, 'Needs the seeded Owner (DEV_ADMIN_* in .env)')
+test.skip(
+  !process.env.DEV_ADMIN_EMAIL || !process.env.DEV_ADMIN_PASSWORD,
+  'Needs the seeded Owner (DEV_ADMIN_* in .env)',
+)
 // A purchase, the admin's first compiles and a webhook round trip.
 test.describe.configure({ timeout: 180_000 })
 
 test.beforeEach(({ page }, info) => useOwnIp(page, info))
-
-async function signInToAdmin(admin: Page) {
-  await admin.goto('/admin/login')
-  await admin.getByLabel(/^Email/).fill(DEV_ADMIN_EMAIL!)
-  await admin.getByLabel(/^Password/).fill(DEV_ADMIN_PASSWORD!)
-  await admin.getByRole('button', { name: 'Login' }).click()
-  await admin.waitForURL(
-    (url) => url.pathname.startsWith('/admin') && !url.pathname.endsWith('/login'),
-  )
-}
 
 test('the Owner refunds part of an order and the customer sees the credit note', async ({
   page,
@@ -43,14 +44,13 @@ test('the Owner refunds part of an order and the customer sees the credit note',
 
   const admin = await newPage(browser)
   await signInToAdmin(admin)
-  // The admin's REST API with the Owner's cookie: the order as stored.
+  // The admin's REST API with the Owner's cookie: the order as stored. Fetched from the page,
+  // because Payload accepts the cookie only with the browser's Origin / Sec-Fetch-Site headers.
   const stored = async () => {
-    const res = await admin.request.get(
+    const { docs } = (await admin.evaluate(
+      async (url) => (await fetch(url)).json(),
       `/api/orders?where[orderNumber][equals]=${orderNumber}&depth=1`,
-    )
-    const { docs } = (await res.json()) as {
-      docs: { id: number; status: string; creditNotes?: { number: string }[] }[]
-    }
+    )) as { docs: { id: number; status: string; creditNotes?: { number: string }[] }[] }
     return docs[0]!
   }
   const { id } = await stored()
