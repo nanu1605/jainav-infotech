@@ -512,7 +512,9 @@ describe('refunds (spec §11.6)', () => {
     expect(license).toMatchObject({ status: 'revoked', statusNotifiedAs: 'revoked' })
     const full = mailsTo(order, /^Refund for order/)
     expect(full).toHaveLength(1)
-    expect(full[0]!.text).toContain('in full')
+    // The last part, and the whole order refunded so far.
+    expect(full[0]!.text).toContain('the remaining ₹599 of your order')
+    expect(full[0]!.text).toContain('refunded in full (₹999)')
     expect(full[0]!.text).toContain('revoked')
     // The refund email said it: no separate revoked email, now or from the sweep.
     await sendPendingStatusEmails()
@@ -607,6 +609,34 @@ describe('refunds (spec §11.6)', () => {
       status: 409,
     })
   })
+
+  it('leaves the order and license alone when the duplicate payment is disputed', async () => {
+    const { order } = await buy('twicedisputed')
+    const second = await gw('pay', { order_id: order.razorpayOrderId, outcome: 'success' })
+    await settled()
+    const duplicate = second.response.razorpay_payment_id as string
+    sent.length = 0
+    telegrams.length = 0
+
+    const opened = await gw('dispute', { payment_id: duplicate })
+    await settled()
+    const fresh = await orderById(order.id)
+    expect(fresh.status).toBe('paid')
+    expect(fresh.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'payment.dispute.created',
+          paymentId: duplicate,
+          disputeId: opened.dispute.id,
+        }),
+      ]),
+    )
+    expect((await licenseOf(order.id)).status).toBe('active')
+    expect(sent).toHaveLength(0)
+    expect(telegrams).toEqual([
+      `Dispute ${opened.dispute.id} is on a duplicate payment ${duplicate} of order ${order.orderNumber}: refund that payment; the order and license are unchanged.\n${SITE_URL}/admin/collections/orders/${order.id}`,
+    ])
+  })
 })
 
 describe('disputes (spec §11.6)', () => {
@@ -640,6 +670,26 @@ describe('disputes (spec §11.6)', () => {
     expect((await licenseOf(order.id)).status).toBe('suspended')
     expect(telegrams[1]).toContain(`on order ${order.orderNumber}: won. Nothing changes by itself`)
     expect(sent).toHaveLength(1)
+  })
+
+  it('says nothing was changed when a dispute comes after a full refund', async () => {
+    const { order, paymentId } = await buy('disputerefunded')
+    await gw('refund', { payment_id: paymentId, amount: 99_900, outcome: 'processed' })
+    await settled()
+    sent.length = 0
+    telegrams.length = 0
+
+    const opened = await gw('dispute', { payment_id: paymentId })
+    await settled()
+    expect((await orderById(order.id)).status).toBe('refunded')
+    expect((await licenseOf(order.id)).status).toBe('revoked')
+    expect(sent).toHaveLength(0)
+    expect(telegrams).toHaveLength(1)
+    expect(telegrams[0]).toMatch(
+      new RegExp(
+        `^Payment dispute ${opened.dispute.id} on order ${order.orderNumber} .*\\. The order is already refunded; nothing was changed\\.\\n`,
+      ),
+    )
   })
 })
 
@@ -737,6 +787,27 @@ describe('admin actions (spec §10, §9.3)', () => {
     await sendPendingStatusEmails()
     expect(mailsTo(order, /license/)).toHaveLength(1)
   })
+
+  it('emails a later suspension when the license was reinstated while one was sending', async () => {
+    const { order } = await buy('inflight')
+    const { id } = await licenseOf(order.id)
+    await db().execute(sql`UPDATE licenses SET status = 'suspended' WHERE id = ${id}`)
+    vi.mocked(payload.sendEmail).mockImplementationOnce(async (message) => {
+      sent.push(message as SendEmailOptions)
+      // Reinstated before the send is recorded.
+      await db().execute(sql`UPDATE licenses SET status = 'active' WHERE id = ${id}`)
+    })
+    await sendPendingStatusEmails()
+    expect(mailsTo(order, /license is suspended/)).toHaveLength(1)
+    const reinstated = await licenseOf(order.id)
+    expect(reinstated.status).toBe('active')
+    expect(reinstated.statusNotifiedAs).toBeFalsy()
+    expect(reinstated.statusClaimedAt).toBeFalsy()
+
+    await db().execute(sql`UPDATE licenses SET status = 'suspended' WHERE id = ${id}`)
+    await sendPendingStatusEmails()
+    expect(mailsTo(order, /license is suspended/)).toHaveLength(2)
+  })
 })
 
 describe('credit notes with GST (spec §11.4)', () => {
@@ -790,5 +861,54 @@ describe('credit notes with GST (spec §11.4)', () => {
       buyer: { stateCode: '27' },
       totals: { taxable: 25_424, cgst: 0, sgst: 0, igst: 4_576, total: 30_000 },
     })
+  })
+
+  it('splits the last note’s CGST and SGST again after several small refunds', async () => {
+    const { order, paymentId } = await buy('gstsmall')
+    const invoice = await invoiceOf(order)
+    for (let i = 0; i < 4; i++) {
+      await gw('refund', { payment_id: paymentId, amount: 100, outcome: 'processed' })
+      await settled()
+    }
+    await refund(order.id, { reason: 'The rest' })
+    await settled()
+    const notes = await creditNotes(order.id)
+    expect(notes).toHaveLength(5)
+    expect(notes[0]!.totals).toMatchObject({ taxable: 85, cgst: 8, sgst: 7, total: 100 })
+    // Left as the sums would leave it: CGST 7,588, SGST 7,591.
+    expect(notes[4]!.totals).toMatchObject({ cgst: 7_590, sgst: 7_589, total: 99_500 })
+    for (const { totals } of notes) {
+      expect(totals.cgst).toBe(Math.ceil((totals.cgst + totals.sgst) / 2))
+    }
+    const total = sums(notes)
+    expect(total).toMatchObject({
+      subtotal: invoice.totals.subtotal,
+      discount: invoice.totals.discount,
+      taxable: invoice.totals.taxable,
+      total: invoice.totals.total,
+    })
+    expect(total.cgst! + total.sgst!).toBe(invoice.totals.cgst + invoice.totals.sgst)
+  })
+
+  it('credits prices before GST from the taxable value, never below zero', async () => {
+    await setCommerce({ pricesIncludeGst: false })
+    const { order } = await buy('gstplus')
+    const invoice = await invoiceOf(order)
+    expect(invoice.totals).toMatchObject({ subtotal: 99_900, taxable: 99_900, total: 117_882 })
+    // More than the subtotal before tax: the rest's subtotal would go negative.
+    await refund(order.id, { amount: 100_000, reason: 'Most of it back' })
+    await settled()
+    await refund(order.id, { reason: 'The rest' })
+    await settled()
+    const notes = await creditNotes(order.id)
+    expect(notes).toHaveLength(2)
+    expect(notes[0]!.totals).toMatchObject({ subtotal: 84_746, taxable: 84_746, total: 100_000 })
+    for (const note of notes) {
+      for (const value of Object.values(note.totals)) expect(value).toBeGreaterThanOrEqual(0)
+      const line = note.lines[0]!
+      expect(line.unitPrice - line.discount).toBe(note.totals.taxable)
+    }
+    expect(sums(notes)).toEqual(invoice.totals)
+    await setCommerce({ pricesIncludeGst: true })
   })
 })

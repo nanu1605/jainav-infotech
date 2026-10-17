@@ -213,8 +213,11 @@ export async function sendLicenseStatusEmail(id: number) {
     await db.execute(sql`UPDATE licenses SET status_claimed_at = NULL WHERE id = ${id}`)
     throw error
   }
+  // Told only if still so: reinstated (or revoked) while sending, the new status is still untold.
   await db.execute(sql`
-    UPDATE licenses SET status_notified_as = ${status}, status_claimed_at = NULL WHERE id = ${id}
+    UPDATE licenses SET status_claimed_at = NULL,
+      status_notified_as = CASE WHEN status::text = ${status} THEN ${status} ELSE status_notified_as END
+    WHERE id = ${id}
   `)
 }
 

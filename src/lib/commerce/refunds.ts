@@ -248,11 +248,20 @@ export async function refundWebhook(
 type Totals = Invoice['totals']
 const TOTALS = ['subtotal', 'discount', 'taxable', 'cgst', 'sgst', 'igst', 'total'] as const
 
-/** What the invoice still holds after earlier credit notes, field by field: they add up exactly. */
-const remainder = (invoice: Invoice, earlier: Invoice[]): Totals =>
-  Object.fromEntries(
+/**
+ * What the invoice still holds after earlier credit notes, field by field: they add up exactly.
+ * At home its tax is split again (CGST = half rounded up, spec §11.4), as each partial note's was:
+ * per head the notes can then differ from the invoice by a paisa or two, the tax never does.
+ */
+function remainder(invoice: Invoice, earlier: Invoice[]): Totals {
+  const rest = Object.fromEntries(
     TOTALS.map((f) => [f, invoice.totals[f] - earlier.reduce((n, note) => n + note.totals[f], 0)]),
   ) as Totals
+  if (invoice.taxMode !== 'cgst_sgst') return rest
+  const tax = rest.cgst + rest.sgst
+  const cgst = Math.ceil(tax / 2)
+  return { ...rest, cgst, sgst: tax - cgst }
+}
 
 /**
  * A partial refund's tax, from the original invoice as issued (its mode and rate), never from
@@ -266,7 +275,10 @@ function partial(invoice: Invoice, amount: number): Totals {
     homeStateCode: invoice.taxMode === 'cgst_sgst' ? invoice.buyer.stateCode : '',
   })
   const { taxable, cgst, sgst, igst, total } = tax
-  return { subtotal: amount, discount: 0, taxable, cgst, sgst, igst, total }
+  // Prices before GST: the invoice's subtotal is net of tax, so the refund's is its taxable value.
+  const t = invoice.totals
+  const exclusive = t.cgst + t.sgst + t.igst > 0 && t.subtotal - t.discount === t.taxable
+  return { subtotal: exclusive ? taxable : amount, discount: 0, taxable, cgst, sgst, igst, total }
 }
 
 /** The credit note: the original's seller and buyer snapshots, one refund line (spec §11.4). */
@@ -477,10 +489,11 @@ async function duplicateRefunded(payload: Payload, order: Order, refund: Razorpa
 }
 
 /**
- * The dispute webhooks (spec §11.6). A new dispute marks a paid order `disputed` and suspends its
- * license through the Local API (audited; the email is sent here, so a failure retries the job).
- * The later stages (won, lost, closed, under review, action required) only alert: the Owner
- * reinstates or revokes the license by hand. Each stage of a dispute alerts once.
+ * The dispute webhooks (spec §11.6). A new dispute of the order's own payment marks a paid order
+ * `disputed` and suspends its license through the Local API (audited; the email is sent here, so
+ * a failure retries the job). A dispute of a duplicate payment changes nothing: the alert says to
+ * refund that payment. The later stages (won, lost, closed, under review, action required) only
+ * alert: the Owner reinstates or revokes the license by hand. Each stage of a dispute alerts once.
  */
 export async function disputeWebhook(
   payload: Payload,
@@ -489,12 +502,18 @@ export async function disputeWebhook(
   dispute: RazorpayDispute,
 ) {
   const created = event === 'payment.dispute.created'
-  if (created) {
-    await drizzle(payload).execute(sql`
+  // The webhook also finds an order by its Razorpay order: any other payment on it is a duplicate.
+  const duplicate = dispute.payment_id !== order.razorpayPaymentId
+  let disputed = false
+  let suspended = 0
+  if (created && !duplicate) {
+    const { rows } = await drizzle(payload).execute(sql`
       UPDATE orders SET status = 'disputed', updated_at = now()
       WHERE id = ${order.id} AND status IN ('paid', 'partially-refunded')
+      RETURNING id
     `)
-    const { errors } = await payload.update({
+    disputed = rows.length > 0
+    const { docs: changed, errors } = await payload.update({
       collection: 'licenses',
       where: { and: [{ order: { equals: order.id } }, { status: { equals: 'active' } }] },
       data: { status: 'suspended' },
@@ -503,6 +522,7 @@ export async function disputeWebhook(
       context: { skipStatusEmail: true, disableRevalidate: true },
     })
     if (errors.length) throw new Error(`refunds: order ${order.id}: the license wasn't suspended`)
+    suspended = changed.length
     const { docs } = await payload.find({
       collection: 'licenses',
       where: { order: { equals: order.id } },
@@ -529,16 +549,25 @@ export async function disputeWebhook(
   )
   if (!added) return
   const link = adminLink(order.id)
-  if (created) {
+  const stage = event.slice('payment.dispute.'.length).replace('_', ' ')
+  if (duplicate) {
+    await alert(
+      created
+        ? `Dispute ${dispute.id} is on a duplicate payment ${dispute.payment_id} of order ${order.orderNumber}: refund that payment; the order and license are unchanged.\n${link}`
+        : `Dispute ${dispute.id} on a duplicate payment ${dispute.payment_id} of order ${order.orderNumber}: ${stage}. The order and license are unchanged.\n${link}`,
+    )
+  } else if (created) {
     const reason = dispute.reason_code ? ` (${dispute.reason_code})` : ''
     const by = dispute.respond_by
       ? `, respond by ${formatDate('en', new Date(dispute.respond_by * 1000))}`
       : ''
+    const done = disputed
+      ? `The order is disputed${suspended ? ' and its license suspended' : '; it had no active license to suspend'}.`
+      : `The order is already ${order.status}${suspended ? '; its license was suspended' : '; nothing was changed'}.`
     await alert(
-      `Payment dispute ${dispute.id} on order ${order.orderNumber}${reason}${by}. The order is disputed and its license suspended.\n${link}`,
+      `Payment dispute ${dispute.id} on order ${order.orderNumber}${reason}${by}. ${done}\n${link}`,
     )
   } else {
-    const stage = event.slice('payment.dispute.'.length).replace('_', ' ')
     await alert(
       `Payment dispute ${dispute.id} on order ${order.orderNumber}: ${stage}. Nothing changes by itself: reinstate or revoke the license in the admin.\n${link}`,
     )

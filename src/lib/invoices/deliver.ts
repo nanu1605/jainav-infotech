@@ -209,12 +209,15 @@ export async function sendRefundEmail(creditNoteId: number) {
         overrideAccess: true,
       }),
     ])
+    // Up to this note: a retry sent after a later refund still tells this one as it was.
+    const refunded = notes.reduce((sum, n) => sum + n.totals.total, 0)
     const message = await refundEmail({
       locale: order.locale,
       orderNumber: order.orderNumber,
       amount: note.totals.total,
+      refunded,
       creditNoteNumber: note.number,
-      full: notes.reduce((sum, n) => sum + n.totals.total, 0) >= order.total,
+      full: refunded >= order.total,
       productName: product.name,
       accountUrl: absoluteUrl(order.locale, '/account/orders'),
     })

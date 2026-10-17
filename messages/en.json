@@ -989,6 +989,7 @@
       "subject": "Refund for order {orderNumber}",
       "partial": "We've refunded {amount} of your order {orderNumber}.",
       "full": "We've refunded your order {orderNumber} in full: {amount}.",
+      "fullRest": "We've refunded the remaining {amount} of your order {orderNumber}, so it's now refunded in full ({total}).",
       "amount": "Amount refunded",
       "creditNote": "Credit note",
       "timing": "The money goes back to the account you paid from. Banks usually take 5–7 working days to show it.",
