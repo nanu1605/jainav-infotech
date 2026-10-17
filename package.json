@@ -48,7 +48,7 @@
     "@payloadcms/ui": "3.90.2",
     "@react-email/components": "1.0.12",
     "@react-pdf/renderer": "4.9.0",
-    "@sentry/nextjs": "11.2.0",
+    "@sentry/nextjs": "11.4.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cross-env": "^10.1.0",
