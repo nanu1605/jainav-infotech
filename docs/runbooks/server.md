@@ -75,6 +75,10 @@ On the server, in `/srv/jainav`:
     `jainav_staging` with `STAGING_DB_PASSWORD`.
   - R2 (`S3_*`, `NEXT_PUBLIC_CDN_URL`, `DOWNLOADS_BASE_URL`), Resend, Turnstile, Telegram, Sentry.
   - `OTP_PEPPER` (customer sign-in codes; `openssl rand -hex 32`, one per environment).
+  - Licensing: `LICENSING_PRIVATE_KEY`, `LICENSING_KEY_ID`, `LICENSE_KEY_ENCRYPTION_KEY`,
+    `DEVICE_ID_PEPPER` from `pnpm gen:licensing-keys`, one set per environment
+    ([licensing.md](licensing.md)). Without them the licensing API answers 503 and paid orders
+    can't be fulfilled. The last two must never change once licenses exist.
   - Staging only: `STAGING_BASIC_AUTH=1`, Razorpay test keys and webhook secret
     ([store.md](store.md)), its own R2 buckets.
   - `chmod 600 .env production.env staging.env`.
