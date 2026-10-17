@@ -32,6 +32,7 @@ export function WaitlistSend({
   const modified = useFormModified()
   const [busy, setBusy] = useState(false)
   const [count, setCount] = useState<number | null>(null)
+  const [countFailed, setCountFailed] = useState(false)
   const base = `${config.routes.api}/waitlist-emails/${id}`
 
   // Who can get the saved draft now (again after each save: the product may have changed).
@@ -39,9 +40,14 @@ export function WaitlistSend({
     if (status !== 'draft' || modified) return
     const controller = new AbortController()
     fetch(`${base}/recipients`, { credentials: 'include', signal: controller.signal })
-      .then((res) => (res.ok ? (res.json() as Promise<{ count: number }>) : null))
-      .then((body) => setCount(body?.count ?? null))
-      .catch(() => undefined)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`recipients: ${res.status}`)
+        setCount(((await res.json()) as { count: number }).count)
+        setCountFailed(false)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setCountFailed(true)
+      })
     return () => controller.abort()
   }, [base, status, modified])
 
@@ -90,21 +96,22 @@ export function WaitlistSend({
     }
   }
 
-  const blocked = busy || modified || count === null
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
       <span>
         {modified
           ? 'Save your changes to send.'
-          : count === null
-            ? 'Counting recipients…'
-            : `${people(count)} can get it.`}
+          : count !== null
+            ? `${people(count)} can get it.`
+            : countFailed
+              ? 'Couldn’t count recipients. Reload to try again.'
+              : 'Counting recipients…'}
       </span>
       <Button
         buttonStyle="secondary"
         size="small"
         margin={false}
-        disabled={blocked}
+        disabled={busy || modified}
         onClick={() => void send(true)}
       >
         Send a test to me
@@ -112,7 +119,7 @@ export function WaitlistSend({
       <Button
         size="small"
         margin={false}
-        disabled={blocked || count === 0}
+        disabled={busy || modified || !count}
         onClick={() => openModal(MODAL)}
       >
         {count ? `Send to ${people(count)}…` : 'Send…'}
