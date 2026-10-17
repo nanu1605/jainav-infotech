@@ -37,6 +37,8 @@ const prepareLicense: CollectionBeforeChangeHook = async ({
     ) {
       throw new APIError('Only the Owner can revoke a license or reinstate a revoked one.', 403)
     }
+    // Reinstated: a later suspension or revocation emails the customer again.
+    if (changed && data.status === 'active') data.statusNotifiedAs = null
     return data
   }
   if (req.user && data.source === 'purchase') {
@@ -50,6 +52,29 @@ const prepareLicense: CollectionBeforeChangeHook = async ({
 const emailNewKey: CollectionAfterChangeHook = async ({ doc, operation, req }) => {
   if (operation === 'create' && doc.source !== 'purchase') {
     await req.payload.jobs.queue({ task: 'sendLicenseEmail', input: { id: doc.id }, req })
+  }
+  return doc
+}
+
+/**
+ * Suspending or revoking a license emails its customer (spec §11.7), whoever does it. Sent after
+ * the response, when the change has committed; the reconcile job's sweep sends what this can't.
+ * Code that tells the customer itself (refunds, disputes) sets `context.skipStatusEmail`.
+ */
+const emailStatusChange: CollectionAfterChangeHook = async ({
+  doc,
+  previousDoc,
+  operation,
+  req,
+}) => {
+  if (
+    operation === 'update' &&
+    doc.status !== previousDoc?.status &&
+    (doc.status === 'suspended' || doc.status === 'revoked') &&
+    !req.context.skipStatusEmail
+  ) {
+    const { statusEmailSoon } = await import('@/lib/licensing/deliver')
+    statusEmailSoon(doc.id)
   }
   return doc
 }
@@ -69,12 +94,24 @@ export const Licenses: CollectionConfig = {
     listSearchableFields: ['keyLast4'],
     description:
       'Create new issues a complimentary license: the key is generated on save and emailed to the customer.',
+    components: {
+      edit: { beforeDocumentControls: ['@/components/admin/LicenseActions#LicenseActions'] },
+    },
   },
   defaultSort: '-issuedAt',
   // A copy would carry the source's email state and update period: licenses come from Create new.
   disableDuplicate: true,
   access: { read: storeStaff, create: ownerOnly, update: storeStaff, delete: nobody },
-  hooks: { beforeChange: [prepareLicense], afterChange: [emailNewKey] },
+  hooks: { beforeChange: [prepareLicense], afterChange: [emailNewKey, emailStatusChange] },
+  endpoints: [
+    {
+      path: '/:id/resend-email',
+      method: 'post',
+      // Imported on use: server-only code can't load in the Payload CLI, which reads this config.
+      handler: async (req) =>
+        (await import('@/lib/licensing/deliver')).resendLicenseEmailEndpoint(req),
+    },
+  ],
   fields: [
     {
       name: 'licenseKey',
