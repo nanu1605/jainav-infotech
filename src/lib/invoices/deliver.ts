@@ -71,8 +71,9 @@ export async function storeInvoicePdf(id: number) {
 /**
  * The sendOrderEmail job (spec §11.7): the order confirmation with the license key and the invoice
  * attached, in the order's language. Claimed in SQL first, so parallel runs never send it twice; a failed send
- * releases the claim for the retry. The claim is a 20-minute lease, shorter than the 30 minutes
- * after which src/jobs releases a job a dead process left running, so that re-run can take it.
+ * releases the claim for the retry. The claim is a 12-minute lease: shorter than the 30 minutes
+ * after which src/jobs releases a job a dead process left running, and than the retries' span (the
+ * last of five starts about 15 minutes after the first), so a dead run's claim is retaken in time.
  * A claim still held without the email recorded as sent fails the run: Payload retries, then
  * alerts, instead of the job ending silently without an email.
  */
@@ -83,7 +84,7 @@ export async function sendOrderEmail(orderId: number) {
     UPDATE orders SET emailed_at = now()
     WHERE id = ${orderId}
       AND (emailed_at IS NULL
-        OR (emailed_at < now() - interval '20 minutes'
+        OR (emailed_at < now() - interval '12 minutes'
           AND NOT (COALESCE(events, '[]'::jsonb) @> ${sent}::jsonb)))
     RETURNING id
   `)

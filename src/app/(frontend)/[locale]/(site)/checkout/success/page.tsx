@@ -12,6 +12,7 @@ import { ClientMessages } from '@/i18n/clientMessages'
 import type { Locale } from '@/i18n/routing'
 import { getCustomer } from '@/lib/account/session'
 import { getClient } from '@/lib/cms'
+import { errorCode } from '@/lib/commerce/http'
 import { customerOrder, storeOpen } from '@/lib/commerce/store'
 import { formatINR } from '@/lib/format'
 import { licenseKeyOf } from '@/lib/licensing/deliver'
@@ -67,17 +68,18 @@ export default async function CheckoutSuccessPage({ params, searchParams }: Prop
   // The key the order created (spec §11.3 step 11), scoped to this customer's own license.
   let licenseKey: string | undefined
   if (view === 'paid') {
-    const { docs } = await payload.find({
-      collection: 'licenses',
-      where: { and: [{ order: { equals: order.id } }, { customer: { equals: customer.id } }] },
-      limit: 1,
-      depth: 0,
-      overrideAccess: true,
-    })
+    // Reading decrypts the key: if that fails, the page still shows the order without it.
     try {
+      const { docs } = await payload.find({
+        collection: 'licenses',
+        where: { and: [{ order: { equals: order.id } }, { customer: { equals: customer.id } }] },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+      })
       licenseKey = docs[0] && licenseKeyOf(docs[0])
-    } catch {
-      licenseKey = undefined
+    } catch (error) {
+      console.error('checkout/success: license key unavailable:', errorCode(error))
     }
   }
 

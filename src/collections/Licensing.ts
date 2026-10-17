@@ -4,6 +4,7 @@ import {
   type CollectionBeforeChangeHook,
   type CollectionConfig,
 } from 'payload'
+import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 
 import { hasRole, nobody, ownerOnly, ownerOnlyField, storeStaff } from '@/access/roles'
 
@@ -11,8 +12,8 @@ export const LICENSE_STATUSES = ['active', 'suspended', 'revoked', 'expired'] as
 export type LicenseStatus = (typeof LICENSE_STATUSES)[number]
 
 const readOnly = { readOnly: true } as const
-/** Written only by server code: staff can't change it through the admin or REST. */
-const fixed = { update: () => false }
+/** Written only by server code: staff can't set or change it through the admin or REST. */
+const fixed = { create: () => false, update: () => false }
 
 /**
  * A new license gets its key here (spec §12.2), whoever creates it: fulfilment, or the Owner
@@ -240,7 +241,12 @@ export const Licenses: CollectionConfig = {
  * Support deactivates a device by unticking Active; the app can then use the slot elsewhere. When
  * and by whom are set here, never taken from the request (the licensing API writes them in SQL).
  */
-const deactivateFromAdmin: CollectionBeforeChangeHook = ({ data, originalDoc, operation }) => {
+const deactivateFromAdmin: CollectionBeforeChangeHook = async ({
+  data,
+  originalDoc,
+  operation,
+  req,
+}) => {
   if (operation !== 'update' || !originalDoc) return data
   if (!originalDoc.active && data.active) {
     throw new APIError('A deactivated device activates again from the app.', 400)
@@ -248,8 +254,17 @@ const deactivateFromAdmin: CollectionBeforeChangeHook = ({ data, originalDoc, op
   delete data.deactivatedAt
   delete data.deactivatedBy
   if (originalDoc.active && data.active === false) {
-    data.deactivatedAt = new Date().toISOString()
-    data.deactivatedBy = 'support'
+    // Payload read the row before this hook: lock it and look again, so a deactivation from the
+    // app or the account page that committed meanwhile keeps its own when and by whom.
+    const adapter = req.payload.db as unknown as PostgresAdapter
+    const tx = adapter.sessions[String(await req.transactionID)]?.db ?? adapter.drizzle
+    const { rows } = await tx.execute(
+      sql`SELECT active FROM activations WHERE id = ${originalDoc.id} FOR UPDATE`,
+    )
+    if ((rows[0] as { active: boolean } | undefined)?.active) {
+      data.deactivatedAt = new Date().toISOString()
+      data.deactivatedBy = 'support'
+    }
   }
   return data
 }

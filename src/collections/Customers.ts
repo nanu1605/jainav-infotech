@@ -64,6 +64,8 @@ export const Customers: CollectionConfig = {
     update: storeStaff,
     delete: ownerOnly,
   },
+  // A copy would carry the source's consent record (group subfields escape create access).
+  disableDuplicate: true,
   hooks: { beforeDelete: [keepBuyers] },
   fields: [
     {

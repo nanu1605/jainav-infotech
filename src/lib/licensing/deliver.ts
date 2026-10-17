@@ -39,8 +39,8 @@ const COLUMNS = {
 } as const
 
 /**
- * Sends once, like the order email: a 20-minute claim in SQL first (shorter than the 30 minutes
- * after which src/jobs releases a job a dead process left running), the sent time after sending.
+ * Sends once, like the order email: a 12-minute claim in SQL first (shorter than the 30-minute job
+ * release in src/jobs and than the retries' span), the sent time after sending.
  * A failed send releases the claim; a claim still held without the email sent fails the run, so
  * Payload retries and then alerts instead of ending silently without an email.
  */
@@ -56,7 +56,7 @@ async function once(
   const { rows } = await drizzle(payload).execute(sql`
     UPDATE ${t} SET ${claimed} = now()
     WHERE id = ${id} AND ${sent} IS NULL
-      AND (${claimed} IS NULL OR ${claimed} < now() - interval '20 minutes')
+      AND (${claimed} IS NULL OR ${claimed} < now() - interval '12 minutes')
     RETURNING id
   `)
   if (!rows.length) {

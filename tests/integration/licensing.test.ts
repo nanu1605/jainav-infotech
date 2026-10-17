@@ -808,6 +808,27 @@ describe('emails (spec §11.7)', () => {
     expect(sent.filter((m) => m.to === english.email)).toHaveLength(1)
   })
 
+  it('retakes a license email claim a dead run left after 12 minutes, not sooner', async () => {
+    const customer = await newCustomer('lease')
+    const license = await newLicense(customer.id)
+    await db().execute(sql`DELETE FROM payload_jobs WHERE input->>'id' = ${String(license.id)}`)
+    const { sendLicenseEmail } = await import('@/lib/licensing/deliver')
+    const claim = (minutes: number) =>
+      db().execute(
+        sql`UPDATE licenses SET email_claimed_at = now() - make_interval(mins => ${minutes}) WHERE id = ${license.id}`,
+      )
+    await claim(5)
+    await expect(sendLicenseEmail(license.id)).rejects.toThrow(/claimed by another run/)
+    expect(sent.filter((m) => m.to === customer.email)).toHaveLength(0)
+    await claim(13)
+    await sendLicenseEmail(license.id)
+    expect(sent.filter((m) => m.to === customer.email)).toHaveLength(1)
+    // Recorded as sent: an old claim no longer matters.
+    await claim(13)
+    await sendLicenseEmail(license.id)
+    expect(sent.filter((m) => m.to === customer.email)).toHaveLength(1)
+  })
+
   it('tells the license’s customer about a new device, and nobody once the account is deleted', async () => {
     const customer = await newCustomer('device')
     const license = await newLicense(customer.id)
@@ -965,5 +986,14 @@ describe('admin rules', () => {
     ids.customers.push(created.id)
     expect(created.deletedAt ?? null).toBeNull()
     expect(created.marketingConsent?.given ?? false).toBe(false)
+    // A copy would carry another customer's consent record.
+    await expect(
+      payload.duplicate({
+        collection: 'customers',
+        id: created.id,
+        data: { email: email('consent-copy') },
+        ...as('owner'),
+      }),
+    ).rejects.toMatchObject({ status: 400 })
   })
 })
