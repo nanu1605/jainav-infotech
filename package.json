@@ -29,6 +29,8 @@
     "seed:publish": "cross-env NODE_OPTIONS=--no-deprecation payload run scripts/seed/publish.ts",
     "seed:store": "cross-env NODE_OPTIONS=--no-deprecation payload run scripts/seed/store.ts",
     "import:release": "cross-env NODE_OPTIONS=--no-deprecation payload run scripts/import-release.ts",
+    "gen:licensing-keys": "tsx scripts/gen-licensing-keys.ts",
+    "license-test-client": "tsx scripts/license-test-client.ts",
     "prepare": "husky",
     "lhci": "lhci autorun"
   },

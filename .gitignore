@@ -59,6 +59,9 @@ node_modules/
 /.outbox
 /private-files
 
+# scripts/license-test-client state (license keys and tokens)
+/.license-client/
+
 # Lighthouse CI reports
 .lighthouseci/
 .claude/worktrees/
