@@ -8,8 +8,6 @@ It must run outside the VPS, so use UptimeRobot or Better Stack (free tier).
   - `https://{{DOMAIN}}/`: HTTP 200.
   - `https://{{DOMAIN}}/api/v1/health`: HTTP 200 with `"ok":true`. The app and its database
     answer.
-  - `https://{{DOMAIN}}/api/v1/updates/vyro/windows/x86_64/0.0.1`: HTTP 200 or 204. The VYRO
-    update feed.
   - From Phase 8: `https://{{DOMAIN}}/api/v1/licensing/health`: HTTP 200 with `"ok":true`. The
     licensing keys are set and the database answers ([licensing.md](licensing.md)).
 - Alerts: the provider's Telegram integration, to the same chat as the site's alerts

@@ -83,7 +83,7 @@ On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/la
 - [ ] A real restore test on the server.
 - [ ] SPF / DKIM / DMARC; mail-tester ≥ 9/10.
 - [ ] Final content check; Owner publishes the legal pages (§8.13).
-- [ ] VYRO download in production: `pnpm import:release <tag>` (v1.0.0 and v1.0.1 shipped on 2026-10-16: which one?), then the Owner publishes it.
+- [ ] VYRO download in production: `pnpm import:release <tag>` (the latest is v1.4.0, imported into dev as a draft on 2026-10-18), then the Owner publishes it.
 - [ ] Lighthouse on the production URLs (§15).
 
 ## Milestone C — VYRO store live (Launch 2)
@@ -143,11 +143,13 @@ With Tanishq's inputs (steps in docs/runbooks/store.md):
 - [ ] Owner publishes the final Terms, Refunds and VYRO EULA.
 - [ ] Production smoke tests; set `storeEnabled = true`.
 
+Input still missing: a signed VYRO build that uses the licensing API. v1.4.0 (2026-10-18) has a valid update signature but no code signing (SmartScreen warns) and no licensing yet (spec §12.6).
+
 ## Milestone D — Growth (Phase 11+; order agreed after Launch 2)
 
 - [ ] Admin: custom dashboard; support tickets; Translator role + Translations view + "Draft Hindi with AI"; TOTP 2FA.
 - [ ] Look and feel: WebGL home hero; GSAP sequences if needed.
-- [ ] Store: Google sign-in; subscriptions (if chosen); international payments (if enabled); volume licenses and quantity > 1; update-feed eligibility via Bearer token.
+- [ ] Store: Google sign-in; subscriptions (if chosen); international payments (if enabled); volume licenses and quantity > 1. (Update-feed eligibility via Bearer token is dropped: VYRO updates from GitHub, docs/decisions.md "VYRO updates".)
 - [ ] Baby: shared commerce API + cross-domain sign-in for Baby's website.
 - [ ] Growth: AI assistant, MenuMesh live demo, VYRO browser teaser, creator / affiliate program, verified-buyer reviews, comparison pages, site search, public roadmap, case studies, press kit, partner program, Startup India / Udyam badges.
 
