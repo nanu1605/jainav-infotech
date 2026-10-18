@@ -221,13 +221,13 @@ The public keys as a JWKS. The app embeds these at build time; this endpoint is 
 
 ## Related: the update feed
 
-Not part of this API, listed so the app has every URL in one place (spec §12.5, built in Phase 3, frozen):
+Not part of this API. VYRO doesn't use it: installed copies update from GitHub (`nanu1605/vyro-releases`, the release's `latest.json`; docs/decisions.md, "VYRO updates"). The site's feed (spec §12.5, built in Phase 3) stays for a later switch:
 
 ```
 GET https://{{DOMAIN}}/api/v1/updates/vyro/{{target}}/{{arch}}/{{current_version}}?channel=stable
 ```
 
-200 with Tauri's `{ version, notes, pub_date, url, signature }`, or 204 when there is no newer release. Before installing, the app compares `pub_date` with the token's `upd` and warns instead of auto-updating when the update is past the customer's update period.
+200 with Tauri's `{ version, notes, pub_date, url, signature }`, or 204 when there is no newer release. Whichever feed the app reads, it compares `pub_date` with the token's `upd` before installing and warns instead of auto-updating when the update is past the customer's update period.
 
 ## Quick test with curl
 
