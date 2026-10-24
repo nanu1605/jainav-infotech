@@ -190,7 +190,7 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
 - **No personal data in Caddy's logs:** the access log and the upstream-error log drop all request headers (visitor IPs, Access identities) and the `token` query parameter. Checked with a request carrying both: neither reached any log line.
 - **The restore test's Postgres sits on an internal network** shared only with the restore job. It briefly holds a decrypted copy of production under a fixed password that is in this repository.
 - **Backups** (`docker/backup`): nightly at 02:30 IST, `pg_dump` of `jainav` and `umami`, encrypted with age to a public key (the private key stays offline with the Owner), uploaded with rclone to an R2 bucket; 30 daily and 12 monthly copies; Telegram alert on failure. The restore test restores the newest dumps into a throwaway Postgres whose data lives only in memory, and checks the tables, the migrations and the site's content. The real restore test needs the server; locally the full path (backup → R2 stand-in → decrypt → restore → checks) passed on 2026-10-16. The test caught a bug on the way: on a first run, pruning a missing `monthly/` folder failed the whole backup.
-- **Rehearsal:** the whole stack ran locally on 2026-10-16 (port 8443, self-signed certificates, a local folder for the bucket). Checked:
+- **Rehearsal:** the whole stack ran locally on 2026-10-16, and again on 2026-10-24 after Phase 9 and the dependency bumps (port 8443, self-signed certificates, a local folder for the bucket). Checked:
   - both apps healthy, with migrations under their own roles;
   - production smoke tests 8/8;
   - staging basic auth with the machine-API exemption, and `X-Robots-Tag`;
