@@ -10,7 +10,12 @@ export default defineConfig({
     projects: [
       {
         extends: true,
-        test: { name: 'unit', include: ['tests/unit/**/*.test.ts'] },
+        test: {
+          name: 'unit',
+          include: ['tests/unit/**/*.test.ts'],
+          // next-intl's middleware imports next/server without the extension Node's loader needs.
+          server: { deps: { inline: ['next-intl'] } },
+        },
       },
       {
         extends: true,
