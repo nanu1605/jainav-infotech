@@ -992,7 +992,7 @@
       "fullRest": "We've refunded the remaining {amount} of your order {orderNumber}, so it's now refunded in full ({total}).",
       "amount": "Amount refunded",
       "creditNote": "Credit note",
-      "timing": "The money goes back to the account you paid from. Banks usually take 5–7 working days to show it.",
+      "timing": "The money goes back to the account you paid from. Banks usually take 5–10 working days to show it.",
       "licenseRevoked": "Your {product} license from this order has been revoked, so the app now runs as the free version.",
       "attached": "Your credit note {creditNoteNumber} is attached as a PDF.",
       "support": "Questions about your refund? Reply to this email and we'll help."
