@@ -5,8 +5,6 @@
  */
 import type { CollectionSlug, RequiredDataFromCollectionSlug } from 'payload'
 
-import { richText } from './richText'
-
 /** Hindi values for localized leaf fields; arrays are matched to the English rows by index. */
 export type HiPatch = { [key: string]: string | HiPatch | HiPatch[] | undefined }
 /** Seeded as drafts, so fields required only on publish (e.g. a legal page's effective date) may be empty. */
@@ -1078,17 +1076,9 @@ export const pages: SeedDoc<'pages'>[] = [
   },
 ]
 
-// ─── Legal drafts (full text in Phase 3; Owner approves by publishing, spec §8.13) ─
+// ─── Legal drafts (Owner approves by publishing, spec §8.13) ─────────────────
 
-const legalPlaceholder = {
-  en: richText(
-    'Draft placeholder. The full text is prepared in Phase 3 and published by the Owner after review.',
-  ),
-  hi: richText(
-    'ड्राफ़्ट। पूरा पाठ Phase 3 में तैयार होगा और समीक्षा के बाद Owner इसे प्रकाशित करेंगे। अंग्रेज़ी और हिंदी संस्करण में अंतर होने पर अंग्रेज़ी संस्करण मान्य होगा।',
-  ),
-}
-
+/** Their text is in ./legal/{slug}.{en,hi}.md (seed.ts legalBody). */
 export const legalPages: DraftSeedDoc<'legal-pages'>[] = [
   ['privacy', 'Privacy Policy', 'गोपनीयता नीति'],
   ['terms', 'Terms of Service', 'सेवा की शर्तें'],
@@ -1098,12 +1088,9 @@ export const legalPages: DraftSeedDoc<'legal-pages'>[] = [
   ['cookies', 'Cookie Policy', 'कुकी नीति'],
   ['privacy-requests', 'Privacy Requests and Grievances', 'गोपनीयता अनुरोध और शिकायतें'],
 ].map(([slug, title, titleHi]) => ({
-  en: { title, slug, version: '0.1', body: legalPlaceholder.en, ...draftHi },
+  en: { title, slug, version: '0.1', ...draftHi },
   hi: { title: titleHi },
 }))
-
-/** Rich text has no per-row ids, so Hindi bodies are written as whole values. */
-export const legalBodyHi = legalPlaceholder.hi
 
 /**
  * Commerce settings (spec §9.2): the schema defaults, plus the seeded legal drafts' version as
@@ -1186,6 +1173,7 @@ export const navigation = {
           { label: 'Refunds', href: '/legal/refunds-cancellation' },
           { label: 'Shipping', href: '/legal/shipping-delivery' },
           { label: 'Cookies', href: '/legal/cookies' },
+          { label: 'Privacy requests', href: '/legal/privacy-requests' },
         ],
       },
     ],
@@ -1222,6 +1210,7 @@ export const navigation = {
           { label: 'रिफ़ंड' },
           { label: 'शिपिंग' },
           { label: 'कुकी' },
+          { label: 'गोपनीयता अनुरोध' },
         ],
       },
     ],
