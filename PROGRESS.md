@@ -73,6 +73,7 @@ In the repository (done; rehearsed locally, see docs/runbooks/server.md#rehearsa
 - [x] Security headers / CSP (§16); `pnpm audit` in CI; Dependabot.
 - [x] VYRO release import (`pnpm import:release`); v0.3.0 verified (SHA-256 `0dacbbaa…25dd3`) and imported into dev as a draft.
 - [x] Runbooks: `docs/runbooks/` (launch, server, cloudflare, backups, monitoring).
+- [x] Legal drafts in English and draft Hindi (`scripts/seed/legal/`), not yet approved; data map corrected against the code.
 
 On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/launch.md):
 
@@ -83,8 +84,8 @@ On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/la
 - [ ] Sentry project, Umami website, external uptime monitor + status page; an uptime alert reaches Telegram.
 - [ ] A real restore test on the server.
 - [ ] SPF / DKIM / DMARC; mail-tester ≥ 9/10.
-- [ ] Final content check; Owner publishes the legal pages (§8.13).
-- [ ] VYRO download in production: `pnpm import:release <tag>` (the latest is v1.4.0, imported into dev as a draft on 2026-10-18), then the Owner publishes it.
+- [ ] Legal review (docs/decisions.md, "Legal drafts"): blanks filled, then the Owner publishes every legal page but the EULA (§8.13). Final content check.
+- [ ] VYRO download in production: `pnpm import:release <tag>` (v1.4.0 was imported into dev as a draft on 2026-10-18; the latest is now v2.0.4, whose features the seeded copy doesn't mention), then the Owner publishes it.
 - [ ] Lighthouse on the production URLs (§15).
 
 ## Milestone C — VYRO store live (Launch 2)
