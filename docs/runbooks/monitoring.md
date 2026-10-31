@@ -17,7 +17,7 @@ It must run outside the VPS, so use UptimeRobot or Better Stack (free tier).
 
 ## Telegram alerts from the site
 
-Phase 4 sends a Telegram alert for every new lead. The backup job alerts on failure. Both need
+Phase 4 sends a Telegram alert for every new lead except newsletter sign-ups. The backup job alerts on failure. Both need
 `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`: the bot from @BotFather, the chat id from
 `https://api.telegram.org/bot<token>/getUpdates` after messaging the bot.
 
