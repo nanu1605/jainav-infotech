@@ -76,6 +76,7 @@ In the repository (done; rehearsed locally, see docs/runbooks/server.md#rehearsa
 
 On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/launch.md):
 
+- [ ] Before going live (docs/decisions.md, "October advisories"): happy-dom fix and Node image 24.22.1 or later (from 2026-11-04), Payload 3.92 or later (from 2026-11-05).
 - [ ] Provision the VPS; firewall to Cloudflare's ranges.
 - [ ] Cloudflare: DNS, SSL Full (strict), Origin CA certificate, WAF skip rule, Bot Fight Mode off, Access on `/admin*` and `/api/users/*`; R2 buckets + custom domains.
 - [ ] GitHub environments, secrets, production reviewer, `DEPLOY_ENABLED`; staging and production live.
