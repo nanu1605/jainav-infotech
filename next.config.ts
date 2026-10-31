@@ -22,6 +22,18 @@ const nextConfig: NextConfig = {
   // The Docker image runs the traced standalone server (docker/Dockerfile sets NEXT_OUTPUT);
   // local `pnpm start` and Lighthouse runs keep `next start`, which standalone output disables.
   output: process.env.NEXT_OUTPUT === 'standalone' ? 'standalone' : undefined,
+  // next dev would otherwise add an AGENTS.md to the repository when a coding agent starts it.
+  agentRules: false,
+  experimental: {
+    // Would stop next dev and next build under a coding agent until a patched Next is installed,
+    // even while the fix waits out the two-week rule (docs/decisions.md).
+    agentUpgrade: false,
+    // 16.4's route prediction and next-intl's unprefixed English paths can refetch a link's
+    // prefetch endlessly (vercel/next.js#100431): 4,000 requests in 8 s on a build with a
+    // database. The image builds without one and doesn't loop. Dev can't show this.
+    // Drop it once #100464 ships.
+    optimisticRouting: false,
+  },
   // Turbopack on Windows can't resolve Payload's Sass imports without this.
   // See https://github.com/vercel/next.js/issues/86431
   sassOptions: {
