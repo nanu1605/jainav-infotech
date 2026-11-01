@@ -26,11 +26,19 @@ Monitoring: [monitoring.md](monitoring.md). The order of everything for Launch 1
   # expect: no / no / no
   systemctl restart ssh
   apt-get update && apt-get install -y unattended-upgrades && dpkg-reconfigure -f noninteractive unattended-upgrades
+  # Logs: a line stays 180 to 187 days, which the privacy policy states (docs/decisions.md). The
+  # name must sort after Ubuntu's own syslog.conf, or its ForwardToSyslog=yes wins.
+  install -d /etc/systemd/journald.conf.d
+  printf '%s\n' '[Journal]' Storage=persistent MaxRetentionSec=187day MaxFileSec=7day SystemMaxUse=8G \
+    SystemMaxFiles=300 ForwardToSyslog=no > /etc/systemd/journald.conf.d/zz-retention.conf
+  systemctl restart systemd-journald
+  journalctl -u systemd-journald -n 3 -o cat   # expect: max 8.0G
   ```
 
 - Install Docker Engine and the Compose plugin from Docker's apt repository
-  (docs.docker.com/engine/install/ubuntu), then `usermod -aG docker deploy`. Membership of the
-  `docker` group is root-equivalent: only the `deploy` key and the deploy pipeline get it.
+  (docs.docker.com/engine/install/ubuntu), then `usermod -aG docker,systemd-journal deploy`.
+  Membership of the `docker` group is root-equivalent: only the `deploy` key and the deploy
+  pipeline get it. `systemd-journal` lets it read the logs ([monitoring.md](monitoring.md#logs)).
 - Install `cloudflared` and connect the **SSH tunnel** ([cloudflare.md](cloudflare.md#ssh-tunnel)).
   Deploys and your own SSH sessions go through it, so port 22 never has to be open to the
   internet.
@@ -218,3 +226,5 @@ local folder for the backup bucket). These all worked:
 - `deploy.sh` both ways: a good image went live, and a broken image rolled back.
 
 The SSH tunnel and the GitHub side can only be checked against the real accounts.
+
+Docker Desktop has no journald: for a local rehearsal, set `LOG_DRIVER=json-file` in `.env`.
