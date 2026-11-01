@@ -86,6 +86,8 @@ services:
       PGUSER: postgres
       PGPASSWORD: ${POSTGRES_PASSWORD}
       BACKUP_DATABASES: jainav umami
+      # Empty keeps Umami's data for good (docs/runbooks/retention.md).
+      UMAMI_RETENTION_DAYS: ${UMAMI_RETENTION_DAYS:-}
       BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:?}
       BACKUP_BUCKET: ${BACKUP_BUCKET:?}
       # rclone remote "backups" = the R2 backup bucket.
