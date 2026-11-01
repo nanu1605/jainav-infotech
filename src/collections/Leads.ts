@@ -6,6 +6,7 @@ import {
   type CollectionConfig,
   type FieldAccess,
   type FieldHook,
+  type Payload,
   type PayloadHandler,
   type Where,
 } from 'payload'
@@ -20,6 +21,21 @@ import type { Lead } from '@/payload-types'
 /** Emails are matched across leads and data requests, so store them normalized. */
 export const normalizeEmail: FieldHook = ({ value }) =>
   typeof value === 'string' ? value.trim().toLowerCase() : value
+
+/**
+ * Stops marketing to every lead of an address. No `req`, as this is no staff contact with those
+ * leads. A lead left out throws, so nobody is told it worked.
+ */
+export async function unsubscribeLeads(payload: Payload, email: string) {
+  const { errors } = await payload.update({
+    collection: 'leads',
+    where: { and: [{ email: { equals: email } }, { unsubscribedAt: { exists: false } }] },
+    data: { unsubscribedAt: new Date().toISOString() },
+    overrideAccess: true,
+    depth: 0,
+  })
+  if (errors.length) throw new Error(`leads: ${errors.length} not unsubscribed`)
+}
 
 // Only server code (Local API, overrideAccess) ever reads or writes the token hash.
 const noFieldAccess: FieldAccess = () => false
@@ -120,7 +136,11 @@ const CSV_COLUMNS: [string, (lead: Lead) => unknown][] = [
   ['UTM campaign', (l) => l.source?.utm?.campaign],
   ['Consent version', (l) => l.consent?.textVersion],
   ['Consent given at (IST)', (l) => istDateTime(l.consent?.givenAt)],
-  ['Marketing consent', (l) => yesNo(l.marketingConsent?.given)],
+  // Yes only while it stands: the dates beside it say why not, as the leads report counts it.
+  [
+    'Marketing consent',
+    (l) => yesNo(l.marketingConsent?.given && !l.marketingConsent.withdrawnAt && !l.unsubscribedAt),
+  ],
   ['Marketing at (IST)', (l) => istDateTime(l.marketingConsent?.at)],
   ['Marketing withdrawn at (IST)', (l) => istDateTime(l.marketingConsent?.withdrawnAt)],
   ['Confirmed at (IST)', (l) => istDateTime(l.confirmedAt)],

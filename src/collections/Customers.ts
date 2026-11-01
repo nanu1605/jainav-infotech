@@ -5,14 +5,15 @@ import { routing } from '@/i18n/routing'
 import { gstinState } from '@/lib/tax/gstin'
 import { GST_STATES } from '@/lib/tax/states'
 
-import { normalizeEmail } from './Leads'
+import { normalizeEmail, unsubscribeLeads } from './Leads'
 
 /** What the customer agreed to is a record: the API ignores staff input to it, on create too. */
 const record = { create: () => false, update: () => false }
 
 /**
  * Orders and invoices must be kept for the tax period (spec §11.2): such customers are anonymized
- * instead. Others go with their sessions (the sessions' customer column can't be emptied).
+ * instead. Others go with their sessions (the sessions' customer column can't be emptied), and
+ * marketing to their address stops, as when an account is anonymized.
  */
 const keepBuyers: CollectionBeforeDeleteHook = async ({ id, req }) => {
   const { totalDocs } = await req.payload.count({
@@ -23,7 +24,7 @@ const keepBuyers: CollectionBeforeDeleteHook = async ({ id, req }) => {
   })
   if (totalDocs) {
     throw new APIError(
-      'This customer has orders, which tax law requires keeping: anonymize the profile instead of deleting it.',
+      'This customer has orders, which tax law requires keeping: use Delete account, above the document, which anonymizes the profile.',
       400,
     )
   }
@@ -34,8 +35,19 @@ const keepBuyers: CollectionBeforeDeleteHook = async ({ id, req }) => {
     req,
   })
   if (licenses.totalDocs) {
-    throw new APIError('This customer has licenses: revoke or keep them instead of deleting.', 400)
+    throw new APIError(
+      'This customer has licenses: use Delete account, above the document, which anonymizes the profile.',
+      400,
+    )
   }
+  const { email } = await req.payload.findByID({
+    collection: 'customers',
+    id,
+    depth: 0,
+    overrideAccess: true,
+    req,
+  })
+  await unsubscribeLeads(req.payload, email)
   await req.payload.delete({
     collection: 'customer-sessions',
     where: { customer: { equals: id } },
@@ -56,6 +68,9 @@ export const Customers: CollectionConfig = {
     useAsTitle: 'email',
     defaultColumns: ['email', 'name', 'state', 'status', 'createdAt'],
     listSearchableFields: ['email', 'name', 'businessName'],
+    components: {
+      edit: { beforeDocumentControls: ['@/components/admin/CustomerActions#CustomerActions'] },
+    },
   },
   access: {
     read: storeStaff,
@@ -67,6 +82,14 @@ export const Customers: CollectionConfig = {
   // A copy would carry the source's consent record (group subfields escape create access).
   disableDuplicate: true,
   hooks: { beforeDelete: [keepBuyers] },
+  endpoints: [
+    {
+      path: '/:id/delete-account',
+      method: 'post',
+      // Imported on use: server-only code can't load in the Payload CLI, which reads this config.
+      handler: async (req) => (await import('@/lib/account/profile')).deleteAccountEndpoint(req),
+    },
+  ],
   fields: [
     {
       name: 'email',

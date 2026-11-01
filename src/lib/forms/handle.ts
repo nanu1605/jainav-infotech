@@ -16,6 +16,7 @@ import { routing, type Locale } from '@/i18n/routing'
 import { getClient } from '@/lib/cms'
 import { runQueuedJobs } from '@/lib/commerce/fulfil'
 import { requestCustomer } from '@/lib/commerce/http'
+import { unsubscribeLeads } from '@/collections/Leads'
 import { dueDates, newTicketNumber } from '@/lib/dataRequests'
 import { inboxAddress, sendEmail, sendTelegram, settle, type Inbox } from '@/lib/notify'
 import { clientIp, hashIp, limit, sha256 } from '@/lib/rateLimit'
@@ -269,7 +270,7 @@ const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome 
     }
   },
 
-  // Subscribing is the marketing consent; it counts once confirmed (double opt-in, spec §13).
+  // Subscribing is the marketing consent: recorded only when confirmed (double opt-in, spec §13).
   async newsletter(v, ctx) {
     const subscribed = await exists(ctx.payload, {
       and: [
@@ -285,7 +286,7 @@ const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome 
     const id = await createLead(ctx, {
       type: 'newsletter',
       email: v.email,
-      marketingConsent: marketingConsent(true, ctx.now),
+      marketingConsent: marketingConsent(false, ctx.now),
       confirmTokenHash: sha256(token),
     })
     return { collection: 'leads', id, confirm: token }
@@ -564,14 +565,21 @@ export async function confirmNewsletter(req: Request): Promise<Response> {
   })
   const lead = docs[0]
   if (!lead) return statusPage(null, 'invalid')
-  if (Date.now() - Date.parse(lead.createdAt) > CONFIRM_DAYS * 86_400_000) {
+  // An opt-out stands: consenting again takes a new sign-up.
+  const optedOut = lead.unsubscribedAt || lead.marketingConsent?.withdrawnAt
+  if (optedOut || Date.now() - Date.parse(lead.createdAt) > CONFIRM_DAYS * 86_400_000) {
     return statusPage(lead.locale, 'invalid')
   }
   // Single use: the hash goes with the confirmation.
+  const now = new Date().toISOString()
   await payload.update({
     collection: 'leads',
     id: lead.id,
-    data: { confirmedAt: new Date().toISOString(), confirmTokenHash: null },
+    data: {
+      confirmedAt: now,
+      confirmTokenHash: null,
+      marketingConsent: marketingConsent(true, now),
+    },
     overrideAccess: true,
     depth: 0,
   })
@@ -597,13 +605,7 @@ export async function unsubscribe(req: Request): Promise<Response> {
       : statusPage(null, 'unsubscribeFailed')
   }
   try {
-    await payload.update({
-      collection: 'leads',
-      where: { and: [{ email: { equals: lead.email } }, { unsubscribedAt: { exists: false } }] },
-      data: { unsubscribedAt: new Date().toISOString() },
-      overrideAccess: true,
-      depth: 0,
-    })
+    await unsubscribeLeads(payload, lead.email)
   } catch (error) {
     console.error('forms/unsubscribe: failed:', errorCode(error))
     return req.method === 'POST'

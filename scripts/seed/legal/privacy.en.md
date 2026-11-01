@@ -100,7 +100,7 @@ You can:
 - **Ask what we hold:** a summary of your data, what we do with it and who received it. The form calls this "Get a copy of my data".
 - **Correct or complete it:** we can change account details and add a correcting note to form data. We do not edit issued invoices or orders.
 - **Ask us to delete it:** we do, unless we still need it for its purpose or the law requires us to keep it. Our system cannot currently delete orders, invoices, licenses, device records or trial records.
-- **Delete a store account:** on its Settings page. This replaces your email, clears your name, phone, state, business name and GSTIN, withdraws marketing consent and signs you out everywhere. If you cannot use that page, ask us: staff make the same changes by hand, except that the record of your marketing choice stays as it was. We keep your orders and invoices with their billing details, licenses and keys (which keep working), device records, form data, privacy requests and a basic account record.
+- **Delete a store account:** on its Settings page. This replaces your email, clears your name, phone, state, business name and GSTIN, withdraws marketing consent and signs you out everywhere. If you cannot use that page, ask us: we make the same changes for you. We keep your orders and invoices with their billing details, licenses and keys (which keep working), device records, form data, privacy requests and a basic account record.
 - **Withdraw consent:** at any time. We then stop that use within a reasonable time, unless the law requires or allows it to continue. Earlier use stands, we still complete what you have paid for, and a service that needs that data may have to stop.
 - **Name someone to act for you** if you die or cannot act yourself.
 
