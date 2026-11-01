@@ -428,6 +428,29 @@ describe('private data', () => {
     ).rejects.toMatchObject(forbidden)
   })
 
+  it('lets support correct a privacy request’s dates, and nothing it records', async () => {
+    const request = await payload.create({
+      collection: 'data-requests',
+      data: { type: 'grievance', email: `late-${run}@b.test`, details: 'As sent.', status: 'new' },
+    })
+    const updated = await payload.update({
+      collection: 'data-requests',
+      id: request.id,
+      data: {
+        dueAt: '2030-06-14T00:00:00.000Z',
+        acknowledgeBy: '2030-05-16T00:00:00.000Z',
+        details: 'Changed.',
+      },
+      ...as('support'),
+    })
+    expect(updated).toMatchObject({
+      dueAt: '2030-06-14T00:00:00.000Z',
+      acknowledgeBy: '2030-05-16T00:00:00.000Z',
+      details: 'As sent.',
+    })
+    await payload.delete({ collection: 'data-requests', id: request.id })
+  })
+
   it('never exposes a testimonial consent note publicly', async () => {
     const t = await payload.create({
       collection: 'testimonials',

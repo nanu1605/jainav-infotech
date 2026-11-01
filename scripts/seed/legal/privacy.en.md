@@ -15,9 +15,9 @@ Sending a form means you agree to the uses listed for it here. You can withdraw 
 - **Waitlist form:** email and product. Why: to confirm your sign-up and, only if you tick the box, email you when the product is ready. If we send that email, we keep a hash of your address so that you get it only once.
 - **Newsletter form:** email. Why: to send a confirmation link and, once you confirm, news of new releases.
 - **Careers form:** name, email, CV (PDF), optional phone, links and message, and any job you applied for. Why: to assess your application and reply.
-- **Privacy request form:** email, request type, details, and your account if signed in. Why: to act on your request and keep a record.
+- **Privacy request form:** email, request type, details, your language, and your account if signed in. We add a ticket number and the dates it is due. Why: to act on your request, reply in your language and keep a record.
 
-Every form except the privacy request form also stores your language, the page you were on, the referring page and any campaign tags, so we can reply in your language and see what led to your message. It also stores a consent record, to show what you agreed to: the notice version, the time and a keyed hash of your IP address. Staff can add a status and notes.
+The other forms also store your language, the page you were on, the referring page and any campaign tags, so we can reply in your language and see what led to your message. They also store a consent record, to show what you agreed to: the notice version, the time and a keyed hash of your IP address. Staff can add a status and notes.
 
 ### Email, phone and WhatsApp
 
@@ -58,7 +58,7 @@ For cookies and browser storage, see the [Cookie Policy](/legal/cookies).
 - **Resend:** sends our emails, so it receives their addresses, content and attachments, including staff alerts with everything you typed in a form, sign-in codes, license keys and invoices.
 - **{{MAILBOX_PROVIDER}}:** hosts our mailbox, which receives those alerts and your emails, and sends our replies.
 - **Razorpay:** only when you pay. It receives the amount, order number, your name, email and phone, and what you enter in its window.
-- **Telegram:** staff alerts such as the form type, job, budget band or order number, with no contact details or messages.
+- **Telegram:** staff alerts such as the form type, job, budget band, or order or ticket number, with no contact details or messages.
 - **Sentry:** when switched on, the error reports described under Technical data.
 - **Google Maps:** only after you click Show map on the [contact page](/contact). Google then gets your IP address and browser details.
 - **WhatsApp:** nothing from this website until you click a WhatsApp button, whose message can include the page address.

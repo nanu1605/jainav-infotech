@@ -1,7 +1,5 @@
 import 'server-only'
 
-import { randomInt } from 'node:crypto'
-
 import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 import { after } from 'next/server'
 import type { Payload } from 'payload'
@@ -11,6 +9,7 @@ import { licensingConfig } from '@/lib/licensing/keys'
 import { clientIp, hashIp, limit } from '@/lib/rateLimit'
 import { gstinState } from '@/lib/tax/gstin'
 import { GST_STATES, type StateCode } from '@/lib/tax/states'
+import { randomCode } from '@/lib/tokens'
 import type { Coupon, Customer, Order } from '@/payload-types'
 
 import { addOrderEvent, checkPayment, fulfilOrder, runQueuedJobs } from './fulfil'
@@ -41,11 +40,9 @@ import {
 
 /** Statuses that count as a use of a coupon (per-customer limit, spec §11.5). */
 const REDEEMED: Order['status'][] = ['paid', 'refunded', 'partially-refunded', 'disputed']
-const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 
 /** Order numbers like JO-7K2QDM9X: 40 random bits, so they reveal nothing about volume. */
-export const newOrderNumber = () =>
-  `JO-${Array.from({ length: 8 }, () => CROCKFORD[randomInt(32)]).join('')}`
+export const newOrderNumber = () => `JO-${randomCode(8)}`
 
 type Guarded = { customer: Customer; payload: Payload }
 

@@ -203,6 +203,8 @@ export interface Config {
       reconcileOrders: TaskReconcileOrders;
       cleanup: TaskCleanup;
       sendWaitlistEmail: TaskSendWaitlistEmail;
+      sendDataRequestAck: TaskSendDataRequestAck;
+      remindDataRequests: TaskRemindDataRequests;
       inline: {
         input: unknown;
         output: unknown;
@@ -2054,10 +2056,31 @@ export interface WaitlistEmail {
  */
 export interface DataRequest {
   id: number;
+  /**
+   * Quoted in the acknowledgement email.
+   */
+  ticketNumber?: string | null;
   email: string;
-  type: 'access' | 'correction' | 'erasure' | 'withdraw-consent' | 'grievance';
+  type: 'access' | 'correction' | 'erasure' | 'withdraw-consent' | 'nomination' | 'grievance';
   details?: string | null;
+  /**
+   * The language of the page it was sent from.
+   */
+  locale?: ('en' | 'hi') | null;
   status: 'new' | 'in-progress' | 'completed' | 'rejected';
+  /**
+   * One month from receipt. A daily reminder goes out until it is closed. Correct it if the request arrived before it was entered.
+   */
+  dueAt?: string | null;
+  /**
+   * Grievances: 48 hours from receipt. Correct it if the complaint arrived before it was entered.
+   */
+  acknowledgeBy?: string | null;
+  /**
+   * Set when the automatic email goes out. If it failed, reply by hand with the ticket number and enter the time.
+   */
+  acknowledgedAt?: string | null;
+  ackClaimedAt?: string | null;
   handledBy?: (number | null) | User;
   handledAt?: string | null;
   /**
@@ -2308,7 +2331,9 @@ export interface PayloadJob {
           | 'sendDeviceEmail'
           | 'reconcileOrders'
           | 'cleanup'
-          | 'sendWaitlistEmail';
+          | 'sendWaitlistEmail'
+          | 'sendDataRequestAck'
+          | 'remindDataRequests';
         taskID: string;
         input?:
           | {
@@ -2352,6 +2377,8 @@ export interface PayloadJob {
         | 'reconcileOrders'
         | 'cleanup'
         | 'sendWaitlistEmail'
+        | 'sendDataRequestAck'
+        | 'remindDataRequests'
       )
     | null;
   queue?: string | null;
@@ -3873,10 +3900,16 @@ export interface WaitlistEmailsSelect<T extends boolean = true> {
  * via the `definition` "data-requests_select".
  */
 export interface DataRequestsSelect<T extends boolean = true> {
+  ticketNumber?: T;
   email?: T;
   type?: T;
   details?: T;
+  locale?: T;
   status?: T;
+  dueAt?: T;
+  acknowledgeBy?: T;
+  acknowledgedAt?: T;
+  ackClaimedAt?: T;
   handledBy?: T;
   handledAt?: T;
   customer?: T;
@@ -4539,6 +4572,24 @@ export interface TaskSendWaitlistEmail {
   input: {
     id: number;
   };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskSendDataRequestAck".
+ */
+export interface TaskSendDataRequestAck {
+  input: {
+    id: number;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskRemindDataRequests".
+ */
+export interface TaskRemindDataRequests {
+  input?: unknown;
   output?: unknown;
 }
 /**
