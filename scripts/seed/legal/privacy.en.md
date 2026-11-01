@@ -30,7 +30,7 @@ If you create an account or buy a paid plan:
 - **Sign-in:** a one-time code, stored with your email and IP address only as keyed hashes, then a hashed session token, your browser type and last use. Why: to sign you in.
 - **Account:** email, language, marketing choice and any name, phone, state, business name and GSTIN you add. Why: to run your account and prepare invoices.
 - **Orders and invoices:** billing name, email, state and any phone, business name and GSTIN you add; the plan, amounts, coupon, payment references, refund and dispute history; and the Terms and EULA versions you accepted, with the time and a keyed hash of your IP address. Why: to fulfil orders, handle refunds and disputes, keep tax records and show what you accepted.
-- **Payment:** you pay in Razorpay's window. Your card number, CVV, UPI PIN and bank login go to Razorpay, not to us. Razorpay sends us the result with your email, phone and a payment method summary (UPI id, or card network, last four digits and issuer, or bank). Why: to confirm payments, refunds and disputes.
+- **Payment:** you pay in Razorpay's window. Your card number, CVV, UPI PIN and bank login go to Razorpay, not to us. Razorpay sends us the result with your email, phone and a payment method summary (UPI id, or card network, last four digits and issuer, or bank). We read what confirms the payment, such as its reference, amount and status, and do not keep the rest. Why: to confirm payments, refunds and disputes.
 
 ### Licenses and trials
 
@@ -76,7 +76,7 @@ Our server is in {{SERVER_LOCATION}}. We ask Cloudflare to store files in its As
 - **Sign-in codes, sessions and abuse limits:** codes last 10 minutes, sessions about 30 days after last use or until you sign out, and abuse-limit records about two hours. Automatic jobs remove them.
 - **Store account:** your details until you delete the account, then a basic record with no end date. Inactive accounts do not expire.
 - **Orders, invoices and credit notes:** as long as tax and company law require, currently eight financial years {{CONFIRM_WITH_CA}}. Deletion after that is a target, not an automatic job.
-- **Razorpay's payment messages:** a daily job deletes them 90 days after receipt.
+- **What we keep of Razorpay's payment messages:** a daily job deletes it 90 days after receipt.
 - **License, device and trial records:** no end date at present, so a license keeps working and a device cannot restart a trial.
 - **Server logs:** {{LOG_RETENTION}}.
 - **Analytics:** no end date at present.

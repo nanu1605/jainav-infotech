@@ -87,17 +87,18 @@ export const paymentSchema = z.object({
 })
 export type RazorpayPayment = z.infer<typeof paymentSchema>
 
-/** Razorpay sends empty notes as `[]`. */
+/** All we read of a refund's notes is the order id our own refunds put there. Empty notes are `[]`. */
 const notesSchema = z
   .union([z.record(z.string(), z.unknown()), z.array(z.unknown())])
   .nullish()
-  .transform((notes) => (notes && !Array.isArray(notes) ? notes : {}))
+  .transform((notes): { orderId?: unknown } =>
+    notes && !Array.isArray(notes) ? { orderId: notes.orderId } : {},
+  )
 
 export const refundSchema = z.object({
   id: z.string(),
   payment_id: z.string(),
   amount: z.number().int(),
-  currency: z.string().optional(),
   status: z.string(),
   notes: notesSchema,
 })
