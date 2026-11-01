@@ -48,7 +48,7 @@ services:
     logging: *logging
 
   umami:
-    image: ghcr.io/umami-software/umami:3.4.0
+    image: ghcr.io/umami-software/umami:3.4.1
     restart: unless-stopped
     depends_on:
       postgres:
