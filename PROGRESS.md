@@ -142,7 +142,7 @@ With Tanishq's inputs (steps in docs/runbooks/store.md):
 
 - [ ] Switch to Razorpay live keys (after activation).
 - [ ] A real purchase with a small amount, then a refund.
-- [ ] Owner publishes the final Terms, Refunds and VYRO EULA.
+- [ ] Owner publishes the final Terms, Refunds, Shipping and VYRO EULA (the checkout refuses orders until all four are live).
 - [ ] Production smoke tests; set `storeEnabled = true`.
 
 Input still missing: a signed VYRO build that uses the licensing API. v1.4.0 (2026-10-18) has a valid update signature but no code signing (SmartScreen warns) and no licensing yet (spec §12.6).

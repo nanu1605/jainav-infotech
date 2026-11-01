@@ -37,6 +37,23 @@ export async function storeOpen(payload?: Payload): Promise<boolean> {
   return settings.storeEnabled === true
 }
 
+/**
+ * Whether every legal page the checkout links to is live, read as a visitor reads them: a buyer
+ * can't accept a EULA that is a 404 (spec §8.13).
+ */
+export async function checkoutPagesPublished(
+  payload: Payload,
+  productSlug: string,
+): Promise<boolean> {
+  const slugs = ['terms', `eula-${productSlug}`, 'refunds-cancellation', 'shipping-delivery']
+  const { totalDocs } = await payload.count({
+    collection: 'legal-pages',
+    where: { slug: { in: slugs } },
+    overrideAccess: false,
+  })
+  return totalDocs === slugs.length
+}
+
 export type Purchasable = { product: Product; plan: Plan }
 
 /**

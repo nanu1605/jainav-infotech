@@ -41,6 +41,10 @@ test('signs in with an emailed code, pays and gets the invoice', async ({ page, 
     }),
   ])
 
+  // A paid order never shows the "not confirmed" page.
+  await page.goto(`/checkout/failed?order=${orderNumber}`)
+  await expect(page).toHaveURL(new RegExp(`/checkout/success\\?order=${orderNumber}$`))
+
   // The order is listed with its invoice.
   await page.goto('/account/orders')
   await expect(page.getByRole('table')).toContainText(orderNumber)
@@ -50,6 +54,36 @@ test('signs in with an emailed code, pays and gets the invoice', async ({ page, 
   await signIn(stranger, address('stranger'))
   const res = await stranger.goto(`/checkout/success?order=${orderNumber}`)
   expect(res?.status()).toBe(404)
+})
+
+test('the checkout shows the refund and delivery pages before paying', async ({ page }) => {
+  await signIn(page, address('policies'), '/checkout/vyro/pro')
+  const main = page.locator('main')
+  for (const [name, href] of [
+    ['Refunds and Cancellation', '/legal/refunds-cancellation'],
+    ['Shipping and Delivery', '/legal/shipping-delivery'],
+  ] as const) {
+    const link = main.getByRole('link', { name: new RegExp(name) })
+    await expect(link).toHaveAttribute('href', href)
+    await expect(link).toHaveAttribute('target', '_blank')
+    expect((await page.request.get(href)).status(), href).toBe(200)
+  }
+  // GST is off in these runs: nothing promises a GST invoice or input tax credit.
+  await expect(main.getByText(/We don't charge GST at the moment/)).toBeVisible()
+  await expect(main).not.toContainText('For a GST invoice')
+  await page.goto('/account/settings')
+  await expect(page.locator('main').getByText(/We don't charge GST at the moment/)).toBeVisible()
+  await expect(page.locator('main')).not.toContainText('input tax credit')
+})
+
+test('the page after an unconfirmed payment promises no outcome', async ({ page }) => {
+  const res = await page.goto('/checkout/failed')
+  expect(res?.status()).toBe(200)
+  const main = page.locator('main')
+  await expect(main.getByText(/If money left your account/)).toBeVisible()
+  await expect(main).not.toContainText('No money was taken')
+  await page.goto('/hi/checkout/failed')
+  await expect(page.locator('main').getByText(/खाते से पैसे कट गए/)).toBeVisible()
 })
 
 test('a failed payment keeps the form for another try', async ({ page }) => {

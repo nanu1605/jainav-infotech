@@ -10,6 +10,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 import config from '@/payload.config'
 
+import { publishCheckoutPages } from './legalPages'
+
 const pending: Promise<unknown>[] = []
 vi.mock('next/server', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/server')>()),
@@ -262,6 +264,7 @@ beforeAll(async () => {
     overrideAccess: true,
   })
   ids.plan = plan.id
+  restore.push(await publishCheckoutPages(payload, `${run}-app`))
 })
 
 beforeEach(async () => {
@@ -559,6 +562,24 @@ describe('checkout (spec §11.3)', () => {
     expect(hindi.body).toEqual({ error: 'invalid', field: 'billing.name' })
     const signedOut = await createRoute(request('/api/v1/checkout/create', { body: {} }))
     expect(signedOut.status).toBe(401)
+  })
+
+  it('refuses the order while the EULA the checkout links to is unpublished', async () => {
+    const setStatus = (status: 'draft' | 'published') =>
+      payload.update({
+        collection: 'legal-pages',
+        where: { slug: { equals: `eula-${run}-app` } },
+        data: { _status: status },
+        depth: 0,
+        overrideAccess: true,
+        context: { disableRevalidate: true },
+      })
+    await setStatus('draft')
+    const refused = await createOrder(cookie)
+    expect(refused.status).toBe(409)
+    expect(refused.body).toEqual({ error: 'unavailable' })
+    await setStatus('published')
+    expect((await createOrder(cookie)).status).toBe(200)
   })
 
   it('verifies, fulfils once and runs the invoice and email jobs', async () => {

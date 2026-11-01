@@ -31,6 +31,7 @@ import {
   type QuoteView,
 } from './schemas'
 import {
+  checkoutPagesPublished,
   findPurchasable,
   getCommerceSettings,
   storeOpen,
@@ -169,9 +170,10 @@ export async function createHandler(req: Request) {
   }
   const { product: productSlug, plan: planCode, coupon: code, billing, locale } = parsed.data
   const cfg = razorpayConfig()
-  const [settings, site] = await Promise.all([
+  const [settings, site, pagesPublished] = await Promise.all([
     getCommerceSettings(payload),
     payload.findGlobal({ slug: 'site-settings', depth: 0, overrideAccess: true }),
+    checkoutPagesPublished(payload, productSlug),
   ])
   // A tax invoice must name the seller's GSTIN (spec §11.4), and site settings could lose it
   // after GST was turned on.
@@ -183,10 +185,11 @@ export async function createHandler(req: Request) {
     !licensing ||
     !settings.currentTermsVersion ||
     !settings.currentEulaVersion ||
-    !gstReady
+    !gstReady ||
+    !pagesPublished
   ) {
     console.error(
-      'checkout: unavailable: set the Razorpay and licensing keys, the current Terms and EULA versions and, with GST on, the company GSTIN.',
+      'checkout: unavailable: set the Razorpay and licensing keys, the current Terms and EULA versions and, with GST on, the company GSTIN, and publish the Terms, EULA, refunds and delivery pages.',
     )
     return json(409, { error: 'unavailable' })
   }
