@@ -625,7 +625,8 @@
       "paid": "Paid",
       "refunded": "Refunded",
       "partially-refunded": "Partly refunded",
-      "disputed": "Disputed"
+      "disputed": "Disputed",
+      "chargeback": "Reversed by your bank"
     },
     "overview": {
       "greeting": "Hello, {name}",
@@ -1007,6 +1008,11 @@
       "attached": "Your credit note {creditNoteNumber} is attached as a PDF.",
       "support": "Questions about your refund? Reply to this email and we'll help."
     },
+    "refundFailed": {
+      "subject": "A refund for order {orderNumber} didn't go through",
+      "body": "We tried to refund {amount} for your order {orderNumber}, but the refund failed, so the money hasn't gone back to you.",
+      "next": "You don't need to do anything yet. We'll try again or arrange another route with you."
+    },
     "duplicateRefund": {
       "subject": "We've refunded a duplicate payment for order {orderNumber}",
       "body": "Your order {orderNumber} was paid twice, so we've refunded the extra payment of {amount}. Your order and license aren't affected."
@@ -1021,6 +1027,11 @@
         "subject": "Your {product} license has been revoked",
         "body": "Your {product} license has been revoked, after a refund or because the license terms weren't followed.",
         "next": "The key can no longer be activated, and Pro features stop when {product} next checks the license."
+      },
+      "reinstated": {
+        "subject": "Your {product} license is active again",
+        "body": "We've reinstated your {product} license.",
+        "next": "The key works again. If Pro features don't come back by themselves, open {product}, choose Activate Pro and paste the key."
       },
       "support": "Questions about your license? Reply to this email and we'll help."
     },

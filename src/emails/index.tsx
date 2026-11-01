@@ -637,7 +637,34 @@ export function duplicateRefundEmail({
   )
 }
 
-/** A license was suspended (a dispute or a support review) or revoked (spec §11.7). */
+/** A refund Razorpay reports as failed: no money went back, so no credit note (spec §11.6). */
+export function refundFailedEmail({
+  locale,
+  orderNumber,
+  amount,
+}: {
+  locale: Locale
+  orderNumber: string
+  amount: number
+}): Promise<RenderedEmail> {
+  const t = translator(locale)
+  const body = t('refundFailed.body', { orderNumber, amount: formatINR(locale, amount) })
+  return renderEmail(
+    t('refundFailed.subject', { orderNumber }),
+    <Layout
+      locale={locale}
+      preview={body}
+      footer={<Text style={smallText(locale)}>{t('refund.support')}</Text>}
+    >
+      <Text style={bodyText(locale)}>{t('greeting')}</Text>
+      <Text style={bodyText(locale)}>{body}</Text>
+      <Text style={bodyText(locale)}>{t('refundFailed.next')}</Text>
+      <Text style={bodyText(locale)}>{t('signoff')}</Text>
+    </Layout>,
+  )
+}
+
+/** A license was suspended (a dispute or a support review), revoked or reinstated (spec §11.7). */
 export function licenseStatusEmail({
   locale,
   status,
@@ -645,7 +672,7 @@ export function licenseStatusEmail({
   licensesUrl,
 }: {
   locale: Locale
-  status: 'suspended' | 'revoked'
+  status: 'suspended' | 'revoked' | 'reinstated'
   productName: string
   licensesUrl: string
 }): Promise<RenderedEmail> {

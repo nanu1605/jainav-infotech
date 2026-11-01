@@ -10,6 +10,7 @@ const TONE: Record<Order['status'], NonNullable<BadgeProps['tone']>> = {
   refunded: 'neutral',
   'partially-refunded': 'warning',
   disputed: 'danger',
+  chargeback: 'danger',
 }
 
 /** Order status with a dot, so it isn't told by color alone. */

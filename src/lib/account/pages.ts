@@ -9,7 +9,13 @@ import { storeOpen } from '@/lib/commerce/store'
 import type { Customer, Order } from '@/payload-types'
 
 /** Orders a customer sees: paid at some point. `created` and `expired` never show. */
-export const PAID_STATUSES = ['paid', 'refunded', 'partially-refunded', 'disputed'] as const
+export const PAID_STATUSES = [
+  'paid',
+  'refunded',
+  'partially-refunded',
+  'disputed',
+  'chargeback',
+] as const
 
 const SIGN_IN = '/account/sign-in'
 
