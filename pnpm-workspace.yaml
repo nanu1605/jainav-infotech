@@ -13,6 +13,10 @@ overrides:
   # Clears the audit for monaco-editor's unused dependency, 3.4.15 (GHSA-cg2g-xh64-v4q7, critical,
   # and GHSA-mrv2-3pqr-j5jr). The admin's Monaco comes from jsDelivr (docs/decisions.md).
   dompurify: 3.4.17
+  # Removes happy-dom 20.14.6 (GHSA-834v-8h66-3h79, GHSA-c8p4-j97h-3vg8): only @lexical/headless's
+  # `./dom` entry imports it, and nothing here loads that entry (docs/decisions.md). Drop this once
+  # Payload moves to Lexical 0.53 or later, whose @lexical/headless declares a fixed happy-dom.
+  '@lexical/headless>happy-dom': '-'
 
 # braces (via sass, chokidar) has an advisory with no fixed release; Sass only compiles the admin's
 # styles at build time, never on visitor input. Drop this once a fix ships.
