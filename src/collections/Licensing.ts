@@ -37,8 +37,6 @@ const prepareLicense: CollectionBeforeChangeHook = async ({
     ) {
       throw new APIError('Only the Owner can revoke a license or reinstate a revoked one.', 403)
     }
-    // Reinstated: a later suspension or revocation emails the customer again.
-    if (changed && data.status === 'active') data.statusNotifiedAs = null
     return data
   }
   if (req.user && data.source === 'purchase') {
@@ -57,9 +55,10 @@ const emailNewKey: CollectionAfterChangeHook = async ({ doc, operation, req }) =
 }
 
 /**
- * Suspending or revoking a license emails its customer (spec §11.7), whoever does it. Sent after
- * the response, when the change has committed; the reconcile job's sweep sends what this can't.
- * Code that tells the customer itself (refunds, disputes) sets `context.skipStatusEmail`.
+ * Suspending, revoking or reinstating a license emails its customer (spec §11.7), whoever does it.
+ * Sent after the response, when the change has committed; the reconcile job's sweep sends what
+ * this can't, and neither sends when there is nothing to tell. Code that tells the customer itself
+ * (refunds, disputes) sets `context.skipStatusEmail`.
  */
 const emailStatusChange: CollectionAfterChangeHook = async ({
   doc,
@@ -70,7 +69,6 @@ const emailStatusChange: CollectionAfterChangeHook = async ({
   if (
     operation === 'update' &&
     doc.status !== previousDoc?.status &&
-    (doc.status === 'suspended' || doc.status === 'revoked') &&
     !req.context.skipStatusEmail
   ) {
     const { statusEmailSoon } = await import('@/lib/licensing/deliver')
@@ -271,7 +269,7 @@ export const Licenses: CollectionConfig = {
     // The license email job's claim and sent time, so parallel runs send it once.
     { name: 'emailClaimedAt', type: 'date', access: fixed, admin: { hidden: true } },
     { name: 'emailedAt', type: 'date', access: fixed, admin: { hidden: true } },
-    // The suspended / revoked email: the status last told to the customer, and the send's claim.
+    // The status emails: the status last told to the customer (none for active), and the claim.
     {
       name: 'statusNotifiedAs',
       type: 'select',

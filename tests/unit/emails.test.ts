@@ -8,10 +8,12 @@ import { describe, expect, it } from 'vitest'
 import {
   autoReplyEmail,
   dataRequestEmail,
+  licenseStatusEmail,
   newsletterConfirmEmail,
   notificationEmail,
   orderConfirmationEmail,
   otpEmail,
+  refundFailedEmail,
 } from '@/emails'
 import type { AutoReplyKind } from '@/emails'
 import { sendEmail } from '@/lib/notify'
@@ -77,6 +79,36 @@ describe('dataRequestEmail', () => {
     const email = await dataRequestEmail({ locale: 'en', type, ...request })
     expect(email.subject).toContain(request.ticketNumber)
     expect(email.text).toContain(request.ticketNumber)
+  })
+})
+
+describe('store notices', () => {
+  it.each(['en', 'hi'] as const)(
+    'tells a failed refund and a reinstatement in %s',
+    async (locale) => {
+      const m = locales[locale].email
+      const failed = await refundFailedEmail({ locale, orderNumber: 'JO-1234ABCD', amount: 49_900 })
+      expect(failed.subject).toBe(m.refundFailed.subject.replace('{orderNumber}', 'JO-1234ABCD'))
+      expect(failed.text).toContain('₹499')
+      expect(failed.text).toContain(m.refundFailed.next)
+
+      const back = await licenseStatusEmail({
+        locale,
+        status: 'reinstated',
+        productName: 'VYRO',
+        licensesUrl: 'https://jainavinfotech.com/account/licenses',
+      })
+      expect(back.subject).toBe(m.licenseStatus.reinstated.subject.replace('{product}', 'VYRO'))
+      expect(back.text).toContain(m.licenseStatus.reinstated.body.replace('{product}', 'VYRO'))
+    },
+  )
+
+  it('promises nothing about what the app does right now', async () => {
+    const copy = JSON.stringify([en.email.refund, en.email.licenseStatus, en.account.licenses])
+    expect(copy).not.toContain('free version')
+    expect(
+      JSON.stringify([hi.email.refund, hi.email.licenseStatus, hi.account.licenses]),
+    ).not.toContain('फ़्री वर्ज़न')
   })
 })
 

@@ -48,7 +48,7 @@ When Razorpay confirms the refund has been processed:
 - A partial refund leaves your license as it is.
 - Once refunds reach the order's full total, we revoke its license, and that email tells you. The key can then no longer be activated, and your right to the paid plan ends. Free versions of the app and open source code stay under their own licenses.
 
-If a refund fails, we are alerted, but you get no credit note or automatic email. We try again or arrange another route. If the money has not arrived in the time above, write to us.
+If a refund fails, we are alerted and we email you. There is no credit note, because no money went back. We try again or arrange another route. If the money has not arrived in the time above, write to us.
 
 We do not send the automatic emails on this page once you have deleted your account, so ask us for copies.
 
@@ -58,7 +58,7 @@ Nothing on this page stops you raising a dispute or chargeback with your bank.
 
 When a dispute opens on a paid order's payment, the order shows as Disputed in your account, and we suspend its active license and email you. A suspended key cannot be activated. A dispute on a duplicate payment changes neither the order nor the license.
 
-Later stages, including the end of the dispute, change nothing by themselves. The license stays suspended until we reinstate or revoke it. If the dispute ends with your money returned, we can revoke it. We email you if we revoke it, but not if we reinstate it, so check your account's Licenses page. The order can keep showing Disputed after the dispute ends, unless its full total is refunded.
+When the dispute ends, the order stops showing Disputed: it goes back to Paid or Partly refunded, or shows Reversed by your bank if the bank returned your money. The license does not change by itself. It stays suspended until we reinstate or revoke it, and we email you either way. If the dispute ends with your money returned, we can revoke it.
 
 ## Contact and complaints
 
