@@ -7,6 +7,7 @@ import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 import { getPayload, type Payload, type SendEmailOptions } from 'payload'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { MARKETING_VERSION } from '@/lib/forms/schemas'
 import { addMonthsIST } from '@/lib/licensing/dates'
 import { inboxKey, ipKey } from '@/lib/rateLimit'
 import config from '@/payload.config'
@@ -365,7 +366,8 @@ describe('newsletter double opt-in and unsubscribe', () => {
     expect((await post('newsletter', { email }, { meta: { locale: 'hi' } })).status).toBe(200)
     await settled()
     const [lead] = await leadsFor(email)
-    expect(lead).toMatchObject({ type: 'newsletter', marketingConsent: { given: true } })
+    // Not consenting until confirmed: reports and CSV exports read `given`.
+    expect(lead).toMatchObject({ type: 'newsletter', marketingConsent: { given: false } })
     expect(lead?.confirmedAt).toBeFalsy()
     // Staff are not alerted for every sign-up.
     expect(telegrams).toHaveLength(0)
@@ -384,6 +386,11 @@ describe('newsletter double opt-in and unsubscribe', () => {
     expect(new URL(confirmed.headers.get('location')!).pathname).toBe('/hi/newsletter/confirmed')
     const [after] = await leadsFor(email)
     expect(after?.confirmedAt).toBeTruthy()
+    expect(after?.marketingConsent).toMatchObject({
+      given: true,
+      at: after?.confirmedAt,
+      textVersion: MARKETING_VERSION,
+    })
 
     // Single use.
     const again = await confirm(
@@ -444,6 +451,31 @@ describe('newsletter double opt-in and unsubscribe', () => {
     await settled()
     expect(await leadsFor(email)).toHaveLength(2)
     expect(tokenFrom(sent.find((m) => m.to === email))).toBeTruthy()
+  })
+
+  it.each([
+    ['unsubscribed', { unsubscribedAt: '2026-10-10T10:00:00.000Z' }],
+    ['opted-out', { marketingConsent: { withdrawnAt: '2026-10-10T10:00:00.000Z' } }],
+  ])('refuses a confirmation link once the sign-up is %s', async (name, optOut) => {
+    const email = address(`confirm-${name}`)
+    await post('newsletter', { email })
+    await settled()
+    const token = tokenFrom(sent.find((m) => m.to === email))
+    const [lead] = await leadsFor(email)
+    await payload.update({
+      collection: 'leads',
+      id: lead!.id,
+      data: optOut,
+      depth: 0,
+      overrideAccess: true,
+    })
+    const res = await confirm(
+      new Request(`http://localhost:3000/api/v1/forms/newsletter/confirm?token=${token}`),
+    )
+    expect(new URL(res.headers.get('location')!).pathname).toBe('/newsletter/invalid')
+    const [after] = await leadsFor(email)
+    expect(after?.confirmedAt).toBeFalsy()
+    expect(after?.marketingConsent?.given).toBeFalsy()
   })
 
   it('rejects confirmation links older than seven days', async () => {

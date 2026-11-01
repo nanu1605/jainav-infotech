@@ -10,6 +10,7 @@ import * as migration_20261017_045458_phase8_email_claims from './20261017_04545
 import * as migration_20261017_060635_phase9_store_operations from './20261017_060635_phase9_store_operations';
 import * as migration_20261017_065846_phase9_job_tasks from './20261017_065846_phase9_job_tasks';
 import * as migration_20261101_053510_store_privacy_requests from './20261101_053510_store_privacy_requests';
+import * as migration_20261101_054600_store_unconfirmed_newsletter from './20261101_054600_store_unconfirmed_newsletter';
 
 export const migrations = [
   {
@@ -70,6 +71,11 @@ export const migrations = [
   {
     up: migration_20261101_053510_store_privacy_requests.up,
     down: migration_20261101_053510_store_privacy_requests.down,
-    name: '20261101_053510_store_privacy_requests'
+    name: '20261101_053510_store_privacy_requests',
+  },
+  {
+    up: migration_20261101_054600_store_unconfirmed_newsletter.up,
+    down: migration_20261101_054600_store_unconfirmed_newsletter.down,
+    name: '20261101_054600_store_unconfirmed_newsletter'
   },
 ];
