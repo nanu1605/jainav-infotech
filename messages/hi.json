@@ -53,6 +53,7 @@
       "label": "फ़ुटर",
       "cin": "CIN: {cin}",
       "registeredOffice": "रजिस्टर्ड ऑफ़िस: {address}",
+      "grievanceOfficer": "शिकायत अधिकारी: {contact}",
       "social": "{platform} पर Jainav Infotech"
     },
     "gallery": {

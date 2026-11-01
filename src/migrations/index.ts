@@ -9,6 +9,7 @@ import * as migration_20261017_040434_phase8_licensing from './20261017_040434_p
 import * as migration_20261017_045458_phase8_email_claims from './20261017_045458_phase8_email_claims';
 import * as migration_20261017_060635_phase9_store_operations from './20261017_060635_phase9_store_operations';
 import * as migration_20261017_065846_phase9_job_tasks from './20261017_065846_phase9_job_tasks';
+import * as migration_20261101_054132_launch_grievance_officer from './20261101_054132_launch_grievance_officer';
 
 export const migrations = [
   {
@@ -64,6 +65,11 @@ export const migrations = [
   {
     up: migration_20261017_065846_phase9_job_tasks.up,
     down: migration_20261017_065846_phase9_job_tasks.down,
-    name: '20261017_065846_phase9_job_tasks'
+    name: '20261017_065846_phase9_job_tasks',
+  },
+  {
+    up: migration_20261101_054132_launch_grievance_officer.up,
+    down: migration_20261101_054132_launch_grievance_officer.down,
+    name: '20261101_054132_launch_grievance_officer'
   },
 ];

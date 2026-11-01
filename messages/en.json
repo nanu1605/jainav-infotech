@@ -53,6 +53,7 @@
       "label": "Footer",
       "cin": "CIN: {cin}",
       "registeredOffice": "Registered office: {address}",
+      "grievanceOfficer": "Grievance Officer: {contact}",
       "social": "Jainav Infotech on {platform}"
     },
     "gallery": {
