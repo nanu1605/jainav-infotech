@@ -70,5 +70,4 @@ Phase 6 in order (spec §20). Each step names who does it. Details are in the ot
 
 **After launch (Tanishq):** once the pricing page shows real VYRO prices, apply for Razorpay
 activation using this website. First get Razorpay's written confirmation that one-time software
-licenses are accepted: its merchant terms name "software download" among prohibited intangible goods
-([decisions](../decisions.md), "Legal drafts").
+licenses are accepted ([decisions](../decisions.md), "Legal drafts").
