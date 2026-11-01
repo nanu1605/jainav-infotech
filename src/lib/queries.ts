@@ -5,6 +5,7 @@ import type { Changelog, Media, Redirect } from '@/payload-types'
 import type { Where } from 'payload'
 
 import { as, getClient, read } from './cms'
+import { withoutPlaceholders } from './placeholders'
 import { publicPath, type RoutedCollection } from './routes'
 import { downloadTotal } from './stats'
 
@@ -13,10 +14,18 @@ const RICH_TEXT_TAGS = ['media', ...Object.keys(publicPath), 'docs']
 /** Collections whose documents page blocks can pull in at depth 2. */
 const BLOCK_TAGS = [...new Set([...RICH_TEXT_TAGS, 'faqs', 'testimonials', 'team'])]
 
+/**
+ * Every page's company details. A `{{BLANK}}` the Owner hasn't filled reads as not set, so it
+ * never prints.
+ */
 export const getSettings = (locale: Locale) =>
-  read(locale, ['site-settings', 'media'], ['settings'], (payload, v) =>
-    payload.findGlobal({ slug: 'site-settings', depth: 1, ...as(v) }),
-  )
+  read(locale, ['site-settings', 'media'], ['settings'], async (payload, v) => {
+    const settings = withoutPlaceholders(
+      await payload.findGlobal({ slug: 'site-settings', depth: 1, ...as(v) }),
+    )
+    // A social link's url is required, so its consumers don't expect a blank one.
+    return { ...settings, socials: settings.socials?.filter(({ url }) => url) }
+  })
 
 /**
  * How plan prices relate to GST, for the note under a price (spec §11.1): null while GST is off,
