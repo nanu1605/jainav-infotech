@@ -42,7 +42,8 @@ for (const collection of COLLECTIONS) {
         data: { _status: 'published' } as never,
         depth: 0,
         overrideAccess: true,
-        context: { disableRevalidate: true },
+        // Legal drafts may hold {{BLANKS}}, which real servers refuse to publish.
+        context: { disableRevalidate: true, allowPlaceholders: true },
       })
       published++
     } catch (err) {
