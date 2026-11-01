@@ -2,22 +2,27 @@
 # HTTPS with SSL "Full (strict)", so every site uses the Cloudflare Origin CA certificate.
 # Compression and caching headers come from Next.js and Cloudflare.
 
+# What a log line keeps of a request: its time, method, host, path, status, size and duration, and
+# Cloudflare's address (Caddy trusts no proxy). Gone are request headers (visitor IPs, Access
+# identities), response headers (Location holds 5-minute signed file URLs), staging's login name,
+# the whole query string (newsletter tokens, order numbers, form prefills) and the token in Payload's
+# password reset path. A path can still identify a record.
+(log_fields) {
+	wrap json
+	request>headers delete
+	request>uri regexp (/admin/reset)/[^?]*|\?.* ${1}
+	resp_headers delete
+	headers delete
+	user_id delete
+}
+
 {
 	# No automatic certificates: the Origin CA certificate is mounted at /certs.
 	auto_https disable_redirects
-	# Upstream errors (e.g. the app restarting) log the whole request: same filter as the
-	# access log below.
+	# Every other log, because upstream errors (e.g. the app restarting) log the whole request.
 	log default {
-		exclude http.log.error
-	}
-	log errors {
-		include http.log.error
 		format filter {
-			wrap json
-			request>headers delete
-			request>uri query {
-				delete token
-			}
+			import log_fields
 		}
 	}
 }
@@ -28,16 +33,10 @@
 	request_body {
 		max_size 110MB
 	}
-	# Access log without personal data or secrets: no request headers (visitor IPs, Access
-	# identities) and no token query parameter (newsletter confirm and unsubscribe links).
 	log {
 		output stdout
 		format filter {
-			wrap json
-			request>headers delete
-			request>uri query {
-				delete token
-			}
+			import log_fields
 		}
 	}
 }

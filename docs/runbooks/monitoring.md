@@ -31,14 +31,42 @@ Phase 4 sends a Telegram alert for every new lead. The backup job alerts on fail
   - turn on _Prevent Storing of IP Addresses_;
   - keep _Data Scrubber_ and _Use Default Scrubbers_ on.
 
-  The app already sends no cookies, headers other than user-agent, bodies, query strings or
-  user fields (`src/lib/sentry.ts`, `src/lib/scrub.ts`).
+  The app already sends no cookies, headers other than user-agent, bodies, query strings, user
+  fields, spans or console lines, and browsers send no session records. It filters the Telegram
+  bot token, Payload's password reset token, database values, email addresses and phone numbers
+  from text (`src/lib/sentry.ts`, `src/lib/scrub.ts`). Don't set `SENTRY_TRACES_SAMPLE_RATE`: it
+  turns on spans, which skip these filters.
 
 - Events say `staging` or `production`, from the site URL.
 - Browser stack traces stay minified until source maps are uploaded. That needs
   `withSentryConfig` and a `SENTRY_AUTH_TOKEN`, which aren't set up yet.
 - The browser SDK loads after the page is idle, so errors thrown before that are not reported.
 - Alerts: Sentry → Alerts, email the Owner on new issues.
+
+## Logs
+
+Every long-running service logs to the host's journal, so a deploy keeps the old container's
+lines. A line stays at least 180 days and at most 187 ([decisions](../decisions.md), "Logs are
+kept").
+
+```bash
+journalctl CONTAINER_NAME=jainav-app-1 --since 2026-11-01 --until 2026-11-02   # or jainav-caddy-1…
+journalctl -t sshd --since yesterday
+```
+
+Once a month, with the restore test, check that no size limit is what deletes lines:
+
+```bash
+journalctl --disk-usage             # well under SystemMaxUse (8G)
+journalctl -o short-iso | head -1   # the oldest line: at least 180 days old, or the server's age if less
+df -h /var/log/journal              # Avail above 5% of Size (4G at most) plus what the journal can still grow to 8G
+```
+
+If Avail is below that, free the disk (`docker images`: old `tools-*` images, keeping the deployed
+commits'). Below it journald deletes its oldest files at any usage, with no message, and raising its
+limits does nothing. Otherwise, if the oldest line is younger than that, or usage nears the limit,
+raise `SystemMaxUse` and `SystemMaxFiles` ([server.md §1](server.md#1-provision-the-vps)) while the
+disk has room. Left alone, the privacy policy's period stops being true.
 
 ## Umami (analytics)
 

@@ -4160,6 +4160,16 @@ export interface SiteSetting {
      * Digits only with the country code, e.g. 919876543210.
      */
     whatsapp?: string | null;
+    /**
+     * The person to contact for queries and grievances. The footer shows them once the name is set.
+     */
+    grievanceOfficer?: {
+      name?: string | null;
+      /**
+       * Their designation, e.g. Director.
+       */
+      title?: string | null;
+    };
   };
   socials?:
     | {
@@ -4359,6 +4369,12 @@ export interface SiteSettingsSelect<T extends boolean = true> {
               privacy?: T;
             };
         whatsapp?: T;
+        grievanceOfficer?:
+          | T
+          | {
+              name?: T;
+              title?: T;
+            };
       };
   socials?:
     | T

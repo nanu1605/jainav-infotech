@@ -45,7 +45,8 @@ if healthy; then
   echo "$service is running $image"
 else
   echo "$service did not become healthy on $image; rolling back to $previous" >&2
-  compose logs --tail 100 "$service" >&2
+  # Where the logs are, not the logs: this output goes to the public job log.
+  echo "its logs: journalctl IMAGE_NAME=$image" >&2
   point_to "$previous"
   exit 1
 fi

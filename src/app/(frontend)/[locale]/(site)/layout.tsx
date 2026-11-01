@@ -62,6 +62,7 @@ export default async function SiteLayout({ children, params }: Props) {
           registeredAddress: company?.registeredAddress,
           email: company?.emails?.hello,
           phone: company?.phone,
+          grievanceOfficer: company?.grievanceOfficer,
         }}
         newsletter={<NewsletterForm />}
       />

@@ -53,6 +53,7 @@
       "label": "Footer",
       "cin": "CIN: {cin}",
       "registeredOffice": "Registered office: {address}",
+      "grievanceOfficer": "Grievance Officer: {contact}",
       "social": "Jainav Infotech on {platform}"
     },
     "gallery": {
@@ -536,7 +537,7 @@
     "introduceTitle": "Introduce yourself",
     "introduceText": "Don't see a role that fits? Tell us what you're good at and what you'd like to build.",
     "internshipsTitle": "Internships",
-    "internshipsText": "Students can work with us on real projects. Write to us with what you've built so far.",
+    "internshipsText": "Students aged 18 or over can work with us on real projects. Write to us with what you've built so far.",
     "posted": "Posted {date}",
     "applyTitle": "Apply",
     "applyText": "Send your CV (PDF) and a few lines about why this role interests you."
