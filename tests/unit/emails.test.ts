@@ -3,7 +3,7 @@ import { readdir, readFile, rm } from 'node:fs/promises'
 import path from 'node:path'
 
 import type { Payload } from 'payload'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   autoReplyEmail,
@@ -21,6 +21,25 @@ import hi from '../../messages/hi.json'
 
 const locales = { en, hi }
 const kinds: AutoReplyKind[] = ['contact', 'project', 'waitlist', 'careers', 'data-request']
+
+describe('outboxAdapter in production', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
+  it('fails the send, so no caller records it as sent', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const payload = {
+      sendEmail: outboxAdapter({ payload: {} as Payload }).sendEmail,
+    } as unknown as Payload
+    const email = { subject: 'Your code', html: '<p>482913</p>', text: '482913' }
+    await expect(sendEmail(payload, 'buyer@example.com', email)).rejects.toThrow('RESEND_API_KEY')
+    // Some callers log only an error's name, so the adapter has to name the key itself.
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('RESEND_API_KEY'))
+  })
+})
 
 describe('autoReplyEmail', () => {
   it.each(['en', 'hi'] as const)(
