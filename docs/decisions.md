@@ -240,7 +240,7 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
 - **Deleting an account** anonymizes it (`deleted-<id>@deleted.invalid`, which can never receive a code), withdraws marketing consent and ends every session. Orders and invoices keep the billing details they were issued with, for the tax period ({{CONFIRM_WITH_CA}}).
 - **Order numbers** are `JO-` and 8 random Crockford characters, so they reveal nothing about sales volume.
 - **Billing text is limited to Latin-1** (printable ASCII plus é, ü…), the characters Helvetica has; the form says why. State names are English everywhere, including the Hindi pages, because they are printed on invoices.
-- **Webhook payloads** hold the payer's email and phone: the daily `cleanup` job deletes handled ones after 90 days (spec §16 logs), along with expired sessions and codes.
+- **Webhook payloads** hold the payer's email and phone: the daily `cleanup` job deletes them 90 days after receipt, handled or not (spec §16 logs), along with expired sessions and codes.
 - **Razorpay's CSP origins are on every page** (spec §16's static CSP), not only on checkout: a policy belongs to the document, and buyers reach checkout by client-side navigation from the pricing page or sign-in, which keeps the first page's policy. Razorpay documents no list: `checkout.razorpay.com` (script, frame), `api.razorpay.com` (frame, connect), `lumberjack.razorpay.com` (connect), `cdn.razorpay.com` (images). To check in the browser console on staging with test keys.
 - **Automatic capture comes from Razorpay's dashboard setting** (the runbook says to check it), not from per-order capture options.
 - **The invoice PDF is English only** (spec §2), so its labels live in `src/lib/invoices/pdf.tsx`, not in the message files. One SAC per invoice (printed once, in the supply block). The checkout collects no postal address, so the invoice shows the buyer's name, business name, GSTIN and state; spec §11.4 asks for the address only "if given" ({{CONFIRM_WITH_CA}} whether one is needed). A GST-off invoice still prints place of supply and reverse charge.
@@ -310,3 +310,26 @@ CI's audit step went red when new advisories landed in October, while every fix 
   - `experimental.agentUpgrade: false`. Its default stops `next dev` and `next build` under a coding agent until a patched Next is installed, which the two-week rule can forbid.
   - `agentRules: false`. Its default adds an `AGENTS.md` to the repository when a coding agent starts `next dev`.
 - **Known bug, not from this bump:** on production builds Payload answers a bare `APIError` with "An unknown error occurred." The minifier leaves the class without a name, and `formatErrors` only keeps the message of a named one (payloadcms/payload#18774). Reproduced on next 16.3.8 and 16.4.2, on Windows and in the image. It hits messages admins read, such as "This customer has orders…"; the status is right, the write is still blocked and the real message is in the server log. `experimental.serverMinification: false` fixes it (checked) but adds 100 MB of server code, so we take Payload 3.92 instead (fix #18775), which passes the rule on 2026-11-05.
+
+## Legal drafts (2026-11-01)
+
+Spec §8.13 has Phase 3 draft the legal pages, but the seed only held a one-line placeholder. All seven now have draft text in English and draft Hindi. They are not approved: the Owner publishes after review, ideally with a lawyer, and publishing counts as approval.
+
+- **The text lives in Markdown files** (`scripts/seed/legal/{slug}.{en,hi}.md`), not in `content.ts`, so a reviewer reads documents. The seed turns them into rich text with `convertMarkdownToLexical`, already in the Lexical package. A test checks that each page's Hindi has the same headings, placeholders and links as its English.
+- **Only a fresh database gets them:** the seed never overwrites a document. No staging or production database exists yet. A development database needs its `legal-pages` deleted and seeded again.
+- **`pnpm seed:publish` sets a legal page's effective date,** so local pages and the footer's links work. On real servers the Owner sets it.
+- **True today and after the store opens.** The store is off and no VYRO build has licensing code, so purchase and license clauses are conditional ("if you buy a paid plan").
+- **Blanks stay visible,** because nothing is invented: `{{CIN}}`, the Grievance Officer, business days, the refund window, the host, server location and mailbox, log retention, `{{CONFIRM_WITH_CA}}` beside the record-keeping period, and `{{CONFIRM_WITH_LAWYER}}` on three clauses. They print as written, so search a page before publishing it. Nothing blocks publishing one.
+- **Terms proposed in the drafts, until the Owner publishes them:**
+  - grievances acknowledged in 48 hours and resolved in one month; rights requests answered in one month;
+  - refund questions answered in 4 working days, which Razorpay's merchant terms ask for;
+  - money back within a window for any reason, even after activation; after it, a fix or refund for anything defective, deficient, not genuine, not as described or agreed, undelivered or late;
+  - refunds started within 7 days of approval. Banks then take 5 to 10 working days: Razorpay's docs say both 5-7 and 7-10, so the refund email now says 5–10 too;
+  - liability capped at the amount paid, as far as the law allows;
+  - Indian law, courts at Indore for disputes that may be brought there, and every consumer route left open;
+  - the site and its forms are for people aged 18 or over, with no age check.
+- **The EULA stays unpublished until VYRO Pro exists (deviation, spec §8.13 and §21).** The spec ties an approved EULA to a live download, but released builds are MIT or Apache-2.0 and have no licensing code. The draft covers only the license key, Pro access and the activation service, and says it restricts nothing those licenses or Copyright Act section 52 allow. Nothing on the site links to it except the checkout, so publish it before the store opens.
+- **Privacy requests are in the footer,** because the Rules ask for the route to be prominent and the page was only reachable from the privacy policy.
+- **Razorpay's current list differs from spec §20:** activation asks for About us, Contact us, Pricing, Terms, Privacy and Refunds, plus a sample invoice. Shipping isn't on it, and stays live anyway. Get written confirmation that one-time software licenses are accepted before applying.
+- **The law moves on dates that matter here:** the E-Commerce (Amendment) Rules start on 2027-01-01, and the DPDP duties for ordinary companies around 2027-05-13. Recheck both before the store opens.
+- **The review notes for the Owner, the lawyer and the CA are not in this repository,** which is public.

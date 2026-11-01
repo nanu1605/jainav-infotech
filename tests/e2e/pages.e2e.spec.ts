@@ -23,6 +23,12 @@ const ROUTES = [
   '/blog',
   '/changelog',
   '/changelog/vyro',
+  '/legal/privacy',
+  '/legal/terms',
+  '/legal/refunds-cancellation',
+  '/legal/shipping-delivery',
+  '/legal/cookies',
+  '/legal/privacy-requests',
 ]
 const hi = (path: string) => (path === '/' ? '/hi' : `/hi${path}`)
 
@@ -41,6 +47,16 @@ for (const path of ROUTES) {
     })
   }
 }
+
+test('legal pages show their version; Hindi says English prevails; requests end in the form', async ({
+  page,
+}) => {
+  await page.goto('/legal/privacy')
+  await expect(page.getByText(/^Version .+, effective /)).toBeVisible()
+  await page.goto('/hi/legal/privacy-requests')
+  await expect(page.getByText('अंग्रेज़ी संस्करण मान्य होगा')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'प्राइवेसी अनुरोध भेजें' })).toBeVisible()
+})
 
 test('unknown pages 404 inside the site, in the visitor’s language', async ({ page }) => {
   expect((await page.goto('/no-such-page'))?.status()).toBe(404)
@@ -173,6 +189,8 @@ for (const url of [
   '/services',
   '/careers',
   '/blog',
+  '/legal/cookies',
+  '/legal/privacy-requests',
 ]) {
   for (const path of [url, hi(url)]) {
     test(`axe: ${path}`, async ({ page }) => {
