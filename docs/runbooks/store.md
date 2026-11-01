@@ -22,6 +22,7 @@ How to switch on accounts and checkout on staging with Razorpay's test mode. Pro
    - Settings → Commerce settings: the SAC code, invoice prefixes and, once the CA confirms, "Charge GST" (needs the company GSTIN in Site settings first); the current Terms and EULA versions (they are recorded with every order).
    - Products → Plans: VYRO Pro's price (paise, GST-inclusive) and "Active".
    - Settings → Site settings → Site: "Store enabled".
+   - Content → Legal pages: one holding a `{{BLANK}}` in either language can't be published, here as on production. Fill the blanks in before a test purchase.
 5. **Content security policy:** keep the browser console open during the test purchase (step 6), starting from the pricing page. Any `Content-Security-Policy` violation naming a Razorpay host goes into `src/lib/csp.ts` (`RAZORPAY`).
 
 ## Test purchase (spec §20 Phase 7 "done when")

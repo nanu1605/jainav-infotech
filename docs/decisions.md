@@ -187,7 +187,7 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
   - **Caches:** tag builds reuse main's build cache and write none (tag caches can't be read by later tags).
   - Deploys are skipped until the repository variable `DEPLOY_ENABLED` is `true`. Pull requests also build the image.
 
-- **No personal data in Caddy's logs:** the access log and the upstream-error log drop all request headers (visitor IPs, Access identities) and the `token` query parameter. Checked with a request carrying both: neither reached any log line.
+- **What Caddy's logs keep:** a request's time, method, host, path, status, size and duration, and Cloudflare's address. Every log, not only the access log, drops all request headers (visitor IPs, Access identities), all response headers (`Location` holds 5-minute signed file URLs), staging's login name, the whole query string and the token in Payload's password reset path; the `log_fields` snippet is the one rule. Any other path can still identify a record. Run with the pinned image on 2026-11-01: a signed redirect, a response cut off midway, an upstream that was down, a config reload, the www redirect, staging's login and reset links, all with marked values in their queries, headers and responses. None of the 26 values reached any log line.
 - **The restore test's Postgres sits on an internal network** shared only with the restore job. It briefly holds a decrypted copy of production under a fixed password that is in this repository.
 - **Backups** (`docker/backup`): nightly at 02:30 IST, `pg_dump` of `jainav` and `umami`, encrypted with age to a public key (the private key stays offline with the Owner), uploaded with rclone to an R2 bucket; 30 daily and 12 monthly copies; Telegram alert on failure. The restore test restores the newest dumps into a throwaway Postgres whose data lives only in memory, and checks the tables, the migrations and the site's content. The real restore test needs the server; locally the full path (backup → R2 stand-in → decrypt → restore → checks) passed on 2026-10-16. The test caught a bug on the way: on a first run, pruning a missing `monthly/` folder failed the whole backup.
 - **Rehearsal:** the whole stack ran locally on 2026-10-16 (port 8443, self-signed certificates, a local folder for the bucket). Checked:
@@ -197,7 +197,7 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
   - the www → apex 308 and Umami;
   - backup and restore;
   - `deploy.sh` both ways: a good image went live, and a broken one rolled back.
-- **Sentry (`@sentry/nextjs` 11.2.0, pinned; newer releases were inside the cool-off).**
+- **Sentry (`@sentry/nextjs` 11.4.0, pinned).**
   - **Server:** `src/instrumentation.ts` starts it on the Node.js runtime only when `SENTRY_DSN` is set; `onRequestError` uses `captureRequestError`.
   - **Browser:** `src/instrumentation-client.ts` imports the SDK only when `NEXT_PUBLIC_SENTRY_DSN` is set, after the load event and once the page is idle. The SDK (about 77 KB gzipped) is an async chunk, never initial JS; errors thrown before it arrives are not reported. `error.tsx` hands browser render errors (no `digest`) to `reportError()`.
   - **Environment:** `staging` or `production`, from the baked-in site URL.
@@ -206,7 +206,20 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
   - every request header except user-agent;
   - URL query params, stack-frame variables and DB query data.
 
-  `src/lib/scrub.ts` (beforeSend / beforeBreadcrumb) is the second layer: it cuts query strings and fragments from every URL or path in the event, which carry newsletter tokens. It also drops `user` and keeps only url, method and user-agent on `request`. No session replay; `tracesSampleRate: 0`. No `withSentryConfig` yet: no source-map upload until a `SENTRY_AUTH_TOKEN` exists.
+  `src/lib/scrub.ts` (beforeSend / beforeBreadcrumb) is the second layer:
+  - in every string of an event it cuts URL queries and fragments, which carry newsletter tokens, and filters the Telegram bot token, Payload's password reset token, a database query with its bound values, a value Postgres quotes, email addresses and phone numbers;
+  - it drops `user` and `extra`, and keeps only url, method and user-agent on `request`;
+  - it drops stack frames whose path doesn't start like a location: a stack starts with the error's message, and the SDK reads a line of bound values as a frame when it holds " at ";
+  - it drops console, click and earlier-error breadcrumbs, and cuts a request breadcrumb's absolute URL to its host, because a path can hold a secret or a file name.
+
+  The text filter works by pattern, so a name inside a message nothing foresaw would still pass. No session replay. **`tracesSampleRate` stays unset:** spans skip these filters, and any rate, even 0, can still record them. No `withSentryConfig` yet: no source-map upload until a `SENTRY_AUTH_TOKEN` exists.
+
+- **Errors only.** `src/lib/sentry.ts` removes three browser integrations (session record, tracing, culture context) and the server's context lines, which read the files a stack names, turns off client reports and sends no trace headers on outgoing calls. Run against a local stand-in for Sentry on 2026-11-01:
+  - before: every page load sent a client report, counting the page-load spans that rate 0 drops, and with a release set (`withSentryConfig` can set one, from a release name or `SENTRY_RELEASE` at build time) a session record too. Error events carried the browser's language and time zone, and Telegram received trace headers;
+  - after: page loads sent nothing, a thrown error arrived filtered, and a request carrying a trace header sent no spans;
+  - the server's error went through the same filter, with the Telegram breadcrumb cut to its host.
+
+  With a release set, the server's SDK also sends counts of requests and a record of its own process, which say nothing about a visitor. Sentry still sees the IP address an event comes from, so its project setting ([monitoring](runbooks/monitoring.md#sentry-errors)) still matters.
 
 - **Umami** loads from the `[locale]` layout with a plain `<script async>` (React hoists it), only when `NEXT_PUBLIC_UMAMI_URL` and `NEXT_PUBLIC_UMAMI_WEBSITE_ID` are set; the admin has its own root layout. `next/script` would have added about 1.4 KB to every page. Code events go through `track()` (`src/lib/analytics.ts`): `form_submit {type}`, `language_switch {to}`, `theme_switch {to}`.
 - **Tracked links use a wrapper.** Umami 3.4.0's tracker (read in its source) handles clicks on a tracked `<a>` in the capture phase: it calls `preventDefault()`, waits for its request, then sets `location.href`. Every tracked internal link would become a slow full page load. `cta_click`, `chip_click` and `download` attributes therefore sit on a `display: contents` wrapper (`src/components/Tracked.tsx`), where the tracker only records the click. An e2e test fails if an `<a>` carries `data-umami-event`.
@@ -218,6 +231,19 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
   - **Re-runs:** a re-run is a no-op, and an existing release with a different file or signature aborts.
   - **Publishing:** imports are drafts unless run with `-- --publish`. The Owner should publish in the admin, because a script can't refresh the running site's cache.
 - **The repository is public** on GitHub (it was planned as private in Phase 0). Nothing secret is committed. The founder photo and bio, the company address and phone, and the code are visible. Tanishq to confirm or switch it to private.
+- **Logs are kept for at least 180 days and at most 187 (deviation, spec §16 says 30–90).** CERT-In's Directions of 2022 ask for a rolling 180 days. A container's json-file log goes with the container on every deploy, so every long-running service now logs to the host's systemd journal (`driver: journald`), and [server.md §1](runbooks/server.md#1-provision-the-vps) sets the period.
+  - journald deletes a whole file once its oldest line passes `MaxRetentionSec`, so `MaxRetentionSec=187day` with `MaxFileSec=7day` keeps a line for 180 to 187 days. Measured on Ubuntu 24.04's systemd 255 with the same two settings at 120 s and 30 s: the oldest line stayed between 90 and 120 s old.
+  - `SystemMaxUse=8G` protects the disk, and reaching it would delete lines early. A filtered access line costs about 1.5 KB (measured on 200,000 lines that differ the way real ones do), so 8 GB holds about 30,000 lines a day across all services for the whole period. `SystemMaxFiles=300` keeps 8 GB the limit that counts: Docker's journal fields fill a file at about 44,000 lines whatever their length, so the default of 100 files would hold only about 4.4 million lines, about 23,000 a day. journald also leaves 5% of the file system free, 4 GB at most (its man page says 15%; systemd 255 does 5%), and the journal can only grow into what is above that: past that point it deletes its oldest files with no message, at any usage. [monitoring.md](runbooks/monitoring.md#logs) has the monthly check.
+  - `ForwardToSyslog=no`: Ubuntu's own `syslog.conf` drop-in copies every line to rsyslog, which would keep it in `/var/log/syslog` with no size limit and another period. Nothing here reads that file, and `journalctl -t sshd` still has the SSH lines. Run on Ubuntu 24.04 with rsyslog installed: before, a container's line reached both; after, only the journal.
+  - Rehearsed on an Ubuntu 24.04 container with `compose.prod.yml` and `deploy.sh`: after two deploys `docker logs` had only the new release, `journalctl CONTAINER_NAME=jainav-app-1` had both, and `docker compose logs` still worked.
+  - DPDP rule 8(3) asks for one year from about 2027-05-13. Raise `MaxRetentionSec` to 372 days and change the privacy policy before then; nothing is lost as long as that comes before the first lines age out. That halves the lines a day 8 GB can hold.
+  - journald's default rate limit stays on.
+  - A failed deploy prints where the logs are, not the logs, because the job log of a public repository is public.
+- **`{{BLANKS}}` in site settings never print on a page.** `getSettings` treats any value still holding one as not set, which covers the footer, company facts, the contact page and structured data. The seed keeps `{{CIN}}`, so the admin shows it is still owed; the launch runbook has a step to enter it and a check that it shows. Invoices print theirs on purpose (Phase 7). Outside site settings and the legal drafts, the seed holds no blank.
+- **A legal page with a blank can't be published.** `refuseBlanks` looks at everything the page prints (title and body in both languages, version, slug). It is a field hook because only a field hook gets `siblingDocWithLocales`, which Payload writes the other languages from, so it reads the text that would really go live on every route: publish, bulk, duplicate, restore. It runs before the write because a bulk publish commits past a document that fails later. Legal pages go live in both languages at once: Payload's Publish in one language is refused, because it writes only that language, and on a first publish the rest of the row stays as the first save wrote it, which the check can't see. `seed:publish`, which only runs against a local database, is exempt, so a local legal draft with a blank can still be read as a live page.
+- **The footer names the Grievance Officer** (Companies rule 26 wants a named contact on the home page). Name and title are localized site settings, empty until the Owner sets them, and Hindi falls back to English.
+- **`payload-token` is Secure in production,** like `__Host-jv_session`. Local production builds still sign in on `http://localhost` in Chrome and Firefox, which treat it as secure; Safari drops the cookie.
+- **Careers invites students aged 18 or over,** to match the age statement in the legal pages.
 
 ## Phase 7
 
