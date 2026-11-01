@@ -58,6 +58,7 @@ export async function sendTelegram(text: string) {
     if (process.env.NODE_ENV !== 'production') console.info(`[telegram skipped] ${text}`)
     return
   }
+  // Telegram takes the token only in the path, which is why scrub.ts filters this URL shape.
   const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

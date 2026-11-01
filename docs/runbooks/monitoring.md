@@ -31,8 +31,11 @@ Phase 4 sends a Telegram alert for every new lead. The backup job alerts on fail
   - turn on _Prevent Storing of IP Addresses_;
   - keep _Data Scrubber_ and _Use Default Scrubbers_ on.
 
-  The app already sends no cookies, headers other than user-agent, bodies, query strings or
-  user fields (`src/lib/sentry.ts`, `src/lib/scrub.ts`).
+  The app already sends no cookies, headers other than user-agent, bodies, query strings, user
+  fields, spans or console lines, and browsers send no session records. It filters the Telegram
+  bot token, Payload's password reset token, database values, email addresses and phone numbers
+  from text (`src/lib/sentry.ts`, `src/lib/scrub.ts`). Don't set `SENTRY_TRACES_SAMPLE_RATE`: it
+  turns on spans, which skip these filters.
 
 - Events say `staging` or `production`, from the site URL.
 - Browser stack traces stay minified until source maps are uploaded. That needs

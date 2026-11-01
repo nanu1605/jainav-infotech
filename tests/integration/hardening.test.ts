@@ -1,9 +1,12 @@
-/** Regression tests for the Phase 1 review: each case was a verified defect before its fix. */
+/** Regression tests from reviews, and the rules they led to. */
 import { createHash } from 'node:crypto'
 
+import { sql } from '@payloadcms/db-postgres'
+import { defaultStackParser } from '@sentry/nextjs'
 import { getPayload, type Payload, type RequiredDataFromCollectionSlug } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { scrubEvent } from '@/lib/scrub'
 import type { User } from '@/payload-types'
 import config from '@/payload.config'
 
@@ -197,6 +200,35 @@ describe('records and accounts', () => {
         ...as('owner'),
       }),
     ).rejects.toThrow(/effective date/i)
+  })
+})
+
+describe('Sentry', () => {
+  it("keeps a real database error's bound values out of the event", async () => {
+    const [email, name, time] = ['jane@example.com', 'Bharat Kumar', '2026-11-01T18:24:22.917Z']
+    const { drizzle } = payload.db as unknown as { drizzle: { execute(q: unknown): Promise<void> } }
+    const error = (await drizzle
+      .execute(sql`select ${email}::text, ${name}::text, ${time}::integer`)
+      .catch((e: unknown) => e)) as (Error & { cause: Error }) | undefined
+    // Sentry sends the error and its cause; both quote a value before scrubbing. A stack starts
+    // with the message, and the SDK's parser reads a frame from the line of values.
+    expect(error?.message).toContain(name)
+    expect(error?.cause.message).toContain(time)
+    expect(JSON.stringify(defaultStackParser(error?.stack ?? '', 1))).toContain('Kumar')
+    const values = [error!.cause, error!].map((e) => ({
+      type: e.name,
+      value: e.message,
+      stacktrace: { frames: defaultStackParser(e.stack ?? '', 1) },
+    }))
+    const event = scrubEvent({ type: undefined, exception: { values } })
+    for (const value of ['jane', 'Kumar', '2026-11-01']) {
+      expect(JSON.stringify(event)).not.toContain(value)
+    }
+    expect(event.exception?.values?.[0]?.value).toBe(
+      'invalid input syntax for type integer: [Filtered]',
+    )
+    expect(event.exception?.values?.[1]?.value).toBe('Failed query: [Filtered]')
+    expect(event.exception?.values?.[1]?.stacktrace?.frames?.length).toBeGreaterThan(0)
   })
 })
 
