@@ -206,6 +206,8 @@ describe('sending a waitlist email', () => {
     await lead(product, address('newsletter'), { type: 'newsletter' })
     await lead(other, address('other'))
     const email = await draft(product, { subject: `तैयार है ${run}`, body: 'हिंदी संदेश।' })
+    const longAgo = '2024-01-01T00:00:00.000Z'
+    await db().execute(sql`UPDATE leads SET last_activity_at = ${longAgo} WHERE id = ${ok.id}`)
 
     expect((await api(`/waitlist-emails/${email.id}/recipients`, 'owner')).body).toEqual({
       count: 2,
@@ -213,6 +215,9 @@ describe('sending a waitlist email', () => {
     const res = await send(email.id)
     expect(res).toEqual({ status: 200, body: { ok: true, recipients: 2 } })
     await settled()
+    // A waitlist email is a contact: retention counts from it.
+    const contacted = await payload.findByID({ collection: 'leads', id: ok.id, depth: 0 })
+    expect(contacted.lastActivityAt).not.toBe(longAgo)
 
     expect(sent.map((m) => m.to).sort()).toEqual([address('ok'), address('twice')])
     const [en] = to(address('ok'))

@@ -4,18 +4,29 @@ import { leadHandlers, nobody, ownerOnly } from '@/access/roles'
 import { routing } from '@/i18n/routing'
 import { DATA_REQUEST_TYPES } from '@/lib/forms/schemas'
 
-import { normalizeEmail } from './Leads'
+import { enteredDate, normalizeEmail } from './Leads'
 
 const CLOSED = ['completed', 'rejected']
 
 /** The request as submitted is a record; the API ignores staff edits to it. */
 const record: { update: FieldAccess } = { update: () => false }
 
-/** Records who closed a request and when, unless staff filled it in already. */
+/**
+ * Records who closed a request and when. Retention counts from the last closing
+ * (src/lib/retention.ts): reopening clears them, and otherwise the date moves only as enteredDate
+ * allows.
+ */
 const stampHandled: CollectionBeforeChangeHook = ({ data, originalDoc, req }) => {
-  if (CLOSED.includes(data.status) && data.status !== originalDoc?.status) {
-    data.handledAt ??= new Date().toISOString()
+  const entered = enteredDate(req, data.handledAt, originalDoc?.handledAt)
+  const moved = data.status && data.status !== originalDoc?.status
+  if (moved && CLOSED.includes(data.status)) {
+    data.handledAt = entered ?? new Date().toISOString()
     data.handledBy ??= req.user?.id
+  } else if (moved && CLOSED.includes(originalDoc?.status)) {
+    data.handledAt = null
+    data.handledBy = null
+  } else {
+    data.handledAt = entered ?? originalDoc?.handledAt ?? null
   }
   return data
 }
@@ -124,7 +135,14 @@ export const DataRequests: CollectionConfig = {
       relationTo: 'users',
       admin: { position: 'sidebar' },
     },
-    { name: 'handledAt', type: 'date', admin: { position: 'sidebar' } },
+    {
+      name: 'handledAt',
+      type: 'date',
+      admin: {
+        position: 'sidebar',
+        description: 'Set when the request is closed. The Owner can enter an earlier date instead.',
+      },
+    },
     {
       name: 'customer',
       type: 'relationship',

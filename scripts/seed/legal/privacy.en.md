@@ -71,7 +71,7 @@ Our server is in {{SERVER_LOCATION}}. We ask Cloudflare to store files in its As
 
 ## How long we keep it
 
-- **Form data and CVs:** our target is deletion within 24 months of our last contact with you, done by hand, not by an automatic job. Unsubscribing does not delete your record.
+- **Form data and CVs:** a daily job deletes a form record 24 months after the last contact recorded on it: your submission, a staff update or a waitlist email. A newsletter sign-up you never confirm goes after 30 days. Unsubscribing does not delete your record.
 - **Privacy requests:** kept as a record, with no fixed period or automatic deletion yet.
 - **Sign-in codes, sessions and abuse limits:** codes last 10 minutes, sessions about 30 days after last use or until you sign out, and abuse-limit records about two hours. Automatic jobs remove them.
 - **Store account:** your details until you delete the account, then a basic record with no end date. Inactive accounts do not expire.
@@ -99,7 +99,7 @@ You can:
 
 - **Ask what we hold:** a summary of your data, what we do with it and who received it. The form calls this "Get a copy of my data".
 - **Correct or complete it:** we can change account details and add a correcting note to form data. We do not edit issued invoices or orders.
-- **Ask us to delete it:** we do, unless we still need it for its purpose or the law requires us to keep it. Our system cannot currently delete orders, invoices, licenses, device records or trial records.
+- **Ask us to delete it:** we do, unless we still need it for its purpose or the law requires us to keep it. Orders and invoices stay for the period above, and our system cannot currently delete licenses, device records or trial records.
 - **Delete a store account:** on its Settings page. This replaces your email, clears your name, phone, state, business name and GSTIN, withdraws marketing consent and signs you out everywhere. If you cannot use that page, ask us: we make the same changes for you. We keep your orders and invoices with their billing details, licenses and keys (which keep working), device records, form data, privacy requests and a basic account record.
 - **Withdraw consent:** at any time. We then stop that use within a reasonable time, unless the law requires or allows it to continue. Earlier use stands, we still complete what you have paid for, and a service that needs that data may have to stop.
 - **Name someone to act for you** if you die or cannot act yourself.
@@ -114,7 +114,7 @@ Marketing emails are optional. These choices cover email only:
 
 - The box on the contact or project form: occasional news about our products.
 - The box on a waitlist form: an email when that product is ready.
-- The newsletter: you are subscribed only if you click the confirmation link within 7 days.
+- The newsletter: you are subscribed only if you click the confirmation link within 7 days. A subscription ends when its record is deleted, 24 months after the last contact recorded on it. Signing up again restarts that period.
 - The box in your account settings: news and offers.
 
 To stop, use the unsubscribe link in a newsletter confirmation or a waitlist launch email (the first email confirming a waitlist sign-up has no link), untick the account box, or ask us through the form or by email. The link and the box are separate, and a later sign-up counts as new.
