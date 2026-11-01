@@ -132,8 +132,7 @@ export const jobs: JobsConfig = {
       },
     },
     {
-      // Expired sign-ins, webhook payloads (they hold payer details) after 90 days (spec §16), and
-      // the retention settings.
+      // Expired sign-ins, webhook events after 90 days (spec §16), and the retention settings.
       slug: 'cleanup',
       schedule: [{ cron: '30 3 * * *', queue: 'default' }],
       retries: 0,
