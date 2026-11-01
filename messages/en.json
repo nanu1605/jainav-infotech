@@ -429,9 +429,11 @@
       "stateLocked": "Set by your GSTIN: the place of supply is the state it's registered in.",
       "businessName": "Business name",
       "gstin": "GSTIN",
-      "gstinHint": "For a GST invoice in your business's name."
+      "gstinHint": "For a GST invoice in your business's name.",
+      "gstinHintOff": "We don't charge GST at the moment, so there's no GST to claim on this invoice. If you add a GSTIN, it's printed on the invoice and sets your state."
     },
     "accept": "I accept the <terms>Terms</terms> and the <eula>{product} EULA</eula>.",
+    "policies": "Before you pay, read <refunds>Refunds and Cancellation</refunds> and <delivery>Shipping and Delivery</delivery>.",
     "newTab": "(opens in a new tab)",
     "pay": "Pay {total}",
     "paying": "Processing your payment…",
@@ -485,10 +487,10 @@
       }
     },
     "failed": {
-      "title": "Payment not completed",
-      "intro": "Your payment didn't go through.",
+      "title": "Payment not confirmed",
+      "intro": "We haven't been able to confirm your payment.",
       "order": "Order {number}",
-      "noCharge": "No money was taken. If an amount was deducted from your account, your bank or Razorpay refunds it automatically.",
+      "ifCharged": "If money left your account, it usually goes back by itself. If the payment still goes through, we complete your order and email you. If you're not sure, contact support with the date and amount.",
       "retry": "Try again",
       "support": "Contact support"
     }
@@ -668,9 +670,9 @@
         "expired": "Expired"
       },
       "statusText": {
-        "suspended": "This license is paused, for example while a payment is disputed. The app runs as the free version until it is reinstated. Contact support if you think this is a mistake.",
-        "revoked": "This license was cancelled, for example after a refund. It can no longer be activated, and the app runs as the free version.",
-        "expired": "This license has expired, so the app runs as the free version."
+        "suspended": "This license is paused, for example while a payment is disputed. The key can't be activated until it's reinstated, and Pro features stop when the app next checks the license. Contact support if you think this is a mistake.",
+        "revoked": "This license was cancelled, for example after a refund. The key can no longer be activated, and Pro features stop when the app next checks the license.",
+        "expired": "This license has expired, so Pro features stop when the app next checks the license."
       },
       "key": "License key",
       "copy": "Copy",
@@ -685,12 +687,12 @@
       "appVersion": "version {version}",
       "lastSeen": "Last seen {date} IST",
       "deactivate": "Deactivate",
-      "confirm": "Deactivate {device}? {product} on that device runs as the free version until it is activated again.",
+      "confirm": "Deactivate {device}? This frees its slot.",
       "confirmButton": "Yes, deactivate",
       "cancel": "Cancel",
       "pending": "Deactivating…",
-      "deactivated": "{device} was deactivated. You can now activate {product} on another device.",
-      "help": "Deactivating a device frees its slot, so you can activate {product} on another device.",
+      "deactivated": "{device} was deactivated. Its slot is free.",
+      "help": "Deactivating a device frees its slot.",
       "deactivationsLeft": "Deactivations left this month: {count}. The count resets on {date}.",
       "limitReached": "You've used this month's deactivations. You can deactivate a device again from {date}.",
       "notFound": "This device is no longer active.",
@@ -721,6 +723,7 @@
       "businessName": "Business name",
       "gstin": "GSTIN",
       "gstinHint": "Optional: add it to claim input tax credit. It sets your state.",
+      "gstinHintOff": "Optional: it's printed on your invoices and sets your state. We don't charge GST at the moment, so there's no GST to claim.",
       "state": "State",
       "stateHint": "Your place of supply, printed on invoices.",
       "stateLocked": "Set from your GSTIN.",
@@ -732,10 +735,10 @@
     },
     "delete": {
       "title": "Delete account",
-      "text": "Deleting your account anonymizes your profile (your name, phone and billing details are removed) and signs you out on every device. Your orders and invoices are kept for the period tax law requires.",
+      "text": "Deleting your account replaces your email address, removes your name, phone and billing details from your profile, withdraws your marketing consent and signs you out on every device. We keep your orders and invoices, with the details on them, for the period tax law requires, your licenses and keys (which keep working) with their device records, your form messages and your privacy requests. You lose these account pages, and we stop sending you license and refund emails, so save your keys and invoices first.",
       "button": "Delete account",
       "confirmTitle": "Delete your account?",
-      "confirmText": "Your profile will be anonymized and every session ends. Orders and invoices are kept for the period tax law requires. This can't be undone.",
+      "confirmText": "Your profile will be anonymized and every session ends. Orders, invoices, licenses, device records, form messages and privacy requests stay, and license and refund emails stop. This can't be undone.",
       "cancel": "Keep my account",
       "confirm": "Delete account",
       "pending": "Deleting…",
@@ -869,12 +872,12 @@
       },
       "unsubscribed": {
         "title": "You're unsubscribed",
-        "text": "We won't send you marketing emails any more. Replies to your own messages still reach you."
+        "text": "We've unsubscribed this address from every sign-up we hold for it. You still get replies, and emails about your orders and licenses. A later sign-up counts as new, and a store account's marketing box is separate: untick it in your account settings."
       },
       "home": "Go to the home page",
       "unsubscribeFailed": {
         "title": "We couldn't unsubscribe you with this link",
-        "text": "The link may be damaged or out of date. Reply to any of our emails, or <privacy>send a privacy request</privacy>, and we'll stop marketing emails to your address."
+        "text": "The link may be damaged or out of date. <privacy>Send a privacy request</privacy> and we'll stop marketing emails to your address."
       }
     },
     "careers": {
@@ -993,7 +996,7 @@
       "amount": "Amount refunded",
       "creditNote": "Credit note",
       "timing": "The money goes back to the account you paid from. Banks usually take 5–10 working days to show it.",
-      "licenseRevoked": "Your {product} license from this order has been revoked, so the app now runs as the free version.",
+      "licenseRevoked": "Your {product} license from this order has been revoked. The key can no longer be activated, and Pro features stop when {product} next checks the license.",
       "attached": "Your credit note {creditNoteNumber} is attached as a PDF.",
       "support": "Questions about your refund? Reply to this email and we'll help."
     },
@@ -1005,12 +1008,12 @@
       "suspended": {
         "subject": "Your {product} license is suspended",
         "body": "We've suspended your {product} license while a payment dispute or a support review is open.",
-        "next": "Until it's resolved, Pro features are off and {product} runs as the free version. If you think this is a mistake, reply to this email."
+        "next": "Until it's resolved, the key can't be activated, and Pro features stop when {product} next checks the license. If you think this is a mistake, reply to this email."
       },
       "revoked": {
         "subject": "Your {product} license has been revoked",
         "body": "Your {product} license has been revoked, after a refund or because the license terms weren't followed.",
-        "next": "Pro features are off, and {product} runs as the free version."
+        "next": "The key can no longer be activated, and Pro features stop when {product} next checks the license."
       },
       "support": "Questions about your license? Reply to this email and we'll help."
     },
