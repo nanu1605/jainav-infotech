@@ -73,7 +73,13 @@ On the server, in `/srv/jainav`:
     `https://staging.{{DOMAIN}}`), `PAYLOAD_SECRET`, `CRON_SECRET`.
   - `DATABASE_URL=postgres://jainav:<APP_DB_PASSWORD>@postgres:5432/jainav`; staging uses
     `jainav_staging` with `STAGING_DB_PASSWORD`.
-  - R2 (`S3_*`, `NEXT_PUBLIC_CDN_URL`, `DOWNLOADS_BASE_URL`), Resend, Turnstile, Telegram, Sentry.
+  - R2 (`S3_*`, `NEXT_PUBLIC_CDN_URL`, `DOWNLOADS_BASE_URL`), Turnstile, Telegram, Sentry.
+  - Resend: `RESEND_API_KEY`, `EMAIL_FROM`. Set them before real visitors arrive. Without the key
+    the app still starts, so a deploy can come before Resend is ready, but every send fails:
+    - each start logs `RESEND_API_KEY is not set` and posts it to Telegram;
+    - sign-in codes and form emails aren't sent, and each failure is only logged;
+    - email jobs retry, then alert on Telegram. After adding the key, restart the app and check
+      failed jobs under System → Payload Jobs.
   - `OTP_PEPPER` (customer sign-in codes; `openssl rand -hex 32`, one per environment).
   - Licensing: `LICENSING_PRIVATE_KEY`, `LICENSING_KEY_ID`, `LICENSE_KEY_ENCRYPTION_KEY`,
     `DEVICE_ID_PEPPER` from `pnpm gen:licensing-keys`, one set per environment
