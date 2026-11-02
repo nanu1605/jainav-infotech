@@ -427,11 +427,12 @@ async function creditRefund(payload: Payload, orderId: number, refund: RazorpayR
       WHERE id = ${orderId}
     `)
     if (full && amount > 0) {
-      // The refund email says it: marked as told, so no separate revoked email goes out.
+      // The refund email says it, and marks it as told once it has gone (sendRefundEmail): if it
+      // fails, the sweep can still send the revoked email.
       const { errors } = await payload.update({
         collection: 'licenses',
         where: { and: [{ order: { equals: orderId } }, { status: { not_equals: 'revoked' } }] },
-        data: { status: 'revoked', statusNotifiedAs: 'revoked' },
+        data: { status: 'revoked' },
         overrideAccess: true,
         depth: 0,
         req,

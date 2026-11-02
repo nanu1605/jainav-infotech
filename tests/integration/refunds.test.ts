@@ -506,6 +506,7 @@ describe('refunds (spec §11.6)', () => {
     expect(note!.emailedAt).toBeTruthy()
     expect(fresh.creditNotes).toEqual([note!.id])
     expect((await licenseOf(order.id)).status).toBe('active')
+    expect((await licenseOf(order.id)).statusNotifiedAs).toBeFalsy()
     const [mail, ...more] = mailsTo(order, /^Refund for order/)
     expect(more).toHaveLength(0)
     expect(mail!.attachments).toEqual([
@@ -562,6 +563,75 @@ describe('refunds (spec §11.6)', () => {
     expect(await refund(order.id, { reason: 'Once more' })).toMatchObject({
       status: 409,
       body: { errors: [{ message: 'A refunded order can’t be refunded.' }] },
+    })
+  })
+
+  describe('when the full refund email fails', () => {
+    /** A full refund whose first email fails, and the job's retry of it. */
+    async function refundEmailFails(name: string) {
+      const { order, paymentId } = await buy(name)
+      vi.mocked(payload.sendEmail).mockImplementationOnce(async () => {
+        throw new Error('Email provider down')
+      })
+      const made = await gw('refund', {
+        payment_id: paymentId,
+        amount: order.total,
+        outcome: 'processed',
+      })
+      await settled()
+      expect((await orderById(order.id)).status).toBe('refunded')
+      expect(mailsTo(order, /./)).toHaveLength(0)
+      expect((await licenseOf(order.id)).status).toBe('revoked')
+      const event = await delivered('refund.processed', made.refund.id)
+      const { processWebhookEvent } = await import('@/lib/commerce/webhooks')
+      return { order, retry: () => processWebhookEvent(event.id) }
+    }
+
+    it('the sweep still tells the customer the license is revoked', async () => {
+      const { order, retry } = await refundEmailFails('refundmailsweep')
+      await sendPendingStatusEmails()
+      expect(mailsTo(order, /license has been revoked/)).toHaveLength(1)
+      expect((await licenseOf(order.id)).statusNotifiedAs).toBe('revoked')
+
+      // The retry still sends the refund and its credit note, and nothing more goes out.
+      await retry()
+      expect(mailsTo(order, /^Refund for order/)).toHaveLength(1)
+      await sendPendingStatusEmails()
+      expect(mailsTo(order, /./)).toHaveLength(2)
+    })
+
+    it('a retry that gets through first tells it, with no separate email', async () => {
+      const { order, retry } = await refundEmailFails('refundmailretry')
+      await retry()
+      expect(mailsTo(order, /^Refund for order/)).toHaveLength(1)
+      expect((await licenseOf(order.id)).statusNotifiedAs).toBe('revoked')
+      await sendPendingStatusEmails()
+      expect(mailsTo(order, /./)).toHaveLength(1)
+    })
+
+    it('a reinstatement before the retry still gets its own email, so "active" is the last word', async () => {
+      const { order, retry } = await refundEmailFails('refundmailback')
+      await reinstate(order.id)
+      await retry()
+      expect(mailsTo(order, /^Refund for order/)).toHaveLength(1)
+      await sendPendingStatusEmails()
+      expect(mailsTo(order, /license is active again/)).toHaveLength(1)
+      expect((await licenseOf(order.id)).statusNotifiedAs).toBeFalsy()
+    })
+  })
+
+  it('has nobody to tell of a revocation once the account is deleted', async () => {
+    const { order, paymentId } = await buy('refunddeleted')
+    await db().execute(
+      sql`UPDATE customers SET status = 'deleted' WHERE id = ${order.customer as number}`,
+    )
+    await gw('refund', { payment_id: paymentId, amount: order.total, outcome: 'processed' })
+    await settled()
+    await sendPendingStatusEmails()
+    expect(mailsTo(order, /./)).toHaveLength(0)
+    expect(await licenseOf(order.id)).toMatchObject({
+      status: 'revoked',
+      statusNotifiedAs: 'revoked',
     })
   })
 
