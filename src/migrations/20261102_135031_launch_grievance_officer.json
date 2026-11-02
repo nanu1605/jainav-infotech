@@ -40108,6 +40108,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "last_activity_at": {
+          "name": "last_activity_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "type": {
           "name": "type",
           "type": "enum_leads_type",
@@ -40302,6 +40308,21 @@
           "columns": [
             {
               "expression": "assigned_to_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "leads_last_activity_at_idx": {
+          "name": "leads_last_activity_at_idx",
+          "columns": [
+            {
+              "expression": "last_activity_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -40833,6 +40854,12 @@
           "primaryKey": true,
           "notNull": true
         },
+        "ticket_number": {
+          "name": "ticket_number",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
         "email": {
           "name": "email",
           "type": "varchar",
@@ -40852,6 +40879,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "locale": {
+          "name": "locale",
+          "type": "enum_data_requests_locale",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "enum_data_requests_status",
@@ -40859,6 +40893,30 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'new'"
+        },
+        "due_at": {
+          "name": "due_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acknowledge_by": {
+          "name": "acknowledge_by",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acknowledged_at": {
+          "name": "acknowledged_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ack_claimed_at": {
+          "name": "ack_claimed_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "handled_by_id": {
           "name": "handled_by_id",
@@ -40894,6 +40952,36 @@
         }
       },
       "indexes": {
+        "data_requests_ticket_number_idx": {
+          "name": "data_requests_ticket_number_idx",
+          "columns": [
+            {
+              "expression": "ticket_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "data_requests_due_at_idx": {
+          "name": "data_requests_due_at_idx",
+          "columns": [
+            {
+              "expression": "due_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "data_requests_handled_by_idx": {
           "name": "data_requests_handled_by_idx",
           "columns": [
@@ -45712,6 +45800,64 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.retention_settings": {
+      "name": "retention_settings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "lead_months": {
+          "name": "lead_months",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 24
+        },
+        "data_request_months": {
+          "name": "data_request_months",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "remove_orders": {
+          "name": "remove_orders",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "order_financial_years": {
+          "name": "order_financial_years",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 8
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.navigation_header": {
       "name": "navigation_header",
       "schema": "",
@@ -47077,6 +47223,7 @@
         "refunded",
         "partially-refunded",
         "disputed",
+        "chargeback",
         "expired"
       ]
     },
@@ -47281,7 +47428,16 @@
         "correction",
         "erasure",
         "withdraw-consent",
+        "nomination",
         "grievance"
+      ]
+    },
+    "public.enum_data_requests_locale": {
+      "name": "enum_data_requests_locale",
+      "schema": "public",
+      "values": [
+        "en",
+        "hi"
       ]
     },
     "public.enum_data_requests_status": {
@@ -47376,7 +47532,9 @@
         "sendDeviceEmail",
         "reconcileOrders",
         "cleanup",
-        "sendWaitlistEmail"
+        "sendWaitlistEmail",
+        "sendDataRequestAck",
+        "remindDataRequests"
       ]
     },
     "public.enum_payload_jobs_log_state": {
@@ -47399,7 +47557,9 @@
         "sendDeviceEmail",
         "reconcileOrders",
         "cleanup",
-        "sendWaitlistEmail"
+        "sendWaitlistEmail",
+        "sendDataRequestAck",
+        "remindDataRequests"
       ]
     },
     "public.enum_site_settings_socials_platform": {
@@ -47484,6 +47644,6 @@
     "tables": {},
     "columns": {}
   },
-  "id": "5a4d312c-118b-476e-8449-ba97543cdde2",
+  "id": "702f6411-970e-4dbe-bcec-1f55e0900556",
   "prevId": "00000000-0000-0000-0000-000000000000"
 }
