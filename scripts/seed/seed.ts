@@ -1,5 +1,11 @@
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
+import {
+  convertMarkdownToLexical,
+  editorConfigFactory,
+  type SanitizedServerEditorConfig,
+} from '@payloadcms/richtext-lexical'
 import type { CollectionSlug, Payload, RequiredDataFromCollectionSlug, Where } from 'payload'
 
 import * as content from './content'
@@ -73,6 +79,20 @@ async function ensure<S extends CollectionSlug>(
   summary.created.push(label)
   return doc.id
 }
+
+/**
+ * A legal page's text as rich text. It lives in Markdown files so that it reads as a document in
+ * review; rich text has no row ids to match, so the Hindi body is written as a whole value.
+ */
+export const legalBody = (
+  editorConfig: SanitizedServerEditorConfig,
+  slug: string,
+  locale: 'en' | 'hi',
+) =>
+  convertMarkdownToLexical({
+    editorConfig,
+    markdown: readFileSync(new URL(`./legal/${slug}.${locale}.md`, import.meta.url), 'utf8'),
+  })
 
 // Tanishq's portrait (2026-10-16), cropped to 4:5 at 1200 × 1500.
 const FOUNDER_PHOTO = fileURLToPath(new URL('./assets/tanishq-jain.jpg', import.meta.url))
@@ -275,14 +295,17 @@ export async function seed(payload: Payload): Promise<SeedSummary> {
     })
   }
 
+  const editorConfig = await editorConfigFactory.default({ config: payload.config })
   for (const doc of content.legalPages) {
+    const slug = doc.en.slug as string
     await ensure(payload, summary, {
       collection: 'legal-pages',
-      label: `legal-pages:${doc.en.slug}`,
-      where: { slug: { equals: doc.en.slug } },
+      label: `legal-pages:${slug}`,
+      where: { slug: { equals: slug } },
       draft: true,
-      hiRaw: { body: content.legalBodyHi },
-      ...doc,
+      en: { ...doc.en, body: legalBody(editorConfig, slug, 'en') },
+      hi: doc.hi,
+      hiRaw: { body: legalBody(editorConfig, slug, 'hi') },
     })
   }
 

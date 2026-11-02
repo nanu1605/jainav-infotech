@@ -8,9 +8,11 @@ Phase 6 in order (spec §20). Each step names who does it. Details are in the ot
 - [ ] VPS account; Cloudflare account; Resend account; mailbox provider; Telegram bot.
 - [ ] Final company details:
   - CIN, incorporation date, registered office, GSTIN if any;
-  - phone and email addresses, business days.
-- [ ] Approved legal texts: privacy, terms, cancellation & refunds, shipping. Also the EULA if a
-      VYRO download goes live (VYRO is MIT/Apache today, so it may not be needed).
+  - phone and email addresses, business days;
+  - the Grievance Officer's name and title.
+- [ ] Legal texts reviewed, ideally by a lawyer: drafts are in `scripts/seed/legal/`, and the seed
+      loads them. Decide the refund window and fill the other `{{PLACEHOLDERS}}`. The EULA waits for
+      VYRO Pro: released builds are MIT or Apache-2.0 ([decisions](../decisions.md), "Legal drafts").
 
 ## Steps
 
@@ -37,8 +39,13 @@ Phase 6 in order (spec §20). Each step names who does it. Details are in the ot
    - tag `v1.0.0`, approve the deploy, seed;
    - create the Owner account in the admin;
    - publish the reviewed content.
-8. **Legal pages:** the Owner publishes the approved texts (spec §8.13). Razorpay checks six
-   pages: Contact, Pricing, Terms, Privacy, Cancellation & Refunds, Shipping.
+8. **Legal pages:**
+   - on staging, in a fresh browser profile, list the cookies and storage on the main pages and
+     compare them with the Cookie Policy: the development check can't see Cloudflare or Umami;
+   - the Owner publishes the reviewed texts with their effective date (spec §8.13), all but the
+     EULA, and sets the Terms version in Commerce settings to match;
+   - Razorpay's activation asks for About us, Contact us, Pricing, Terms, Privacy and Refunds, plus
+     a sample invoice. Shipping stays live too.
 9. **VYRO download** (if it goes live): `pnpm import:release <tag>` with the tools image
    ([server.md §8](server.md#8-one-off-commands)), then the Owner publishes the release.
 10. **Email** ([cloudflare.md](cloudflare.md#email)): Resend domain verified, mailboxes, SPF,
@@ -57,9 +64,10 @@ Phase 6 in order (spec §20). Each step names who does it. Details are in the ot
 - [ ] An uptime alert reaches Telegram (pause a monitor's target, or use the provider's test
       alert).
 - [ ] mail-tester scores at least 9/10.
-- [ ] The six pages Razorpay checks are live.
+- [ ] The pages Razorpay checks are live (step 8).
 - [ ] Lighthouse on the production URLs: `LHCI_BASE_URL=https://{{DOMAIN}} pnpm lhci` (spec
       §15; Phase 5 measured locally only).
 
 **After launch (Tanishq):** once the pricing page shows real VYRO prices, apply for Razorpay
-activation using this website.
+activation using this website. First get Razorpay's written confirmation that one-time software
+licenses are accepted ([decisions](../decisions.md), "Legal drafts").
