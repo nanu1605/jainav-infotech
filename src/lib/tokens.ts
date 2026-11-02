@@ -19,8 +19,9 @@ const sign = (value: string) =>
     .digest('base64url')
 
 /**
- * Unsubscribe links must keep working in every email ever sent, so the token is the lead id
- * signed with PAYLOAD_SECRET rather than a stored value. Rotating the secret breaks old links.
+ * Unsubscribe links work for as long as the lead exists, so the token is the lead id signed with
+ * PAYLOAD_SECRET rather than a stored value. Once the lead is purged, or the secret rotated, a link
+ * lands on the failure page, which offers a privacy request instead.
  */
 export const unsubscribeToken = (leadId: number | string) => `${leadId}.${sign(String(leadId))}`
 

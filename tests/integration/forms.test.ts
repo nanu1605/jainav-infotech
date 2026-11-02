@@ -337,6 +337,39 @@ describe('waitlist', () => {
     expect(sent).toHaveLength(0)
   })
 
+  it('counts a repeat sign-up as a contact, for retention', async () => {
+    const waiting = address('repeat-waitlist')
+    const subscribed = address('repeat-newsletter')
+    const join = { product: `${run}-app`, email: waiting, marketing: false }
+    await post('waitlist', join)
+    await settled()
+    await payload.create({
+      collection: 'leads',
+      data: {
+        type: 'newsletter',
+        status: 'new',
+        email: subscribed,
+        confirmedAt: '2024-01-01T00:00:00.000Z',
+        marketingConsent: { given: true },
+      },
+      overrideAccess: true,
+    })
+    const old = '2024-01-01T00:00:00.000Z'
+    const db = (payload.db as unknown as PostgresAdapter).drizzle
+    await db.execute(
+      sql`UPDATE leads SET last_activity_at = ${old} WHERE email IN ${[waiting, subscribed]}`,
+    )
+
+    await post('waitlist', join)
+    await post('newsletter', { email: subscribed })
+    await settled()
+    for (const email of [waiting, subscribed]) {
+      const leads = await leadsFor(email)
+      expect(leads).toHaveLength(1)
+      expect(Date.parse(leads[0]!.lastActivityAt!)).toBeGreaterThan(Date.now() - 60_000)
+    }
+  })
+
   it('takes a new tick after a withdrawal as consent again', async () => {
     const email = address('waitlist-withdrawn')
     const join = { product: `${run}-app`, email, marketing: true }

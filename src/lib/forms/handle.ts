@@ -136,6 +136,16 @@ async function findProduct(payload: Payload, slug: string) {
 const exists = async (payload: Payload, where: Where) =>
   (await payload.count({ collection: 'leads', where, overrideAccess: true })).totalDocs > 0
 
+/** A repeat submission is a contact too: retention counts from it. */
+const touchLeads = (ctx: Ctx, where: Where) =>
+  ctx.payload.update({
+    collection: 'leads',
+    where,
+    data: { lastActivityAt: ctx.now },
+    overrideAccess: true,
+    depth: 0,
+  })
+
 type Values<F extends FormName> = z.infer<(typeof formSchemas)[F]>
 
 const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome | null> } = {
@@ -224,6 +234,7 @@ const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome 
       { unsubscribedAt: { exists: false } },
     ]
     if (await exists(ctx.payload, { and: waiting })) {
+      await touchLeads(ctx, { and: waiting })
       if (v.marketing) {
         await ctx.payload.update({
           collection: 'leads',
@@ -272,7 +283,7 @@ const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome 
 
   // Subscribing is the marketing consent: recorded only when confirmed (double opt-in, spec §13).
   async newsletter(v, ctx) {
-    const subscribed = await exists(ctx.payload, {
+    const subscribed: Where = {
       and: [
         { type: { equals: 'newsletter' } },
         { email: { equals: v.email } },
@@ -280,8 +291,11 @@ const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome 
         { unsubscribedAt: { exists: false } },
         { 'marketingConsent.withdrawnAt': { exists: false } },
       ],
-    })
-    if (subscribed) return null
+    }
+    if (await exists(ctx.payload, subscribed)) {
+      await touchLeads(ctx, subscribed)
+      return null
+    }
     const token = randomToken()
     const id = await createLead(ctx, {
       type: 'newsletter',

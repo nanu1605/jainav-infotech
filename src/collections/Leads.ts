@@ -2,17 +2,19 @@ import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 import {
   APIError,
   type CollectionAfterDeleteHook,
+  type CollectionBeforeChangeHook,
   type CollectionBeforeDeleteHook,
   type CollectionConfig,
   type FieldAccess,
   type FieldHook,
   type Payload,
   type PayloadHandler,
+  type PayloadRequest,
   type Where,
 } from 'payload'
 import { z } from 'zod'
 
-import { leadHandlers, nobody, ownerOnly, staff } from '@/access/roles'
+import { hasRole, leadHandlers, nobody, ownerOnly, staff } from '@/access/roles'
 import { routing } from '@/i18n/routing'
 import { istDateTime, toCsv } from '@/lib/csv'
 import { istDate } from '@/lib/format'
@@ -99,6 +101,32 @@ const deleteDeliveries: CollectionAfterDeleteHook = async ({ doc, req }) => {
     WHERE address_hash = encode(sha256(convert_to(lower(btrim(${email})), 'UTF8')), 'hex')
       AND NOT EXISTS (SELECT 1 FROM leads WHERE lower(btrim(email)) = lower(btrim(${email})))
   `)
+}
+
+/**
+ * A new date on a field retention counts from, if it may stand; undefined means a plain save.
+ * Server code means what it passes. Staff can't enter a future day, and only the Owner, who can
+ * delete a record anyway, an earlier date. Compared as IST days: the date picker stores a time.
+ */
+export function enteredDate(req: PayloadRequest, value: unknown, stored: unknown) {
+  if (typeof value !== 'string' || value === stored) return undefined
+  if (!req.user) return value
+  if (istDate(new Date(value)) > istDate()) {
+    throw new APIError('This date can’t be in the future.', 400)
+  }
+  return hasRole(req.user, 'owner') ? value : undefined
+}
+
+/**
+ * Retention counts from here (src/lib/retention.ts): a new lead, or staff saving one, unless the
+ * Owner entered the date. An unsubscribe has no user, so it doesn't extend the period; server code
+ * that is a contact sets the date.
+ */
+const stampLastContact: CollectionBeforeChangeHook = ({ data, operation, originalDoc, req }) => {
+  const entered = enteredDate(req, data.lastActivityAt, originalDoc?.lastActivityAt)
+  if (entered) data.lastActivityAt = entered
+  else if (operation === 'create' || req.user) data.lastActivityAt = new Date().toISOString()
+  return data
 }
 
 // The list view's own query string: where (qs-parsed by Payload), search and sort.
@@ -208,7 +236,11 @@ export const Leads: CollectionConfig = {
     update: leadHandlers,
     delete: ownerOnly,
   },
-  hooks: { beforeDelete: [deleteOwnFiles], afterDelete: [deleteDeliveries] },
+  hooks: {
+    beforeChange: [stampLastContact],
+    beforeDelete: [deleteOwnFiles],
+    afterDelete: [deleteDeliveries],
+  },
   endpoints: [{ path: '/export', method: 'get', handler: exportLeads }],
   fields: [
     {
@@ -235,6 +267,18 @@ export const Leads: CollectionConfig = {
       admin: { position: 'sidebar' },
     },
     { name: 'notes', type: 'textarea', admin: { position: 'sidebar' } },
+    {
+      name: 'lastActivityAt',
+      label: 'Last contact',
+      type: 'date',
+      index: true,
+      admin: {
+        position: 'sidebar',
+        date: { pickerAppearance: 'dayOnly' },
+        description:
+          'Saving the lead sets this to today. The Owner can enter an earlier date instead. The lead and its CV are deleted a set time after it (Settings → Retention settings).',
+      },
+    },
     {
       // What the visitor submitted and agreed to is a record: those fields deny updates (and so
       // render read-only); staff may set withdrawnAt and unsubscribedAt, but not clear them.

@@ -132,12 +132,18 @@ export const jobs: JobsConfig = {
       },
     },
     {
-      // Expired sign-ins, and webhook payloads (they hold payer details) after 90 days (spec §16).
+      // Expired sign-ins, webhook payloads (they hold payer details) after 90 days (spec §16), and
+      // the retention settings.
       slug: 'cleanup',
       schedule: [{ cron: '30 3 * * *', queue: 'default' }],
       retries: 0,
+      onFail: alertWhenExhausted('cleanup', 0),
       handler: async () => {
-        await guarded(async () => (await import('@/lib/commerce/webhooks')).cleanup())
+        const results = await Promise.allSettled([
+          guarded(async () => (await import('@/lib/commerce/webhooks')).cleanup()),
+          guarded(async () => (await import('@/lib/retention')).applyRetention()),
+        ])
+        for (const result of results) if (result.status === 'rejected') throw result.reason
         return { output: {} }
       },
     },
