@@ -38,6 +38,10 @@ Phase 6 in order (spec §20). Each step names who does it. Details are in the ot
 7. **Production:**
    - tag `v1.0.0`, approve the deploy, seed;
    - create the Owner account in the admin;
+   - in Settings → Site settings, enter the CIN and the Grievance Officer's name and title, in
+     English and Hindi: until then the footer leaves them out without saying so. The Privacy,
+     Privacy Requests, Terms and Refunds pages name the officer in their text too, so a new officer
+     means publishing new versions of them as well;
    - publish the reviewed content.
 8. **Legal pages:**
    - on staging, in a fresh browser profile, list the cookies and storage on the main pages and
@@ -61,6 +65,10 @@ Phase 6 in order (spec §20). Each step names who does it. Details are in the ot
 - [ ] Production runs on HTTPS with A-grade security headers (<https://securityheaders.com>).
 - [ ] `/admin` requires Cloudflare Access (the smoke test checks it).
 - [ ] A restore test succeeds on the server.
+- [ ] After a second deploy, `journalctl CONTAINER_NAME=jainav-app-1` still shows the first
+      deploy's lines ([monitoring.md](monitoring.md#logs)).
+- [ ] The home page's footer shows the CIN, registered office, email, phone and Grievance Officer,
+      on `/` and `/hi`.
 - [ ] An uptime alert reaches Telegram (pause a monitor's target, or use the provider's test
       alert).
 - [ ] mail-tester scores at least 9/10.
