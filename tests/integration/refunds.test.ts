@@ -49,6 +49,7 @@ let ipCounter = 0
 const nextIp = () => `198.51.102.${++ipCounter % 250}`
 const sent: SendEmailOptions[] = []
 const telegrams: string[] = []
+let telegramDown = false
 const ids: { product?: number; plan?: number; users: number[] } = { users: [] }
 const restore: (() => Promise<unknown>)[] = []
 const users: Record<'owner' | 'support' | 'editor', User> = {} as never
@@ -192,6 +193,19 @@ const licenseOf = async (orderId: number) =>
     })
   ).docs[0]!
 
+/** Staff set the license back to active, as the admin would. */
+const reinstate = async (orderId: number) => {
+  await payload.update({
+    collection: 'licenses',
+    id: (await licenseOf(orderId)).id,
+    data: { status: 'active' },
+    overrideAccess: true,
+    depth: 0,
+    context: { disableRevalidate: true },
+  })
+  await settled()
+}
+
 const eventTypes = (order: Order) => (order.events as { type: string }[]).map((e) => e.type)
 const mailsTo = (order: Order, subject: RegExp) =>
   sent.filter((m) => m.to === order.billing.email && subject.test(String(m.subject)))
@@ -296,6 +310,7 @@ beforeAll(async () => {
   vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input)
     if (url.includes('api.telegram.org')) {
+      if (telegramDown) return new Response(null, { status: 500 })
       telegrams.push(JSON.parse(String(init?.body)).text)
       return Response.json({ ok: true })
     }
@@ -367,6 +382,7 @@ beforeEach(async () => {
   await settled()
   sent.length = 0
   telegrams.length = 0
+  telegramDown = false
   await db()
     .execute(sql`DELETE FROM rate_limit.hits`)
     .catch(() => undefined)
@@ -490,6 +506,7 @@ describe('refunds (spec §11.6)', () => {
     expect(note!.emailedAt).toBeTruthy()
     expect(fresh.creditNotes).toEqual([note!.id])
     expect((await licenseOf(order.id)).status).toBe('active')
+    expect((await licenseOf(order.id)).statusNotifiedAs).toBeFalsy()
     const [mail, ...more] = mailsTo(order, /^Refund for order/)
     expect(more).toHaveLength(0)
     expect(mail!.attachments).toEqual([
@@ -546,6 +563,75 @@ describe('refunds (spec §11.6)', () => {
     expect(await refund(order.id, { reason: 'Once more' })).toMatchObject({
       status: 409,
       body: { errors: [{ message: 'A refunded order can’t be refunded.' }] },
+    })
+  })
+
+  describe('when the full refund email fails', () => {
+    /** A full refund whose first email fails, and the job's retry of it. */
+    async function refundEmailFails(name: string) {
+      const { order, paymentId } = await buy(name)
+      vi.mocked(payload.sendEmail).mockImplementationOnce(async () => {
+        throw new Error('Email provider down')
+      })
+      const made = await gw('refund', {
+        payment_id: paymentId,
+        amount: order.total,
+        outcome: 'processed',
+      })
+      await settled()
+      expect((await orderById(order.id)).status).toBe('refunded')
+      expect(mailsTo(order, /./)).toHaveLength(0)
+      expect((await licenseOf(order.id)).status).toBe('revoked')
+      const event = await delivered('refund.processed', made.refund.id)
+      const { processWebhookEvent } = await import('@/lib/commerce/webhooks')
+      return { order, retry: () => processWebhookEvent(event.id) }
+    }
+
+    it('the sweep still tells the customer the license is revoked', async () => {
+      const { order, retry } = await refundEmailFails('refundmailsweep')
+      await sendPendingStatusEmails()
+      expect(mailsTo(order, /license has been revoked/)).toHaveLength(1)
+      expect((await licenseOf(order.id)).statusNotifiedAs).toBe('revoked')
+
+      // The retry still sends the refund and its credit note, and nothing more goes out.
+      await retry()
+      expect(mailsTo(order, /^Refund for order/)).toHaveLength(1)
+      await sendPendingStatusEmails()
+      expect(mailsTo(order, /./)).toHaveLength(2)
+    })
+
+    it('a retry that gets through first tells it, with no separate email', async () => {
+      const { order, retry } = await refundEmailFails('refundmailretry')
+      await retry()
+      expect(mailsTo(order, /^Refund for order/)).toHaveLength(1)
+      expect((await licenseOf(order.id)).statusNotifiedAs).toBe('revoked')
+      await sendPendingStatusEmails()
+      expect(mailsTo(order, /./)).toHaveLength(1)
+    })
+
+    it('a reinstatement before the retry still gets its own email, so "active" is the last word', async () => {
+      const { order, retry } = await refundEmailFails('refundmailback')
+      await reinstate(order.id)
+      await retry()
+      expect(mailsTo(order, /^Refund for order/)).toHaveLength(1)
+      await sendPendingStatusEmails()
+      expect(mailsTo(order, /license is active again/)).toHaveLength(1)
+      expect((await licenseOf(order.id)).statusNotifiedAs).toBeFalsy()
+    })
+  })
+
+  it('has nobody to tell of a revocation once the account is deleted', async () => {
+    const { order, paymentId } = await buy('refunddeleted')
+    await db().execute(
+      sql`UPDATE customers SET status = 'deleted' WHERE id = ${order.customer as number}`,
+    )
+    await gw('refund', { payment_id: paymentId, amount: order.total, outcome: 'processed' })
+    await settled()
+    await sendPendingStatusEmails()
+    expect(mailsTo(order, /./)).toHaveLength(0)
+    expect(await licenseOf(order.id)).toMatchObject({
+      status: 'revoked',
+      statusNotifiedAs: 'revoked',
     })
   })
 
@@ -671,7 +757,7 @@ describe('disputes (spec §11.6)', () => {
     expect(telegrams).toHaveLength(1)
     expect(telegrams[0]).toMatch(
       new RegExp(
-        `^Payment dispute ${opened.dispute.id} on order ${order.orderNumber} \\(fraudulent\\), respond by \\d{1,2} \\w{3} \\d{4}\\. The order is disputed and its license suspended\\.`,
+        `^Payment dispute ${opened.dispute.id} on order ${order.orderNumber} \\(fraudulent\\), respond by \\d{1,2} \\w{3,4} \\d{4}\\. The order is disputed and its license suspended\\.`,
       ),
     )
 
@@ -793,25 +879,165 @@ describe('disputes (spec §11.6)', () => {
     expect((await orderById(lost.order.id)).status).toBe('paid')
   })
 
-  it('alerts the state a dispute left when its first run failed after the suspension', async () => {
+  it('alerts a new dispute with its respond-by date when the email fails, then retries it', async () => {
     const { order, paymentId } = await buy('disputeretry')
     vi.mocked(payload.sendEmail).mockImplementationOnce(async () => {
       throw new Error('Email provider down')
     })
     const opened = await gw('dispute', { payment_id: paymentId })
     await settled()
-    expect((await orderById(order.id)).status).toBe('disputed')
+    const disputed = await orderById(order.id)
+    expect(disputed.status).toBe('disputed')
+    expect(eventTypes(disputed)).toContain('payment.dispute.created')
     expect((await licenseOf(order.id)).status).toBe('suspended')
-    expect(telegrams).toHaveLength(0)
+    expect(mailsTo(order, /license is suspended/)).toHaveLength(0)
+    expect(telegrams).toHaveLength(1)
+    expect(telegrams[0]).toMatch(
+      /, respond by \d{1,2} \w{3,4} \d{4}\. The order is disputed and its license suspended\./,
+    )
 
-    // The job's retry: the first run already disputed the order and suspended the license.
+    // The failed email still fails the job: its retry sends the email and alerts nothing twice.
     const event = await delivered('payment.dispute.created', opened.dispute.id)
     expect(event.status).toBe('failed')
     const { processWebhookEvent } = await import('@/lib/commerce/webhooks')
     await processWebhookEvent(event.id)
     expect(mailsTo(order, /license is suspended/)).toHaveLength(1)
     expect(telegrams).toHaveLength(1)
+    expect((await delivered('payment.dispute.created', opened.dispute.id)).status).toBe('processed')
+  })
+
+  it('retries a dispute alert that failed along with the email', async () => {
+    const { order, paymentId } = await buy('disputeoutage')
+    telegramDown = true
+    vi.mocked(payload.sendEmail).mockImplementationOnce(async () => {
+      throw new Error('Email provider down')
+    })
+    const opened = await gw('dispute', { payment_id: paymentId })
+    await settled()
+    expect(telegrams).toHaveLength(0)
+
+    telegramDown = false
+    const event = await delivered('payment.dispute.created', opened.dispute.id)
+    expect(event.status).toBe('failed')
+    const { processWebhookEvent } = await import('@/lib/commerce/webhooks')
+    await processWebhookEvent(event.id)
+    expect(telegrams).toHaveLength(1)
+    expect(telegrams[0]).toMatch(/, respond by .*The order is disputed and its license suspended\./)
+    expect(mailsTo(order, /license is suspended/)).toHaveLength(1)
+
+    // Told and alerted: a redelivery adds nothing.
+    await send('payment.dispute.created', (event.payload as { payload: object }).payload)
+    await settled()
+    expect(telegrams).toHaveLength(1)
+    expect(mailsTo(order, /license/)).toHaveLength(1)
+  })
+
+  it('retries a dispute alert that failed by itself, and emails once', async () => {
+    const { order, paymentId } = await buy('disputenotelegram')
+    telegramDown = true
+    const opened = await gw('dispute', { payment_id: paymentId })
+    await settled()
+    expect(mailsTo(order, /license is suspended/)).toHaveLength(1)
+
+    telegramDown = false
+    const event = await delivered('payment.dispute.created', opened.dispute.id)
+    expect(event.status).toBe('failed')
+    const { processWebhookEvent } = await import('@/lib/commerce/webhooks')
+    await processWebhookEvent(event.id)
+    expect(telegrams).toHaveLength(1)
+    expect(mailsTo(order, /license is suspended/)).toHaveLength(1)
+  })
+
+  it('says what is true when an alert’s retry comes after the dispute moved on', async () => {
+    const retried = async (
+      name: string,
+      meanwhile: (order: Order, id: string) => Promise<void>,
+    ) => {
+      const { order, paymentId } = await buy(name)
+      telegramDown = true
+      const opened = await gw('dispute', { payment_id: paymentId })
+      await settled()
+      telegramDown = false
+      await meanwhile(order, opened.dispute.id)
+      telegrams.length = 0
+      const event = await delivered('payment.dispute.created', opened.dispute.id)
+      const { processWebhookEvent } = await import('@/lib/commerce/webhooks')
+      await processWebhookEvent(event.id)
+      return telegrams[0]
+    }
+    expect(await retried('alertback', (order) => reinstate(order.id))).toContain(
+      'The order is disputed; it has no suspended license.',
+    )
+    expect(
+      await retried('alertwon', async (order, dispute) => {
+        const paymentId = order.razorpayPaymentId as string
+        await gw('dispute', { payment_id: paymentId, dispute_id: dispute, event: 'won' })
+        await settled()
+      }),
+    ).toContain('The order is already paid; its license was suspended.')
+  })
+
+  it('keeps the respond-by date in the order’s history', async () => {
+    const { order, paymentId } = await buy('disputedate')
+    await gw('dispute', { payment_id: paymentId })
+    await settled()
+    expect((await orderById(order.id)).events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'payment.dispute.created',
+          detail: expect.stringMatching(/respond by \d{1,2} \w{3,4} \d{4}/),
+        }),
+      ]),
+    )
+  })
+
+  it('leaves a license staff reinstated after the alert alone when the email is retried', async () => {
+    const { order, paymentId } = await buy('disputeback')
+    vi.mocked(payload.sendEmail).mockImplementationOnce(async () => {
+      throw new Error('Email provider down')
+    })
+    const opened = await gw('dispute', { payment_id: paymentId })
+    await settled()
+    expect(telegrams).toHaveLength(1)
+    await reinstate(order.id)
+
+    const event = await delivered('payment.dispute.created', opened.dispute.id)
+    const { processWebhookEvent } = await import('@/lib/commerce/webhooks')
+    await processWebhookEvent(event.id)
+    // Nor does a redelivery, later, under another event id.
+    await send('payment.dispute.created', (event.payload as { payload: object }).payload)
+    await settled()
+    expect((await licenseOf(order.id)).status).toBe('active')
+    expect(mailsTo(order, /license/)).toHaveLength(0)
+    expect(telegrams).toHaveLength(1)
+  })
+
+  it('applies a dispute’s end once, so a redelivered loss doesn’t undo a later win', async () => {
+    const { order, paymentId } = await buy('lostagain')
+    const opened = await gw('dispute', { payment_id: paymentId })
+    await settled()
+    await gw('dispute', { payment_id: paymentId, dispute_id: opened.dispute.id, event: 'lost' })
+    await settled()
+    await gw('dispute', { payment_id: paymentId, dispute_id: opened.dispute.id, event: 'won' })
+    await settled()
+    expect((await orderById(order.id)).status).toBe('paid')
+
+    const event = await delivered('payment.dispute.lost', opened.dispute.id)
+    await send('payment.dispute.lost', (event.payload as { payload: object }).payload)
+    await settled()
+    expect((await orderById(order.id)).status).toBe('paid')
+  })
+
+  it('alerts the state a dispute left when its first run stopped after the suspension', async () => {
+    const { order, paymentId } = await buy('disputestopped')
+    // As a crash would leave it: changed, with no event or alert yet.
+    await db().execute(sql`UPDATE orders SET status = 'disputed' WHERE id = ${order.id}`)
+    await db().execute(sql`UPDATE licenses SET status = 'suspended' WHERE order_id = ${order.id}`)
+    await gw('dispute', { payment_id: paymentId })
+    await settled()
+    expect(telegrams).toHaveLength(1)
     expect(telegrams[0]).toContain('The order is disputed and its license suspended.')
+    expect(mailsTo(order, /license is suspended/)).toHaveLength(1)
   })
 
   it('says nothing was changed when a dispute comes after a full refund', async () => {

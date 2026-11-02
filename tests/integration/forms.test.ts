@@ -10,6 +10,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { MARKETING_VERSION } from '@/lib/forms/schemas'
 import { addMonthsIST } from '@/lib/licensing/dates'
 import { inboxKey, ipKey } from '@/lib/rateLimit'
+import { SITE_URL } from '@/lib/seo'
 import config from '@/payload.config'
 
 const pending: Promise<unknown>[] = []
@@ -653,7 +654,7 @@ describe('privacy requests', () => {
     const task = payload.config.jobs.tasks?.find((t) => t.slug === 'remindDataRequests')
     // Only the fields the hook reads, of what Payload passes.
     await task?.onFail?.({ job: { id: 7 }, taskStatus: { totalTried: 0 } } as never)
-    expect(telegrams.at(-1)).toBe('Job remindDataRequests #7 failed after 1 attempt.')
+    expect(telegrams.at(-1)).toBe(`Job remindDataRequests #7 failed after 1 attempt.\n${SITE_URL}`)
   })
 
   it('says what open requests need, with no personal data, until they are closed', async () => {

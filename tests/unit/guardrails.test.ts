@@ -1,3 +1,8 @@
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import { missingKeys } from '../../scripts/check-i18n'
@@ -37,6 +42,31 @@ describe('check:i18n', () => {
 
   it('passes when hi has every key', () => {
     expect(missingKeys({ a: 'A' }, { a: 'अ' })).toEqual([])
+  })
+})
+
+describe('check:migrations', () => {
+  // The real command, on a folder of its own: one migration the index has, one it doesn't.
+  it('fails on a migration file missing from the index', { timeout: 120_000 }, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'migrations-'))
+    try {
+      for (const file of [
+        '20261015_154806_initial.ts',
+        '20261015_154806_initial.json',
+        '20990101_000000_forgotten.ts',
+        'index.ts',
+      ]) {
+        writeFileSync(path.join(dir, file), '')
+      }
+      const { status, stderr } = spawnSync(`pnpm check:migrations "${dir}"`, {
+        encoding: 'utf8',
+        shell: true,
+      })
+      expect(stderr).toMatch(/is missing:\n {2}20990101_000000_forgotten\n/)
+      expect(status).toBe(1)
+    } finally {
+      rmSync(dir, { recursive: true })
+    }
   })
 })
 

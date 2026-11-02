@@ -163,7 +163,8 @@ const idOf = (value: number | { id: number }) => (typeof value === 'object' ? va
 /**
  * The refund email (spec §11.7), sent once per credit note like the license emails: the amount,
  * whether the whole order is now refunded (its license is then revoked) and the credit note PDF,
- * in the order's language. Nobody gets it once the customer's account is deleted.
+ * in the order's language. Nobody gets it once the customer's account is deleted. Having gone, it
+ * counts as telling the customer of the revocation, so the sweep sends no separate email.
  */
 export async function sendRefundEmail(creditNoteId: number) {
   const payload = await getClient()
@@ -211,13 +212,14 @@ export async function sendRefundEmail(creditNoteId: number) {
     ])
     // Up to this note: a retry sent after a later refund still tells this one as it was.
     const refunded = notes.reduce((sum, n) => sum + n.totals.total, 0)
+    const full = refunded >= order.total
     const message = await refundEmail({
       locale: order.locale,
       orderNumber: order.orderNumber,
       amount: note.totals.total,
       refunded,
       creditNoteNumber: note.number,
-      full: refunded >= order.total,
+      full,
       productName: product.name,
       accountUrl: absoluteUrl(order.locale, '/account/orders'),
     })
@@ -231,6 +233,12 @@ export async function sendRefundEmail(creditNoteId: number) {
         },
       ],
     })
+    // What this email said, whatever happened meanwhile: a license reinstated since is still untold.
+    if (full) {
+      await drizzle(payload).execute(sql`
+        UPDATE licenses SET status_notified_as = 'revoked' WHERE order_id = ${order.id}
+      `)
+    }
   })
 }
 
