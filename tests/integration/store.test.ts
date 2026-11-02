@@ -875,6 +875,123 @@ describe('checkout (spec §11.3)', () => {
     expect(order.creditNotes).toHaveLength(1)
   })
 
+  it('stores only the webhook fields it reads, and still acts on them', async () => {
+    const { body } = await createOrder(cookie)
+    const order = await orderByNumber(body.order.number)
+    const payer = {
+      email: 'priya@example.test',
+      contact: '+919876543210',
+      vpa: 'priya@okbank',
+      bank: 'BANKNAME',
+      card: { network: 'Visa', last4: '4242', issuer: 'ISSUERNAME' },
+      notes: { address: 'Vijay Nagar' },
+    }
+    const send = (event: string, entities: object) => {
+      const raw = JSON.stringify({ entity: 'event', event, payload: entities, created_at: 0 })
+      return webhookRoute(
+        new Request(`${SITE_URL}/api/v1/webhooks/razorpay`, {
+          method: 'POST',
+          headers: {
+            'x-razorpay-signature': hmacHex(DEV_GATEWAY.webhookSecret, raw),
+            'x-razorpay-event-id': `evt_dev${run}fields${event}`,
+          },
+          body: raw,
+        }),
+      )
+    }
+    const payment = {
+      id: 'pay_devfields',
+      order_id: body.razorpay.order_id,
+      amount: order.total,
+      currency: 'INR',
+      status: 'failed',
+      error_code: 'BAD_REQUEST_ERROR',
+      ...payer,
+    }
+    await send('payment.failed', {
+      payment: { entity: payment },
+      order: { entity: { id: body.razorpay.order_id, notes: payer.notes } },
+    })
+    const refund = {
+      ...payer,
+      id: 'rfnd_devfields',
+      payment_id: 'pay_devfields',
+      amount: 100,
+      currency: 'INR',
+      status: 'created',
+      notes: { orderId: String(order.id), comment: 'Call Priya' },
+    }
+    await send('refund.created', { refund: { entity: refund } })
+    await settled()
+
+    const { docs } = await payload.find({
+      collection: 'webhook-events',
+      where: { eventId: { like: `evt_dev${run}fields` } },
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(docs.map((d) => d.status)).toEqual(['processed', 'processed'])
+    const stored = JSON.stringify(docs.map((d) => d.payload))
+    for (const detail of [
+      'priya',
+      '+919876543210',
+      'okbank',
+      'BANKNAME',
+      'Visa',
+      '4242',
+      'ISSUERNAME',
+      'Vijay',
+      'Priya',
+      'comment',
+      'INR',
+    ]) {
+      expect(stored).not.toContain(detail)
+    }
+    expect(stored).toContain(`"orderId":"${order.id}"`)
+    const failed = docs.find((d) => d.event === 'payment.failed')!
+    expect(failed.payload).toEqual({
+      event: 'payment.failed',
+      payload: {
+        payment: {
+          entity: {
+            id: 'pay_devfields',
+            order_id: body.razorpay.order_id,
+            error_code: 'BAD_REQUEST_ERROR',
+          },
+        },
+      },
+    })
+    const acted = (await orderByNumber(body.order.number)).events as {
+      type: string
+      detail?: string
+    }[]
+    expect(acted).toContainEqual(
+      expect.objectContaining({ type: 'payment-failed', detail: 'BAD_REQUEST_ERROR' }),
+    )
+    // Found through what is left of its notes: this payment isn't the order's.
+    expect(acted).toContainEqual(expect.objectContaining({ type: 'refund.created' }))
+  })
+
+  it('logs which fields of a rejected webhook didn’t fit, never their values', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const raw = JSON.stringify({
+      event: 'payment.failed',
+      payload: { payment: { entity: { id: 42, order_id: 'priya@example.test' } } },
+    })
+    const res = await webhookRoute(
+      new Request(`${SITE_URL}/api/v1/webhooks/razorpay`, {
+        method: 'POST',
+        headers: { 'x-razorpay-signature': hmacHex(DEV_GATEWAY.webhookSecret, raw) },
+        body: raw,
+      }),
+    )
+    const logged = JSON.stringify(warn.mock.calls)
+    warn.mockRestore()
+    expect(res.status).toBe(400)
+    expect(logged).toContain('payload.payment.entity.id')
+    expect(logged).not.toContain('priya')
+  })
+
   it('numbers concurrent invoices consecutively, without gaps or repeats', async () => {
     const orders = await Promise.all(Array.from({ length: 6 }, () => createOrder(cookie)))
     const payments = await Promise.all(

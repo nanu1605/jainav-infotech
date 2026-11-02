@@ -4,7 +4,8 @@ import { nobody, ownerOnly } from '@/access/roles'
 
 /**
  * Incoming payment webhooks (spec §11.3), stored once per `x-razorpay-event-id` so a redelivered
- * event is ignored. Payloads hold the payer's email and phone: owner-only.
+ * event is ignored. Payloads hold only the fields processing reads (src/lib/commerce/webhooks.ts),
+ * no payer details; owner-only all the same.
  */
 export const WebhookEvents: CollectionConfig = {
   slug: 'webhook-events',
