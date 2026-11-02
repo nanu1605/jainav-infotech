@@ -25,6 +25,16 @@ export async function register() {
         error instanceof Error ? error.message : error,
       )
     }
+    // Sign-in codes and form emails don't run as jobs, so their failures only reach the logs, and
+    // the alert after a job's last retry may not come until the first sale.
+    if (process.env.NODE_ENV === 'production' && !process.env.RESEND_API_KEY) {
+      const missing = `${process.env.NEXT_PUBLIC_SITE_URL}: RESEND_API_KEY is not set, every email will fail.`
+      console.error(missing)
+      const { sendTelegram } = await import('@/lib/notify')
+      await sendTelegram(missing).catch((error: unknown) =>
+        console.error('Email key alert failed:', error instanceof Error ? error.message : error),
+      )
+    }
   }
 }
 

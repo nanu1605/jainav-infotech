@@ -11,8 +11,9 @@ export const OUTBOX_DIR = path.resolve(process.cwd(), '.outbox')
 
 /**
  * Email adapter for running without Resend. Development writes each message to `.outbox/` as
- * JSON (a local test mailbox); production drops it and logs only that it did, because Payload's
- * console adapter would print personal data into the logs.
+ * JSON (a local test mailbox). Production fails the send, like a Resend error, so callers retry or
+ * report it instead of recording it as sent. It also logs the reason, because some callers log only
+ * an error's name, and never the message: Payload's console adapter would log personal data.
  */
 export const outboxAdapter: EmailAdapter = () => ({
   name: 'outbox',
@@ -20,8 +21,9 @@ export const outboxAdapter: EmailAdapter = () => ({
   defaultFromName: 'Jainav Infotech',
   sendEmail: async (message) => {
     if (process.env.NODE_ENV === 'production') {
-      console.error('RESEND_API_KEY is not set: an email was not sent.')
-      return
+      const reason = 'RESEND_API_KEY is not set: an email was not sent.'
+      console.error(reason)
+      throw new Error(reason)
     }
     // Attachments as a fingerprint, not their bytes: tests check what was attached. (Payload types
     // messages with nodemailer's types, which aren't installed, so this spells out the shape.)
