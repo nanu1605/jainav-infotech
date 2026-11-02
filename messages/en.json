@@ -894,13 +894,14 @@
     },
     "dataRequest": {
       "title": "Make a privacy request",
-      "intro": "Ask for a copy of your data, a correction or deletion, withdraw your consent, or raise a grievance.",
+      "intro": "Ask for a copy of your data, a correction or deletion, withdraw your consent, name someone to act for you, or raise a grievance.",
       "type": "Request type",
       "types": {
         "access": "Get a copy of my data",
         "correction": "Correct my data",
         "erasure": "Delete my data",
         "withdraw-consent": "Withdraw my consent",
+        "nomination": "Name someone to act for me",
         "grievance": "Raise a grievance"
       },
       "email": "Email address you used with us",
@@ -939,11 +940,17 @@
       "careers": {
         "subject": "We've received your application",
         "body": "Thanks for your interest in working with us. We'll review your application and get back to you."
-      },
-      "data-request": {
-        "subject": "We've received your privacy request",
-        "body": "We'll look into your request and reply to this address. We may ask you to confirm that the request is yours before we act on it."
       }
+    },
+    "dataRequest": {
+      "subject": "We've received your privacy request: {ticketNumber}",
+      "subjectGrievance": "We've received your complaint: {ticketNumber}",
+      "body": "We'll look into your request and reply to this address within one month. We may ask you to confirm that the request is yours before we act on it.",
+      "bodyGrievance": "We'll look into your complaint and reply to this address. We resolve complaints within one month of receiving them. We may ask you to confirm that the complaint is yours.",
+      "ticket": "Ticket number",
+      "received": "Received",
+      "type": "Request",
+      "status": "To ask about its status, reply to this email and give the ticket number."
     },
     "newsletter": {
       "subject": "Confirm your subscription",

@@ -42,12 +42,14 @@ type IdInput = { input: { id: number }; output: object }
  * use: server-only modules can't load in the Payload CLI, which reads this config.
  */
 const alertWhenExhausted =
-  (slug: string): TaskConfig['onFail'] =>
+  (slug: string, retries = RETRIES): TaskConfig['onFail'] =>
   async ({ job, taskStatus }) => {
-    if ((taskStatus?.totalTried ?? 0) < RETRIES) return
+    if ((taskStatus?.totalTried ?? 0) < retries) return
     try {
       const { sendTelegram } = await import('@/lib/notify')
-      await sendTelegram(`Job ${slug} #${job.id} failed after ${RETRIES + 1} attempts.`)
+      await sendTelegram(
+        `Job ${slug} #${job.id} failed after ${retries + 1} attempt${retries ? 's' : ''}.`,
+      )
     } catch (error) {
       console.error(`jobs/${slug}: alert failed:`, error instanceof Error ? error.message : error)
     }
@@ -142,5 +144,19 @@ export const jobs: JobsConfig = {
     idTask('sendWaitlistEmail', async (id) =>
       (await import('@/lib/waitlist')).sendWaitlistEmail(id),
     ),
+    idTask('sendDataRequestAck', async (id) =>
+      (await import('@/lib/dataRequests')).sendDataRequestAck(id),
+    ),
+    {
+      // The periods the legal pages publish. 04:00 UTC is 09:30 IST.
+      slug: 'remindDataRequests',
+      schedule: [{ cron: '0 4 * * *', queue: 'default' }],
+      retries: 0,
+      onFail: alertWhenExhausted('remindDataRequests', 0),
+      handler: async () => {
+        await guarded(async () => (await import('@/lib/dataRequests')).remindDataRequests())
+        return { output: {} }
+      },
+    },
   ] as TaskConfig[],
 }

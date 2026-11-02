@@ -42,6 +42,22 @@ const turnstileReady = (scope: ReturnType<Page['locator']>) =>
     timeout: 20_000,
   })
 
+test('a grievance is acknowledged with a ticket number, without its text', async ({ page }) => {
+  await page.goto('/legal/privacy-requests')
+  const form = page.locator('main form').first()
+  await expect(form.getByRole('radio', { name: 'Name someone to act for me' })).toBeVisible()
+  await form.getByRole('radio', { name: 'Raise a grievance' }).check()
+  const email = address('grievance')
+  await form.getByLabel(/^Email address/).fill(email)
+  await form.getByLabel(/^Details/).fill('The key from my order never arrived.')
+  await turnstileReady(form)
+  await form.getByRole('button', { name: 'Send request' }).click()
+  await expect(page.getByText('Request received')).toBeVisible({ timeout: 20_000 })
+  const mail = await mailTo(email)
+  expect(mail.subject).toMatch(/^We've received your complaint: JT-[0-9A-Z]{8}$/)
+  expect(mail.text).not.toContain('The key from my order never arrived.')
+})
+
 test('contact form validates, sends, confirms and emails a localized auto-reply', async ({
   page,
 }) => {

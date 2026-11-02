@@ -13,19 +13,19 @@ Some records cannot be edited or deleted, and backups can keep deleted data for 
 
 ## What happens after you ask
 
-1. A form request gets an automatic confirmation email. If it does not arrive, check your spam folder or email us.
+1. A form request gets an automatic confirmation email with a ticket number. If it does not arrive, check your spam folder or email us.
 2. A member of our staff finds your data by the email address you used with us and checks that the request is yours. Before we act, we may ask you to confirm from that address, or to give a detail such as an order number.
 3. We answer by email. If we cannot do all that you asked, we tell you why.
 
 ## How long it takes
 
 - Requests: we answer within one month of receiving them.
-- Grievances: we acknowledge within 48 hours and resolve within one month of receiving them. If yours is about something you bought, our acknowledgement gives you a ticket number, so you can ask about its status, and a copy of your complaint as we recorded it.
+- Grievances: we acknowledge within 48 hours and resolve within one month of receiving them. Our acknowledgement gives you a ticket number, so you can ask about its status. Our Grievance Officer's first reply includes a copy of your complaint as we recorded it.
 - Refund and other purchase questions: we aim to answer within 4 working days, and never later than one month. See [Refunds and Cancellation](/legal/refunds-cancellation).
 
 ## Naming someone to act for you
 
-The form has no option for this yet. Email us, or choose **Correct my data** and use the **Details** box. Give your name, the email address you used with us, and the name and contact details of each person you name. Before acting on a nomination, we ask that person to show who they are and what has happened.
+Choose **Name someone to act for me** in the form, or email us. Give your name, the email address you used with us, and the name and contact details of each person you name. Before acting on a nomination, we ask that person to show who they are and what has happened.
 
 ## Withdrawing consent and unsubscribing
 

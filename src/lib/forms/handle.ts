@@ -14,7 +14,9 @@ import {
 } from '@/emails'
 import { routing, type Locale } from '@/i18n/routing'
 import { getClient } from '@/lib/cms'
+import { runQueuedJobs } from '@/lib/commerce/fulfil'
 import { requestCustomer } from '@/lib/commerce/http'
+import { dueDates, newTicketNumber } from '@/lib/dataRequests'
 import { inboxAddress, sendEmail, sendTelegram, settle, type Inbox } from '@/lib/notify'
 import { clientIp, hashIp, limit, sha256 } from '@/lib/rateLimit'
 import { localizedPath, SITE_URL } from '@/lib/seo'
@@ -67,6 +69,8 @@ type Outcome = {
   autoReply?: { kind: AutoReplyKind; product?: string | null; notify?: boolean }
   /** Newsletter: the raw confirmation token (only its hash is stored). */
   confirm?: string
+  /** Privacy requests: a job was queued for the visitor's email, to run after the response. */
+  jobs?: boolean
 }
 
 class InvalidForm extends Error {}
@@ -356,33 +360,42 @@ const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome 
   },
 
   async 'data-request'(v, ctx) {
+    const ticketNumber = newTicketNumber()
     const doc = await ctx.payload.create({
       collection: 'data-requests',
       data: {
+        ticketNumber,
         email: v.email,
         type: v.type,
         details: v.details,
+        locale: ctx.meta.locale,
         status: 'new',
         customer: ctx.customer,
+        ...dueDates(v.type, new Date(ctx.now)),
       },
       overrideAccess: true,
       depth: 0,
     })
+    // The request is saved, so a failure here must not fail it: the daily reminder shows it.
+    await ctx.payload.jobs
+      .queue({ task: 'sendDataRequestAck', input: { id: doc.id } })
+      .catch((error) => console.error('forms/data-request: not queued:', errorCode(error)))
     return {
       collection: 'data-requests',
       id: doc.id,
+      jobs: true,
       staff: {
         inbox: 'privacy',
-        title: `Privacy request: ${v.type}`,
-        telegram: `New privacy request (${v.type})`,
+        title: `Privacy request ${ticketNumber}: ${v.type}`,
+        telegram: `New privacy request ${ticketNumber} (${v.type})`,
         fields: rows([
+          ['Ticket', ticketNumber],
           ['Request', v.type],
           ['Email', v.email],
           ['Details', v.details],
           ['Language', ctx.meta.locale],
         ]),
       },
-      autoReply: { kind: 'data-request' },
     }
   },
 }
@@ -486,8 +499,9 @@ export async function handleForm(form: FormName, req: Request): Promise<Response
 
 async function notify(payload: Payload, outcome: Outcome, email: string, locale: Locale) {
   const adminUrl = `${SITE_URL}/admin/collections/${outcome.collection}/${outcome.id}`
-  const { staff, autoReply, confirm } = outcome
+  const { staff, autoReply, confirm, jobs } = outcome
   const tasks: Promise<unknown>[] = []
+  if (jobs) tasks.push(runQueuedJobs(payload))
   if (staff) {
     tasks.push(sendTelegram(`${staff.telegram}\n${adminUrl}`))
     tasks.push(

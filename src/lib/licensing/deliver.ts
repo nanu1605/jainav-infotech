@@ -42,6 +42,8 @@ const COLUMNS = {
   activations: { claimed: 'notify_claimed_at', sent: 'notified_at' },
   // Credit notes: the refund email (src/lib/invoices/deliver.ts).
   invoices: { claimed: 'email_claimed_at', sent: 'emailed_at' },
+  // The acknowledgement of a privacy request (src/lib/dataRequests.ts).
+  data_requests: { claimed: 'ack_claimed_at', sent: 'acknowledged_at' },
 } as const
 
 /**

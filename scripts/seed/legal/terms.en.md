@@ -123,9 +123,9 @@ This does not affect your right to:
 
 ## Complaints
 
-For any question or complaint, [write to us](/contact?topic=support). We aim to answer refund and other complaint questions within 4 working days, and never later than one month.
+For a question, [write to us](/contact?topic=support). For a complaint, use the form on [Privacy Requests and Grievances](/legal/privacy-requests#data-request), which gives you a ticket number. We aim to answer refund and other complaint questions within 4 working days, and never later than one month.
 
-You can also write to our Grievance Officer: {{GRIEVANCE_OFFICER_NAME}}, {{GRIEVANCE_OFFICER_TITLE}}, at the email, phone and address below, or use the form on [Privacy Requests and Grievances](/legal/privacy-requests). We acknowledge a grievance within 48 hours and resolve it within one month. If you complain about something you bought, our acknowledgement gives you a ticket number, so you can ask about its status, and a copy of your complaint as we recorded it.
+You can also write to our Grievance Officer: {{GRIEVANCE_OFFICER_NAME}}, {{GRIEVANCE_OFFICER_TITLE}}, at the email, phone and address below. We acknowledge a grievance within 48 hours and resolve it within one month. If you complain about something you bought, our acknowledgement gives you a ticket number, so you can ask about its status, and our Grievance Officer's first reply includes a copy of your complaint as we recorded it.
 
 ## Language
 

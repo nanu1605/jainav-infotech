@@ -1,11 +1,17 @@
 import 'server-only'
 
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto'
 
 import { SITE_URL } from './seo'
 
 /** A random URL-safe token (256 bits); store only its sha256 (rateLimit.ts). */
 export const randomToken = () => randomBytes(32).toString('base64url')
+
+const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+
+/** Random characters for a number people read out: 8 are 40 bits, revealing nothing about volume. */
+export const randomCode = (length: number) =>
+  Array.from({ length }, () => CROCKFORD[randomInt(32)]).join('')
 
 const sign = (value: string) =>
   createHmac('sha256', process.env.PAYLOAD_SECRET ?? '')

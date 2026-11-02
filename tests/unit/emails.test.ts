@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   autoReplyEmail,
+  dataRequestEmail,
   newsletterConfirmEmail,
   notificationEmail,
   orderConfirmationEmail,
@@ -20,7 +21,7 @@ import en from '../../messages/en.json'
 import hi from '../../messages/hi.json'
 
 const locales = { en, hi }
-const kinds: AutoReplyKind[] = ['contact', 'project', 'waitlist', 'careers', 'data-request']
+const kinds: AutoReplyKind[] = ['contact', 'project', 'waitlist', 'careers']
 
 describe('autoReplyEmail', () => {
   it.each(['en', 'hi'] as const)(
@@ -54,6 +55,28 @@ describe('autoReplyEmail', () => {
     expect(notify.text).toContain("as soon as it's ready")
     expect(none.text).not.toContain("as soon as it's ready")
     expect(none.text).toContain('only email')
+  })
+})
+
+describe('dataRequestEmail', () => {
+  const request = { ticketNumber: 'JT-7K2QDM9X', receivedAt: '2026-11-01T10:00:00.000Z' }
+
+  it.each(['en', 'hi'] as const)('gives a grievance its ticket and dates in %s', async (locale) => {
+    const email = await dataRequestEmail({ locale, type: 'grievance', ...request })
+    const m = locales[locale].email.dataRequest
+    expect(email.subject).toBe(m.subjectGrievance.replace('{ticketNumber}', request.ticketNumber))
+    expect(email.html).toContain(`lang="${locale}"`)
+    expect(email.text).toContain(request.ticketNumber)
+    expect(email.text).toContain(m.received)
+    expect(email.text).toContain(m.status)
+    expect(email.text).toContain(locales[locale].forms.dataRequest.types.grievance)
+    expect(email.text).toContain(locales[locale].email.note)
+  })
+
+  it.each(['access', 'nomination'] as const)('quotes the ticket of a %s', async (type) => {
+    const email = await dataRequestEmail({ locale: 'en', type, ...request })
+    expect(email.subject).toContain(request.ticketNumber)
+    expect(email.text).toContain(request.ticketNumber)
   })
 })
 

@@ -26,6 +26,7 @@ export const DATA_REQUEST_TYPES = [
   'correction',
   'erasure',
   'withdraw-consent',
+  'nomination',
   'grievance',
 ] as const
 export const CV_MAX_BYTES = 5 * 1024 * 1024

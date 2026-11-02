@@ -21,6 +21,14 @@ Phase 4 sends a Telegram alert for every new lead except newsletter sign-ups. Th
 `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`: the bot from @BotFather, the chat id from
 `https://api.telegram.org/bot<token>/getUpdates` after messaging the bot.
 
+## Privacy requests and grievances
+
+Every request gets a ticket number, a due date one month away (Answer by) and, for a grievance, 48 hours to be acknowledged. The automatic email is the acknowledgement: it retries for about 15 minutes, then a Telegram alert names the job. At 09:30 IST a reminder lists open requests that aren't acknowledged, are due within 7 days or are overdue, on Telegram and to the privacy inbox, every day until they are closed.
+
+- If the automatic email failed, reply by hand with the ticket number, then fill in **Acknowledged at**.
+- The Grievance Officer's first reply to a grievance includes a copy of the complaint as recorded. The automatic email doesn't carry it.
+- Enter a complaint that arrives by phone, email, WhatsApp or the contact form through the form, with the person's email address, so it gets a ticket and due dates. Correct the dates if it arrived earlier.
+
 ## Sentry (errors)
 
 - Create a Sentry project (platform Next.js). Its DSN goes in two places:

@@ -19,13 +19,14 @@ import type { CSSProperties, ReactElement, ReactNode } from 'react'
 
 import type { Locale } from '@/i18n/routing'
 import { formatDate, formatINR } from '@/lib/format'
+import type { DataRequest } from '@/payload-types'
 import { tokens } from '@/styles/tokens.generated'
 
 import en from '../../messages/en.json'
 import hi from '../../messages/hi.json'
 
 export type RenderedEmail = { subject: string; html: string; text: string }
-export type AutoReplyKind = 'contact' | 'project' | 'waitlist' | 'careers' | 'data-request'
+export type AutoReplyKind = 'contact' | 'project' | 'waitlist' | 'careers'
 
 // Static imports: these render inside after(), where there is no request to read messages from.
 const messages: Record<Locale, typeof en> = { en, hi }
@@ -190,6 +191,51 @@ function Fields({ locale, rows }: { locale: Locale; rows: [label: string, value:
         ))}
       </tbody>
     </table>
+  )
+}
+
+/**
+ * The acknowledgement of a privacy request or grievance (spec §16): its ticket number and dates.
+ * Like every auto-reply, it repeats nothing the visitor typed.
+ */
+export function dataRequestEmail({
+  locale,
+  ticketNumber,
+  type,
+  receivedAt,
+}: {
+  locale: Locale
+  ticketNumber: string
+  type: DataRequest['type']
+  receivedAt: string
+}): Promise<RenderedEmail> {
+  const t = translator(locale)
+  const types = createTranslator({
+    locale,
+    messages: messages[locale],
+    namespace: 'forms.dataRequest.types',
+  })
+  const grievance = type === 'grievance'
+  const body = t(grievance ? 'dataRequest.bodyGrievance' : 'dataRequest.body')
+  const received = formatDate(locale, receivedAt, { dateStyle: 'medium', timeStyle: 'short' })
+  const rows: [string, string][] = [
+    [t('dataRequest.ticket'), ticketNumber],
+    [t('dataRequest.received'), `${received} IST`],
+    [t('dataRequest.type'), types(type)],
+  ]
+  return renderEmail(
+    t(grievance ? 'dataRequest.subjectGrievance' : 'dataRequest.subject', { ticketNumber }),
+    <Layout
+      locale={locale}
+      preview={body}
+      footer={<Text style={smallText(locale)}>{t('note')}</Text>}
+    >
+      <Text style={bodyText(locale)}>{t('greeting')}</Text>
+      <Text style={bodyText(locale)}>{body}</Text>
+      <Fields locale={locale} rows={rows} />
+      <Text style={{ ...bodyText(locale), marginTop: '24px' }}>{t('dataRequest.status')}</Text>
+      <Text style={bodyText(locale)}>{t('signoff')}</Text>
+    </Layout>,
   )
 }
 
