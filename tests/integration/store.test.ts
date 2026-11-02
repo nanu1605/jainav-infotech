@@ -582,6 +582,34 @@ describe('checkout (spec §11.3)', () => {
     expect((await createOrder(cookie)).status).toBe(200)
   })
 
+  it('alerts when one customer has two paid orders for the same plan', async () => {
+    const buyer = await signIn(email('twoorders'))
+    const pay = async () => {
+      const { body } = await createOrder(buyer)
+      const paid = await gw('pay', {
+        order_id: body.razorpay.order_id,
+        outcome: 'success',
+        webhooks: false,
+      })
+      await verify(buyer, paid.response)
+      await settled()
+      return body.order.number as string
+    }
+    const first = await pay()
+    expect(telegrams.filter((t) => t.includes(first))).toHaveLength(0)
+    const second = await pay()
+    const alert = telegrams.find((t) => t.includes(second))!
+    expect(alert).toContain(first)
+    expect(alert).toContain('refund the extra order')
+    const order = await orderByNumber(second)
+    expect(order.events).toContainEqual(
+      expect.objectContaining({ type: 'repeat-purchase', detail: first }),
+    )
+    // Nothing is refunded by itself: both stay paid, each with its license.
+    expect((await orderByNumber(first)).status).toBe('paid')
+    expect(order.status).toBe('paid')
+  })
+
   it('verifies, fulfils once and runs the invoice and email jobs', async () => {
     const { body } = await createOrder(cookie)
     const paid = await gw('pay', {
@@ -765,7 +793,8 @@ describe('checkout (spec §11.3)', () => {
     expect(order.razorpayPaymentId).toBe(first.response.razorpay_payment_id)
     const flagged = (order.events as { type: string }[]).filter((e) => e.type === 'paid-twice')
     expect(flagged).toHaveLength(1)
-    expect(telegrams.filter((t) => t.includes(body.order.number))).toHaveLength(1)
+    const alerts = telegrams.filter((t) => t.includes(body.order.number) && /paid twice/.test(t))
+    expect(alerts).toHaveLength(1)
     expect(await invoicesFor(order.id)).toHaveLength(1)
   })
 

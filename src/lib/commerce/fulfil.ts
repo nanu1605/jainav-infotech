@@ -239,7 +239,7 @@ export async function fulfilOrder(
         WHERE c.id = ${couponId} AND c.per_customer_limit IS NOT NULL
           AND (SELECT count(*) FROM orders o
                WHERE o.coupon_id = c.id AND o.customer_id = ${order.customer as number}
-                 AND o.status IN ('paid', 'refunded', 'partially-refunded', 'disputed'))
+                 AND o.status IN ('paid', 'refunded', 'partially-refunded', 'disputed', 'chargeback'))
               > c.per_customer_limit
       `)
       const over = [
@@ -272,10 +272,56 @@ export async function fulfilOrder(
     await payload.jobs.queue({ task: 'renderInvoicePdf', input: { id: invoice.id }, req })
     await payload.jobs.queue({ task: 'sendOrderEmail', input: { id: orderId }, req })
     await commitTransaction(req)
+    await alertRepeatPurchase(payload, order)
     return 'fulfilled'
   } catch (error) {
     await killTransaction(req)
     throw error
+  }
+}
+
+/** A late capture on one order plus a retry on another fall this close together (72-hour watch). */
+const REPEAT_DAYS = 7
+
+/**
+ * Pressing Pay again creates a new order, so one purchase can end up as two paid orders, which the
+ * paid-twice check can't see: that one looks at a single Razorpay order. Someone can also buy twice
+ * on purpose (quantity is fixed at 1), so this only records and alerts. After the commit, so of two
+ * orders fulfilled at once, the later one always sees the other; it never fails the payment.
+ */
+async function alertRepeatPurchase(payload: Payload, order: Order) {
+  try {
+    const { docs } = await payload.find({
+      collection: 'orders',
+      where: {
+        and: [
+          { id: { not_equals: order.id } },
+          { customer: { equals: order.customer } },
+          { 'items.plan': { equals: order.items[0]!.plan } },
+          { status: { in: ['paid', 'partially-refunded', 'disputed'] } },
+          {
+            createdAt: {
+              greater_than: new Date(Date.now() - REPEAT_DAYS * 86_400_000).toISOString(),
+            },
+          },
+        ],
+      },
+      select: { orderNumber: true },
+      limit: 5,
+      depth: 0,
+      overrideAccess: true,
+    })
+    if (!docs.length) return
+    const others = docs.map((doc) => doc.orderNumber).join(', ')
+    await addOrderEvent(payload, order.id, { type: 'repeat-purchase', detail: others })
+    await sendTelegram(
+      `Order ${order.orderNumber} and ${others} are paid orders for the same plan by one customer within ${REPEAT_DAYS} days. If it was one purchase, refund the extra order.\n${SITE_URL}/admin/collections/orders/${order.id}`,
+    )
+  } catch (error) {
+    console.error(
+      'fulfil: repeat-purchase alert failed:',
+      error instanceof Error ? error.name : error,
+    )
   }
 }
 

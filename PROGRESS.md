@@ -138,6 +138,21 @@ With Tanishq's inputs (steps in docs/runbooks/store.md):
 - [ ] A test-mode refund from the admin and from Razorpay's dashboard on staging; the dispute and paid-twice paths if Razorpay's test mode can raise them.
 - [ ] From the CA: the credit note layout, the CA report's columns (CSV or XLSX, rate-wise or B2B/B2C splits) and the refund window.
 
+### Before the store opens: the store against the legal drafts
+
+In the repository (done; see docs/decisions.md, "The store against the legal drafts"):
+
+- [x] Checkout links the refund and delivery pages and refuses orders until its legal pages are live; copy matches the code in both languages.
+- [x] Privacy requests: ticket numbers, due dates staff can correct, daily reminders, nomination.
+- [x] The Owner's Delete account on a customer; unconfirmed newsletter sign-ups no longer count as consenting.
+- [x] Retention: a lead's last contact and a purge of leads and CVs; settings for closed privacy requests, orders and invoices (off) and Umami data (off).
+- [x] Alerts for two paid orders for one plan; emails for a failed refund and a reinstated license; a dispute's end clears Disputed; the CA report lists lost disputes.
+
+With inputs (steps in docs/runbooks/retention.md):
+
+- [ ] From the lawyer: a period for closed privacy requests, and for analytics. Then set them and change the Privacy Policy.
+- [ ] From the CA: the period for orders and invoices, then turn on their removal; how a lost chargeback is recorded.
+
 ### Phase 10 — Store go-live
 
 - [ ] Switch to Razorpay live keys (after activation).

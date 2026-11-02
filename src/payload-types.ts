@@ -1566,7 +1566,7 @@ export interface Order {
   id: number;
   orderNumber: string;
   customer: number | Customer;
-  status: 'created' | 'paid' | 'refunded' | 'partially-refunded' | 'disputed' | 'expired';
+  status: 'created' | 'paid' | 'refunded' | 'partially-refunded' | 'disputed' | 'chargeback' | 'expired';
   flags?: 'paid-twice'[] | null;
   paidAt?: string | null;
   amountRefunded: number;

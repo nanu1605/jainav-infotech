@@ -102,7 +102,7 @@ Nothing in these Terms limits or excludes a right or liability that the law does
 
 We may block your access to the site or an account, or suspend or revoke a license, if we have reasonable cause. Examples are a breach of these Terms or the EULA, a fraudulent or disputed payment, a security risk, or a legal requirement. A full refund also revokes the license for that order. [Refunds and Cancellation](/legal/refunds-cancellation) explains refunds and payment disputes.
 
-When we suspend or revoke a license, we email you, unless you have deleted your account. If you think we got it wrong, reply to that email.
+When we suspend, revoke or reinstate a license, we email you, unless you have deleted your account. If you think we got it wrong, reply to that email.
 
 None of this affects what an open source license already lets you do with code you hold.
 

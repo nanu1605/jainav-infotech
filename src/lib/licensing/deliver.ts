@@ -163,16 +163,21 @@ const names = (payload: Payload, license: License, locale: Locale) =>
     }) as Promise<Plan>,
   ])
 
-/** Whether a license's suspension or revocation still has to be told to its customer. */
-const statusUntold = sql`status IN ('suspended', 'revoked')
-  AND status_notified_as::text IS DISTINCT FROM status::text`
+/**
+ * Whether a license's status still has to be told to its customer: a suspension or revocation, or
+ * a reinstatement after one they were told of (someone never told it was off needs no news).
+ */
+const statusUntold = sql`(
+  (status IN ('suspended', 'revoked') AND status_notified_as::text IS DISTINCT FROM status::text)
+  OR (status = 'active' AND status_notified_as IS NOT NULL)
+)`
 
 /**
- * The license suspended / revoked email (spec §11.7), whoever changed the status: Support, the
- * Owner or a payment dispute. `statusNotifiedAs` is the status the customer was last told, so each
- * change emails once: a 12-minute claim in SQL first (like `once`), the told status after sending,
- * the claim released if sending fails. Reinstating clears it (Licenses hook), so a later
- * suspension emails again. A deleted customer gets nothing; the status still counts as told.
+ * The license suspended / revoked / reinstated email (spec §11.7), whoever changed the status:
+ * Support, the Owner or a payment dispute. `statusNotifiedAs` is the status the customer was last
+ * told, with null for active, so each change emails once: a 12-minute claim in SQL first (like
+ * `once`), the told status after sending, the claim released if sending fails. A deleted customer
+ * gets nothing; the status still counts as told.
  */
 export async function sendLicenseStatusEmail(id: number) {
   const payload = await getClient()
@@ -183,7 +188,7 @@ export async function sendLicenseStatusEmail(id: number) {
       AND (status_claimed_at IS NULL OR status_claimed_at < now() - interval '12 minutes')
     RETURNING status
   `)
-  const status = (rows[0] as { status: 'suspended' | 'revoked' } | undefined)?.status
+  const status = (rows[0] as { status: 'suspended' | 'revoked' | 'active' } | undefined)?.status
   if (!status) {
     const { rows: due } = await db.execute(
       sql`SELECT 1 FROM licenses WHERE id = ${id} AND ${statusUntold}`,
@@ -203,7 +208,7 @@ export async function sendLicenseStatusEmail(id: number) {
       const [product] = await names(payload, license, to.locale)
       const message = await licenseStatusEmail({
         locale: to.locale,
-        status,
+        status: status === 'active' ? 'reinstated' : status,
         productName: product.name,
         licensesUrl: absoluteUrl(to.locale, '/account/licenses'),
       })
@@ -215,10 +220,11 @@ export async function sendLicenseStatusEmail(id: number) {
     await db.execute(sql`UPDATE licenses SET status_claimed_at = NULL WHERE id = ${id}`)
     throw error
   }
-  // Told only if still so: reinstated (or revoked) while sending, the new status is still untold.
+  // What this email said, whatever happened meanwhile: a change while it was sending is still
+  // untold, and the next run tells it.
   await db.execute(sql`
     UPDATE licenses SET status_claimed_at = NULL,
-      status_notified_as = CASE WHEN status::text = ${status} THEN ${status} ELSE status_notified_as END
+      status_notified_as = ${status === 'active' ? null : status}
     WHERE id = ${id}
   `)
 }

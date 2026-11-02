@@ -9,6 +9,8 @@ export const ORDER_STATUSES = [
   'refunded',
   'partially-refunded',
   'disputed',
+  // A dispute lost: the bank returned the money. No credit note follows by itself.
+  'chargeback',
   'expired',
 ] as const
 export type OrderStatus = (typeof ORDER_STATUSES)[number]

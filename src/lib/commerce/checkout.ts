@@ -39,7 +39,13 @@ import {
 } from './store'
 
 /** Statuses that count as a use of a coupon (per-customer limit, spec §11.5). */
-const REDEEMED: Order['status'][] = ['paid', 'refunded', 'partially-refunded', 'disputed']
+const REDEEMED: Order['status'][] = [
+  'paid',
+  'refunded',
+  'partially-refunded',
+  'disputed',
+  'chargeback',
+]
 
 /** Order numbers like JO-7K2QDM9X: 40 random bits, so they reveal nothing about volume. */
 export const newOrderNumber = () => `JO-${randomCode(8)}`

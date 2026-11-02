@@ -37,7 +37,9 @@ const { createSession, SESSION_COOKIE } = await import('@/lib/account/session')
 const { findOrCreateCustomer } = await import('@/lib/account/otp')
 const { DEV_GATEWAY, hmacHex } = await import('@/lib/commerce/razorpay')
 const { sendPendingStatusEmails } = await import('@/lib/licensing/deliver')
+const { istDate } = await import('@/lib/format')
 const { financialYear } = await import('@/lib/invoices/numbering')
+const { lostDisputes } = await import('@/lib/reports')
 const { SITE_URL } = await import('@/lib/seo')
 
 let payload: Payload
@@ -566,7 +568,7 @@ describe('refunds (spec §11.6)', () => {
     expect(mailsTo(order, /^Refund for order/)).toHaveLength(1)
   })
 
-  it('alerts on a failed refund and issues nothing', async () => {
+  it('alerts and emails the customer on a failed refund, and issues nothing', async () => {
     const { order, paymentId } = await buy('failed')
     const made = await gw('refund', { payment_id: paymentId, amount: 10_000, outcome: 'failed' })
     await settled()
@@ -577,8 +579,18 @@ describe('refunds (spec §11.6)', () => {
     expect(telegrams).toEqual([
       `Refund ${made.refund.id} for order ${order.orderNumber} failed.\n${SITE_URL}/admin/collections/orders/${order.id}`,
     ])
-    expect(sent).toHaveLength(0)
+    const [mail, ...more] = mailsTo(order, /didn't go through/)
+    expect(more).toHaveLength(0)
+    expect(mail!.text).toContain('₹100')
+    expect(eventTypes(await orderById(order.id))).toContain('refund-failed-emailed')
     expect((await licenseOf(order.id)).status).toBe('active')
+
+    // A redelivered event sends nothing more.
+    const event = await delivered('refund.failed', made.refund.id)
+    await send('refund.failed', (event.payload as { payload: object }).payload)
+    await settled()
+    expect(mailsTo(order, /didn't go through/)).toHaveLength(1)
+    expect(telegrams).toHaveLength(1)
   })
 
   it('refunds a duplicate payment with one click, without a credit note', async () => {
@@ -647,7 +659,7 @@ describe('refunds (spec §11.6)', () => {
 })
 
 describe('disputes (spec §11.6)', () => {
-  it('marks the order disputed, suspends the license and emails once; later stages only alert', async () => {
+  it('marks the order disputed, suspends the license and emails once; its end clears Disputed', async () => {
     const { order, paymentId } = await buy('dispute')
     const opened = await gw('dispute', { payment_id: paymentId, reason_code: 'fraudulent' })
     await settled()
@@ -669,14 +681,116 @@ describe('disputes (spec §11.6)', () => {
     expect(mailsTo(order, /license/)).toHaveLength(1)
     expect(telegrams).toHaveLength(1)
 
+    await gw('dispute', {
+      payment_id: paymentId,
+      dispute_id: opened.dispute.id,
+      event: 'under_review',
+    })
+    await settled()
+    expect((await orderById(order.id)).status).toBe('disputed')
+    expect(telegrams[1]).toContain(`${order.orderNumber}: under review. Nothing changes by itself`)
+
     await gw('dispute', { payment_id: paymentId, dispute_id: opened.dispute.id, event: 'won' })
     await settled()
     fresh = await orderById(order.id)
-    expect(fresh.status).toBe('disputed')
+    expect(fresh.status).toBe('paid')
     expect(eventTypes(fresh)).toContain('payment.dispute.won')
     expect((await licenseOf(order.id)).status).toBe('suspended')
-    expect(telegrams[1]).toContain(`on order ${order.orderNumber}: won. Nothing changes by itself`)
+    expect(telegrams[2]).toContain(`${order.orderNumber}: won. The order is now paid.`)
     expect(sent).toHaveLength(1)
+  })
+
+  it('opens nothing when a dispute’s end is processed before its start', async () => {
+    const { order, paymentId } = await buy('disputeorder')
+    const dispute = { id: 'disp_devorder', payment_id: paymentId, amount: 99_900 }
+    await send('payment.dispute.won', { dispute: { entity: dispute } })
+    await settled()
+    await send('payment.dispute.created', { dispute: { entity: dispute } })
+    await settled()
+    expect((await orderById(order.id)).status).toBe('paid')
+    expect((await licenseOf(order.id)).status).toBe('active')
+    expect(mailsTo(order, /license/)).toHaveLength(0)
+  })
+
+  it('takes a loss processed before its start, and says the license wasn’t suspended', async () => {
+    const { order, paymentId } = await buy('lostfirst')
+    const dispute = { id: 'disp_devlostfirst', payment_id: paymentId, amount: 99_900 }
+    await send('payment.dispute.lost', { dispute: { entity: dispute } })
+    await settled()
+    expect((await orderById(order.id)).status).toBe('chargeback')
+    expect(telegrams.at(-1)).toContain("The license wasn't suspended")
+    await send('payment.dispute.created', { dispute: { entity: dispute } })
+    await settled()
+    expect((await orderById(order.id)).status).toBe('chargeback')
+    expect((await licenseOf(order.id)).status).toBe('active')
+    // The month's CA report shows it, with its invoice.
+    const listed = await lostDisputes(payload, istDate().slice(0, 7))
+    expect(listed).toContainEqual({
+      orderNumber: order.orderNumber,
+      invoiceNumber: expect.any(String),
+      at: expect.any(String),
+      amount: 99_900,
+    })
+    expect(await lostDisputes(payload, '2020-01')).toEqual([])
+  })
+
+  it('keeps a loss through a later partial refund', async () => {
+    const { order, paymentId } = await buy('lostrefund')
+    const opened = await gw('dispute', { payment_id: paymentId })
+    await settled()
+    await gw('dispute', { payment_id: paymentId, dispute_id: opened.dispute.id, event: 'lost' })
+    await settled()
+    await gw('refund', { payment_id: paymentId, amount: 10_000, outcome: 'processed' })
+    await settled()
+    expect(await orderById(order.id)).toMatchObject({
+      status: 'chargeback',
+      amountRefunded: 10_000,
+    })
+    expect(await creditNotes(order.id)).toHaveLength(1)
+    expect((await refund(order.id, { reason: 'Too late' })).status).toBe(409)
+  })
+
+  it('leaves a fully refunded order as it is when a dispute is lost', async () => {
+    const { order, paymentId } = await buy('lostrefunded')
+    await gw('refund', { payment_id: paymentId, amount: order.total, outcome: 'processed' })
+    await settled()
+    const dispute = { id: 'disp_devlostrefunded', payment_id: paymentId, amount: order.total }
+    await send('payment.dispute.lost', { dispute: { entity: dispute } })
+    await settled()
+    expect((await orderById(order.id)).status).toBe('refunded')
+  })
+
+  it('goes back to what the money says when a dispute ends', async () => {
+    const ending = async (name: string, event: string, refund?: number) => {
+      const { order, paymentId } = await buy(name)
+      if (refund)
+        await gw('refund', { payment_id: paymentId, amount: refund, outcome: 'processed' })
+      const opened = await gw('dispute', { payment_id: paymentId })
+      await settled()
+      expect((await orderById(order.id)).status).toBe('disputed')
+      await gw('dispute', { payment_id: paymentId, dispute_id: opened.dispute.id, event })
+      await settled()
+      return { order: await orderById(order.id), paymentId, dispute: opened.dispute.id }
+    }
+    expect((await ending('endclosed', 'closed')).order.status).toBe('paid')
+    expect((await ending('endpartial', 'won', 10_000)).order.status).toBe('partially-refunded')
+
+    const lost = await ending('endlost', 'lost')
+    expect(lost.order.status).toBe('chargeback')
+    expect(lost.order.amountRefunded).toBe(0)
+    expect(await creditNotes(lost.order.id)).toHaveLength(0)
+    expect(telegrams.at(-1)).toContain(
+      `${lost.order.orderNumber}: lost. The order is now chargeback`,
+    )
+    // Not refundable: the bank already returned the money.
+    expect((await refund(lost.order.id, { reason: 'Too late' })).status).toBe(409)
+    // Closing doesn't undo it; a later win does.
+    await gw('dispute', { payment_id: lost.paymentId, dispute_id: lost.dispute, event: 'closed' })
+    await settled()
+    expect((await orderById(lost.order.id)).status).toBe('chargeback')
+    await gw('dispute', { payment_id: lost.paymentId, dispute_id: lost.dispute, event: 'won' })
+    await settled()
+    expect((await orderById(lost.order.id)).status).toBe('paid')
   })
 
   it('alerts the state a dispute left when its first run failed after the suspension', async () => {
@@ -957,10 +1071,21 @@ describe('admin actions (spec §10, §9.3)', () => {
     await asSupport('active')
     await settled()
     expect((await licenseOf(order.id)).statusNotifiedAs).toBeFalsy()
-    expect(mailsTo(order, /license/)).toHaveLength(1)
+    expect(mailsTo(order, /license is active again/)).toHaveLength(1)
+    await sendPendingStatusEmails()
+    expect(mailsTo(order, /license is active again/)).toHaveLength(1)
     await asSupport('suspended')
     await settled()
     expect(mailsTo(order, /license is suspended/)).toHaveLength(2)
+  })
+
+  it('has nothing to say about a reinstatement nobody was told needed one', async () => {
+    const { order } = await buy('nevertold')
+    const { id } = await licenseOf(order.id)
+    await db().execute(sql`UPDATE licenses SET status = 'suspended' WHERE id = ${id}`)
+    await db().execute(sql`UPDATE licenses SET status = 'active' WHERE id = ${id}`)
+    await sendPendingStatusEmails()
+    expect(mailsTo(order, /license/)).toHaveLength(0)
   })
 
   it('sends a status email the request couldn’t send from the sweep', async () => {
@@ -974,7 +1099,7 @@ describe('admin actions (spec §10, §9.3)', () => {
     expect(mailsTo(order, /license/)).toHaveLength(1)
   })
 
-  it('emails a later suspension when the license was reinstated while one was sending', async () => {
+  it('tells the customer a license was reinstated while its suspension email was sending', async () => {
     const { order } = await buy('inflight')
     const { id } = await licenseOf(order.id)
     await db().execute(sql`UPDATE licenses SET status = 'suspended' WHERE id = ${id}`)
@@ -987,8 +1112,12 @@ describe('admin actions (spec §10, §9.3)', () => {
     expect(mailsTo(order, /license is suspended/)).toHaveLength(1)
     const reinstated = await licenseOf(order.id)
     expect(reinstated.status).toBe('active')
-    expect(reinstated.statusNotifiedAs).toBeFalsy()
+    expect(reinstated.statusNotifiedAs).toBe('suspended')
     expect(reinstated.statusClaimedAt).toBeFalsy()
+
+    await sendPendingStatusEmails()
+    expect(mailsTo(order, /license is active again/)).toHaveLength(1)
+    expect((await licenseOf(order.id)).statusNotifiedAs).toBeFalsy()
 
     await db().execute(sql`UPDATE licenses SET status = 'suspended' WHERE id = ${id}`)
     await sendPendingStatusEmails()

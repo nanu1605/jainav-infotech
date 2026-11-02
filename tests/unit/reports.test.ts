@@ -96,6 +96,30 @@ describe('caReportCsv', () => {
     ])
   })
 
+  it('lists lost disputes after the totals, only when there are any', () => {
+    const lines = caReportCsv(
+      [],
+      [
+        {
+          orderNumber: 'JO-1234ABCD',
+          invoiceNumber: 'JI/26-27/00001',
+          at: '2026-10-31T18:31:00.000Z',
+          amount: 99_900,
+        },
+      ],
+    )
+      .slice(1)
+      .trimEnd()
+      .split('\r\n')
+    expect(lines.slice(-5)).toEqual([
+      'Total,0,0,0.00,0.00,0.00,0.00,0.00',
+      '',
+      'Disputes lost this month: no credit note and not in the totals above',
+      'Order,Invoice,Date,Amount',
+      'JO-1234ABCD,JI/26-27/00001,2026-11-01,999.00',
+    ])
+  })
+
   it('still has the summary for an empty month', () => {
     expect(caReportCsv([]).slice(1).trimEnd().split('\r\n').slice(-2)).toEqual([
       'SAC,Invoices,Credit notes,Taxable,CGST,SGST,IGST,Total',
