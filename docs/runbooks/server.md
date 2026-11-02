@@ -10,7 +10,9 @@ Monitoring: [monitoring.md](monitoring.md). The order of everything for Launch 1
 
 ## 1. Provision the VPS
 
-- Ubuntu 24.04 LTS, 4 GB RAM, 2 vCPU, in Mumbai or Bengaluru (Singapore if neither).
+- Ubuntu 24.04 LTS on Oracle Cloud's Always Free Arm shape (`VM.Standard.A1.Flex`, 2 OCPU, 6 GB,
+  100 GB boot volume), home region Hyderabad ([decisions](../decisions.md)). On a paid host: 4 GB
+  RAM, 2 vCPU, in Mumbai or Bengaluru (Singapore if neither), and x86 images.
 - Sign in as root once (the provider's console or its first SSH session), then:
 
   ```bash

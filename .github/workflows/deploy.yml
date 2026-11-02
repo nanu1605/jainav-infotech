@@ -31,7 +31,8 @@ jobs:
   build:
     # Off until the VPS exists: set the repository variable DEPLOY_ENABLED to "true".
     if: vars.DEPLOY_ENABLED == 'true'
-    runs-on: ubuntu-24.04
+    # The runner sets the image's architecture, and the server is Arm (docs/decisions.md).
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 40
     permissions:
       contents: read
