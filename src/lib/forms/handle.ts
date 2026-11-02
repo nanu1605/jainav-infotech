@@ -14,7 +14,10 @@ import {
 } from '@/emails'
 import { routing, type Locale } from '@/i18n/routing'
 import { getClient } from '@/lib/cms'
+import { runQueuedJobs } from '@/lib/commerce/fulfil'
 import { requestCustomer } from '@/lib/commerce/http'
+import { unsubscribeLeads } from '@/collections/Leads'
+import { dueDates, newTicketNumber } from '@/lib/dataRequests'
 import { inboxAddress, sendEmail, sendTelegram, settle, type Inbox } from '@/lib/notify'
 import { clientIp, hashIp, limit, sha256 } from '@/lib/rateLimit'
 import { localizedPath, SITE_URL } from '@/lib/seo'
@@ -67,6 +70,8 @@ type Outcome = {
   autoReply?: { kind: AutoReplyKind; product?: string | null; notify?: boolean }
   /** Newsletter: the raw confirmation token (only its hash is stored). */
   confirm?: string
+  /** Privacy requests: a job was queued for the visitor's email, to run after the response. */
+  jobs?: boolean
 }
 
 class InvalidForm extends Error {}
@@ -130,6 +135,16 @@ async function findProduct(payload: Payload, slug: string) {
 
 const exists = async (payload: Payload, where: Where) =>
   (await payload.count({ collection: 'leads', where, overrideAccess: true })).totalDocs > 0
+
+/** A repeat submission is a contact too: retention counts from it. */
+const touchLeads = (ctx: Ctx, where: Where) =>
+  ctx.payload.update({
+    collection: 'leads',
+    where,
+    data: { lastActivityAt: ctx.now },
+    overrideAccess: true,
+    depth: 0,
+  })
 
 type Values<F extends FormName> = z.infer<(typeof formSchemas)[F]>
 
@@ -219,6 +234,7 @@ const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome 
       { unsubscribedAt: { exists: false } },
     ]
     if (await exists(ctx.payload, { and: waiting })) {
+      await touchLeads(ctx, { and: waiting })
       if (v.marketing) {
         await ctx.payload.update({
           collection: 'leads',
@@ -265,9 +281,9 @@ const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome 
     }
   },
 
-  // Subscribing is the marketing consent; it counts once confirmed (double opt-in, spec §13).
+  // Subscribing is the marketing consent: recorded only when confirmed (double opt-in, spec §13).
   async newsletter(v, ctx) {
-    const subscribed = await exists(ctx.payload, {
+    const subscribed: Where = {
       and: [
         { type: { equals: 'newsletter' } },
         { email: { equals: v.email } },
@@ -275,13 +291,16 @@ const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome 
         { unsubscribedAt: { exists: false } },
         { 'marketingConsent.withdrawnAt': { exists: false } },
       ],
-    })
-    if (subscribed) return null
+    }
+    if (await exists(ctx.payload, subscribed)) {
+      await touchLeads(ctx, subscribed)
+      return null
+    }
     const token = randomToken()
     const id = await createLead(ctx, {
       type: 'newsletter',
       email: v.email,
-      marketingConsent: marketingConsent(true, ctx.now),
+      marketingConsent: marketingConsent(false, ctx.now),
       confirmTokenHash: sha256(token),
     })
     return { collection: 'leads', id, confirm: token }
@@ -356,33 +375,42 @@ const save: { [F in FormName]: (values: Values<F>, ctx: Ctx) => Promise<Outcome 
   },
 
   async 'data-request'(v, ctx) {
+    const ticketNumber = newTicketNumber()
     const doc = await ctx.payload.create({
       collection: 'data-requests',
       data: {
+        ticketNumber,
         email: v.email,
         type: v.type,
         details: v.details,
+        locale: ctx.meta.locale,
         status: 'new',
         customer: ctx.customer,
+        ...dueDates(v.type, new Date(ctx.now)),
       },
       overrideAccess: true,
       depth: 0,
     })
+    // The request is saved, so a failure here must not fail it: the daily reminder shows it.
+    await ctx.payload.jobs
+      .queue({ task: 'sendDataRequestAck', input: { id: doc.id } })
+      .catch((error) => console.error('forms/data-request: not queued:', errorCode(error)))
     return {
       collection: 'data-requests',
       id: doc.id,
+      jobs: true,
       staff: {
         inbox: 'privacy',
-        title: `Privacy request: ${v.type}`,
-        telegram: `New privacy request (${v.type})`,
+        title: `Privacy request ${ticketNumber}: ${v.type}`,
+        telegram: `New privacy request ${ticketNumber} (${v.type})`,
         fields: rows([
+          ['Ticket', ticketNumber],
           ['Request', v.type],
           ['Email', v.email],
           ['Details', v.details],
           ['Language', ctx.meta.locale],
         ]),
       },
-      autoReply: { kind: 'data-request' },
     }
   },
 }
@@ -486,8 +514,9 @@ export async function handleForm(form: FormName, req: Request): Promise<Response
 
 async function notify(payload: Payload, outcome: Outcome, email: string, locale: Locale) {
   const adminUrl = `${SITE_URL}/admin/collections/${outcome.collection}/${outcome.id}`
-  const { staff, autoReply, confirm } = outcome
+  const { staff, autoReply, confirm, jobs } = outcome
   const tasks: Promise<unknown>[] = []
+  if (jobs) tasks.push(runQueuedJobs(payload))
   if (staff) {
     tasks.push(sendTelegram(`${staff.telegram}\n${adminUrl}`))
     tasks.push(
@@ -550,14 +579,21 @@ export async function confirmNewsletter(req: Request): Promise<Response> {
   })
   const lead = docs[0]
   if (!lead) return statusPage(null, 'invalid')
-  if (Date.now() - Date.parse(lead.createdAt) > CONFIRM_DAYS * 86_400_000) {
+  // An opt-out stands: consenting again takes a new sign-up.
+  const optedOut = lead.unsubscribedAt || lead.marketingConsent?.withdrawnAt
+  if (optedOut || Date.now() - Date.parse(lead.createdAt) > CONFIRM_DAYS * 86_400_000) {
     return statusPage(lead.locale, 'invalid')
   }
   // Single use: the hash goes with the confirmation.
+  const now = new Date().toISOString()
   await payload.update({
     collection: 'leads',
     id: lead.id,
-    data: { confirmedAt: new Date().toISOString(), confirmTokenHash: null },
+    data: {
+      confirmedAt: now,
+      confirmTokenHash: null,
+      marketingConsent: marketingConsent(true, now),
+    },
     overrideAccess: true,
     depth: 0,
   })
@@ -583,13 +619,7 @@ export async function unsubscribe(req: Request): Promise<Response> {
       : statusPage(null, 'unsubscribeFailed')
   }
   try {
-    await payload.update({
-      collection: 'leads',
-      where: { and: [{ email: { equals: lead.email } }, { unsubscribedAt: { exists: false } }] },
-      data: { unsubscribedAt: new Date().toISOString() },
-      overrideAccess: true,
-      depth: 0,
-    })
+    await unsubscribeLeads(payload, lead.email)
   } catch (error) {
     console.error('forms/unsubscribe: failed:', errorCode(error))
     return req.method === 'POST'

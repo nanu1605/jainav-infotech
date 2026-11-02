@@ -41,11 +41,15 @@ if healthy; then
   docker images --format '{{.Repository}}:{{.Tag}}' "${image%:*}" |
     grep -F ":$tag_prefix" | grep -vxF -e "$image" -e "$previous" |
     xargs -r docker rmi >/dev/null 2>&1 || true
+  # Tools images (tools-<commit>, shared by both environments): the three newest stay.
+  docker images --format '{{.Repository}}:{{.Tag}}' "${image%:*}" | grep -F ':tools-' |
+    tail -n +4 | xargs -r docker rmi >/dev/null 2>&1 || true
   docker image prune -f >/dev/null
   echo "$service is running $image"
 else
   echo "$service did not become healthy on $image; rolling back to $previous" >&2
-  compose logs --tail 100 "$service" >&2
+  # Where the logs are, not the logs: this output goes to the public job log.
+  echo "its logs: journalctl IMAGE_NAME=$image" >&2
   point_to "$previous"
   exit 1
 fi

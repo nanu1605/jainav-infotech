@@ -35,6 +35,30 @@ test('the Owner downloads the CA report and sees the insights', async ({ page })
   await expect(page.getByRole('table').filter({ hasText: 'Top keys (30 days)' })).toHaveCount(2)
 })
 
+test('the Owner deletes a customer’s account', async ({ page }) => {
+  await signInToAdmin(page)
+  const id = await page.evaluate(async (email) => {
+    const res = await fetch('/api/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, name: 'Priya Sharma', status: 'active' }),
+    })
+    return ((await res.json()) as { doc: { id: number } }).doc.id
+  }, `gone.${Date.now()}@example.test`)
+
+  await page.goto(`/admin/collections/customers/${id}`)
+  await page.getByRole('button', { name: 'Delete account' }).click()
+  await page.locator('.confirmation-modal').getByRole('button', { name: 'Delete account' }).click()
+  await expect(page.getByText('The account is deleted')).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Delete account' })).toHaveCount(0)
+  const customer = await page.evaluate(
+    async (url) => (await fetch(url)).json() as Promise<{ email: string; status: string }>,
+    `/api/customers/${id}`,
+  )
+  expect(customer).toMatchObject({ email: `deleted-${id}@deleted.invalid`, status: 'deleted' })
+})
+
 test('the Owner sends a waitlist email test to themselves', async ({ page }) => {
   await signInToAdmin(page)
   const subject = `Launch news ${Date.now()}`

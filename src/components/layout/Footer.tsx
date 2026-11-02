@@ -20,6 +20,7 @@ export type FooterProps = {
     registeredAddress?: string | null
     email?: string | null
     phone?: string | null
+    grievanceOfficer?: { name?: string | null; title?: string | null } | null
   }
   /** Newsletter sign-up (NewsletterForm). */
   newsletter?: ReactNode
@@ -76,6 +77,7 @@ const inlineLink = 'underline-offset-4 hover:text-fg hover:underline'
 /** Site footer (spec §8.1): link columns, newsletter slot, socials, language switch, legal block. */
 export function Footer({ columns, socials, legal, newsletter }: FooterProps) {
   const t = useTranslations('ui.footer')
+  const officer = legal.grievanceOfficer
 
   const legalParts = [
     legal.legalName,
@@ -91,6 +93,10 @@ export function Footer({ columns, socials, legal, newsletter }: FooterProps) {
         {legal.phone}
       </a>
     ),
+    officer?.name &&
+      t('grievanceOfficer', {
+        contact: officer.title ? `${officer.name}, ${officer.title}` : officer.name,
+      }),
   ].filter(Boolean)
 
   return (

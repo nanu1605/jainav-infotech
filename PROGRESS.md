@@ -70,9 +70,12 @@ In the repository (done; rehearsed locally, see docs/runbooks/server.md#rehearsa
 - [x] Per-environment image builds; deploy workflow (staging on `main`, production on `v*` tags after approval, automatic rollback, smoke tests); `prodMigrations` on container start via `/api/v1/health`.
 - [x] Sentry and Umami wired in (off until configured); Telegram alerts from the backup job.
 - [x] Backups + restore runbook; restore test passed locally.
+- [x] Logs kept for 180 to 187 days in the host's journal; Caddy's logs and Sentry events filtered (docs/decisions.md).
+- [x] Grievance Officer in site settings and the footer; `{{BLANKS}}` in site settings never print on a page, and legal pages holding one can't be published.
 - [x] Security headers / CSP (§16); `pnpm audit` in CI; Dependabot.
 - [x] VYRO release import (`pnpm import:release`); v0.3.0 verified (SHA-256 `0dacbbaa…25dd3`) and imported into dev as a draft.
 - [x] Runbooks: `docs/runbooks/` (launch, server, cloudflare, backups, monitoring).
+- [x] Legal drafts in English and draft Hindi (`scripts/seed/legal/`), not yet approved; data map corrected against the code.
 
 On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/launch.md):
 
@@ -83,8 +86,8 @@ On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/la
 - [ ] Sentry project, Umami website, external uptime monitor + status page; an uptime alert reaches Telegram.
 - [ ] A real restore test on the server.
 - [ ] SPF / DKIM / DMARC; mail-tester ≥ 9/10.
-- [ ] Final content check; Owner publishes the legal pages (§8.13).
-- [ ] VYRO download in production: `pnpm import:release <tag>` (the latest is v1.4.0, imported into dev as a draft on 2026-10-18), then the Owner publishes it.
+- [ ] Legal review (docs/decisions.md, "Legal drafts"): blanks filled, then the Owner publishes every legal page but the EULA (§8.13). Final content check.
+- [ ] VYRO download in production: `pnpm import:release <tag>` (v1.4.0 was imported into dev as a draft on 2026-10-18; the latest is now v2.0.4, whose features the seeded copy doesn't mention), then the Owner publishes it.
 - [ ] Lighthouse on the production URLs (§15).
 
 ## Milestone C — VYRO store live (Launch 2)
@@ -137,11 +140,26 @@ With Tanishq's inputs (steps in docs/runbooks/store.md):
 - [ ] A test-mode refund from the admin and from Razorpay's dashboard on staging; the dispute and paid-twice paths if Razorpay's test mode can raise them.
 - [ ] From the CA: the credit note layout, the CA report's columns (CSV or XLSX, rate-wise or B2B/B2C splits) and the refund window.
 
+### Before the store opens: the store against the legal drafts
+
+In the repository (done; see docs/decisions.md, "The store against the legal drafts"):
+
+- [x] Checkout links the refund and delivery pages and refuses orders until its legal pages are live; copy matches the code in both languages.
+- [x] Privacy requests: ticket numbers, due dates staff can correct, daily reminders, nomination.
+- [x] The Owner's Delete account on a customer; unconfirmed newsletter sign-ups no longer count as consenting.
+- [x] Retention: a lead's last contact and a purge of leads and CVs; settings for closed privacy requests, orders and invoices (off) and Umami data (off).
+- [x] Alerts for two paid orders for one plan; emails for a failed refund and a reinstated license; a dispute's end clears Disputed; the CA report lists lost disputes.
+
+With inputs (steps in docs/runbooks/retention.md):
+
+- [ ] From the lawyer: a period for closed privacy requests, and for analytics. Then set them and change the Privacy Policy.
+- [ ] From the CA: the period for orders and invoices, then turn on their removal; how a lost chargeback is recorded.
+
 ### Phase 10 — Store go-live
 
 - [ ] Switch to Razorpay live keys (after activation).
 - [ ] A real purchase with a small amount, then a refund.
-- [ ] Owner publishes the final Terms, Refunds and VYRO EULA.
+- [ ] Owner publishes the final Terms, Refunds, Shipping and VYRO EULA (the checkout refuses orders until all four are live).
 - [ ] Production smoke tests; set `storeEnabled = true`.
 
 Input still missing: a signed VYRO build that uses the licensing API. v1.4.0 (2026-10-18) has a valid update signature but no code signing (SmartScreen warns) and no licensing yet (spec §12.6).

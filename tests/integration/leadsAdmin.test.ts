@@ -117,6 +117,30 @@ describe('leads CSV export', () => {
     expect(text).toContain(',yes,2026-10-17 00:05,')
   })
 
+  it('says yes to marketing consent only while it stands', async () => {
+    const consent = async (data: object) => {
+      const lead = await payload.create({
+        collection: 'leads',
+        data: {
+          type: 'contact',
+          status: 'new',
+          email: `consent${leads.length}-${run}@jainav.test`,
+          ...data,
+        },
+      })
+      leads.push(lead)
+      const res = await exportCsv({ where: { email: { equals: lead.email } } }, owner)
+      const [header, row] = (await res.text()).trimEnd().split('\r\n')
+      return row!.split(',')[header!.split(',').indexOf('Marketing consent')]
+    }
+    const at = '2026-10-16T18:35:00.000Z'
+    expect(await consent({ marketingConsent: { given: true, at } })).toBe('yes')
+    expect(await consent({ marketingConsent: { given: true, at, withdrawnAt: at } })).toBe('no')
+    expect(await consent({ marketingConsent: { given: true, at }, unsubscribedAt: at })).toBe('no')
+    // A newsletter sign-up nobody confirmed (forms.test.ts checks what the form records).
+    expect(await consent({ type: 'newsletter', marketingConsent: { given: false } })).toBe('no')
+  })
+
   it('applies the list search and sort', async () => {
     const res = await exportCsv({ search: run, sort: '-email' }, owner)
     const text = new TextDecoder().decode(new Uint8Array(await res.arrayBuffer()))

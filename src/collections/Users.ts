@@ -25,6 +25,7 @@ export const Users: CollectionConfig = {
   auth: {
     maxLoginAttempts: 5,
     lockTime: 15 * 60 * 1000,
+    cookies: { secure: process.env.NODE_ENV === 'production' },
   },
   access: {
     admin: ({ req: { user } }) => isStaff(user),

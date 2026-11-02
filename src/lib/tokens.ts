@@ -1,11 +1,17 @@
 import 'server-only'
 
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto'
 
 import { SITE_URL } from './seo'
 
 /** A random URL-safe token (256 bits); store only its sha256 (rateLimit.ts). */
 export const randomToken = () => randomBytes(32).toString('base64url')
+
+const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+
+/** Random characters for a number people read out: 8 are 40 bits, revealing nothing about volume. */
+export const randomCode = (length: number) =>
+  Array.from({ length }, () => CROCKFORD[randomInt(32)]).join('')
 
 const sign = (value: string) =>
   createHmac('sha256', process.env.PAYLOAD_SECRET ?? '')
@@ -13,8 +19,9 @@ const sign = (value: string) =>
     .digest('base64url')
 
 /**
- * Unsubscribe links must keep working in every email ever sent, so the token is the lead id
- * signed with PAYLOAD_SECRET rather than a stored value. Rotating the secret breaks old links.
+ * Unsubscribe links work for as long as the lead exists, so the token is the lead id signed with
+ * PAYLOAD_SECRET rather than a stored value. Once the lead is purged, or the secret rotated, a link
+ * lands on the failure page, which offers a privacy request instead.
  */
 export const unsubscribeToken = (leadId: number | string) => `${leadId}.${sign(String(leadId))}`
 

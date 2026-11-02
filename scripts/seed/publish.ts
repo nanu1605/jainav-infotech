@@ -39,10 +39,15 @@ for (const collection of COLLECTIONS) {
       await payload.update({
         collection,
         id: doc.id,
-        data: { _status: 'published' } as never,
+        // On real servers the Owner sets a legal page's effective date when publishing it.
+        data: {
+          _status: 'published',
+          ...(collection === 'legal-pages' && { effectiveDate: new Date().toISOString() }),
+        } as never,
         depth: 0,
         overrideAccess: true,
-        context: { disableRevalidate: true },
+        // Legal drafts may hold {{BLANKS}}, which real servers refuse to publish.
+        context: { disableRevalidate: true, allowPlaceholders: true },
       })
       published++
     } catch (err) {

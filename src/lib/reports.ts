@@ -5,6 +5,7 @@ import { APIError, type Payload, type PayloadHandler, type PayloadRequest } from
 import { z } from 'zod'
 
 import { hasRole, type Role } from '@/access/roles'
+import { eventsOf } from '@/lib/commerce/refundState'
 import { toCsv } from '@/lib/csv'
 import { istDate } from '@/lib/format'
 import { istMonthStart } from '@/lib/licensing/dates'
@@ -93,12 +94,53 @@ export async function caReport(payload: Payload, month: string): Promise<CaRow[]
   })
 }
 
+export type LostDispute = {
+  orderNumber: string
+  invoiceNumber: string | null
+  at: string
+  /** Paise. */
+  amount: number
+}
+
+/**
+ * Disputes lost in the IST month, on orders still showing it. A chargeback has no document of its
+ * own and can come months after its invoice, so the CA would otherwise never see it.
+ */
+export async function lostDisputes(payload: Payload, month: string): Promise<LostDispute[]> {
+  const [start, end] = monthBounds(month)
+  const { docs } = await payload.find({
+    collection: 'orders',
+    where: { status: { equals: 'chargeback' } },
+    select: { orderNumber: true, invoice: true, events: true },
+    populate: { invoices: { number: true } },
+    pagination: false,
+    depth: 1,
+    overrideAccess: true,
+  })
+  return docs.flatMap((order) =>
+    eventsOf(order)
+      .filter((event) => {
+        const at = new Date(event.at)
+        return event.type === 'payment.dispute.lost' && at >= start && at < end
+      })
+      .map((event) => ({
+        orderNumber: order.orderNumber,
+        invoiceNumber: typeof order.invoice === 'object' ? (order.invoice?.number ?? null) : null,
+        at: event.at,
+        amount: event.amount ?? 0,
+      })),
+  )
+}
+
 const NO_SAC = 'SAC not set'
 const money = (amounts: Amounts) => AMOUNTS.map((key) => rupees(amounts[key]))
 const zero = (): Amounts => ({ taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0 })
 
-/** The CA's CSV: one line per document, then a SAC-wise summary that nets credit notes. */
-export function caReportCsv(rows: CaRow[]): string {
+/**
+ * The CA's CSV: one line per document, then a SAC-wise summary that nets credit notes, then any
+ * lost disputes, which no document covers and the totals leave out.
+ */
+export function caReportCsv(rows: CaRow[], lost: LostDispute[] = []): string {
   type Summary = { invoices: number; creditNotes: number; amounts: Amounts }
   const bySac = new Map<string, Summary>()
   const total: Summary = { invoices: 0, creditNotes: 0, amounts: zero() }
@@ -156,6 +198,19 @@ export function caReportCsv(rows: CaRow[]): string {
     ['SAC', 'Invoices', 'Credit notes', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total'],
     ...[...bySac.keys()].sort().map((sac) => summaryLine(sac, bySac.get(sac)!)),
     summaryLine('Total', total),
+    ...(lost.length
+      ? [
+          [],
+          ['Disputes lost this month: no credit note and not in the totals above'],
+          ['Order', 'Invoice', 'Date', 'Amount'],
+          ...lost.map((dispute) => [
+            dispute.orderNumber,
+            dispute.invoiceNumber,
+            istDate(new Date(dispute.at)),
+            rupees(dispute.amount),
+          ]),
+        ]
+      : []),
   ])
 }
 
@@ -251,7 +306,7 @@ const reportEndpoint =
 
 /** Financial: Owner only (spec §9.3). */
 export const caReportEndpoint = reportEndpoint(['owner'], 'ca-report', async (payload, month) =>
-  caReportCsv(await caReport(payload, month)),
+  caReportCsv(await caReport(payload, month), await lostDisputes(payload, month)),
 )
 export const leadsReportEndpoint = reportEndpoint(
   ['owner', 'support'],
