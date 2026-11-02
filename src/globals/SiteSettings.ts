@@ -61,6 +61,23 @@ export const SiteSettings: GlobalConfig = {
                   validate: whatsappNumber,
                   admin: { description: 'Digits only with the country code, e.g. 919876543210.' },
                 },
+                {
+                  name: 'grievanceOfficer',
+                  type: 'group',
+                  admin: {
+                    description:
+                      'The person to contact for queries and grievances. The footer shows them once the name is set.',
+                  },
+                  fields: [
+                    { name: 'name', type: 'text', localized: true },
+                    {
+                      name: 'title',
+                      type: 'text',
+                      localized: true,
+                      admin: { description: 'Their designation, e.g. Director.' },
+                    },
+                  ],
+                },
               ],
             },
           ],

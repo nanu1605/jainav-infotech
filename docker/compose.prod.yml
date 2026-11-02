@@ -13,9 +13,10 @@ x-app: &app
     postgres:
       condition: service_healthy
   # Healthcheck comes from the image (/api/v1/health, which also applies pending migrations).
+  # The host's journal: a container's own log file goes with it on every deploy, and the journal
+  # keeps lines for a known period (docs/runbooks/server.md §1). LOG_DRIVER is for local rehearsals.
   logging: &logging
-    driver: json-file
-    options: { max-size: 10m, max-file: '5' }
+    driver: ${LOG_DRIVER:-journald}
 
 services:
   app:

@@ -58,6 +58,7 @@ const LEGAL: FooterProps['legal'] = {
   registeredAddress: '{{REGISTERED_ADDRESS}}',
   email: '{{EMAIL}}',
   phone: '{{PHONE}}',
+  grievanceOfficer: { name: '{{GRIEVANCE_OFFICER_NAME}}', title: '{{GRIEVANCE_OFFICER_TITLE}}' },
 }
 
 const COPY: Record<'en' | 'hi', Copy> = {

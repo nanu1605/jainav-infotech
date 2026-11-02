@@ -25,6 +25,7 @@ for (const [path, lang] of [
     expect(res?.status()).toBe(200)
     await expect(page.locator('html')).toHaveAttribute('lang', lang)
     await expect(page.locator('h1')).toHaveCount(1)
+    expect(await page.content()).not.toContain('{{')
   })
 }
 

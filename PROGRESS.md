@@ -70,6 +70,8 @@ In the repository (done; rehearsed locally, see docs/runbooks/server.md#rehearsa
 - [x] Per-environment image builds; deploy workflow (staging on `main`, production on `v*` tags after approval, automatic rollback, smoke tests); `prodMigrations` on container start via `/api/v1/health`.
 - [x] Sentry and Umami wired in (off until configured); Telegram alerts from the backup job.
 - [x] Backups + restore runbook; restore test passed locally.
+- [x] Logs kept for 180 to 187 days in the host's journal; Caddy's logs and Sentry events filtered (docs/decisions.md).
+- [x] Grievance Officer in site settings and the footer; `{{BLANKS}}` in site settings never print on a page, and legal pages holding one can't be published.
 - [x] Security headers / CSP (§16); `pnpm audit` in CI; Dependabot.
 - [x] VYRO release import (`pnpm import:release`); v0.3.0 verified (SHA-256 `0dacbbaa…25dd3`) and imported into dev as a draft.
 - [x] Runbooks: `docs/runbooks/` (launch, server, cloudflare, backups, monitoring).
