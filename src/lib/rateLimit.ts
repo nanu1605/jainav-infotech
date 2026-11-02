@@ -84,9 +84,14 @@ async function createLimiters() {
   await pool.query(
     'CREATE TABLE IF NOT EXISTS rate_limit.hits (key varchar(255) PRIMARY KEY, points integer NOT NULL DEFAULT 0, expire bigint)',
   )
+  // The limiter names its statements, which Supabase's transaction pooler doesn't support.
+  const unnamed = {
+    query: ({ text, values }: { text: string; values?: unknown[] }) => pool.query(text, values),
+  }
   const limiter = (rule: Rule) =>
     new RateLimiterPostgres({
-      storeClient: pool,
+      storeClient: unnamed,
+      storeType: 'pool',
       schemaName: 'rate_limit',
       tableName: 'hits',
       tableCreated: true,
