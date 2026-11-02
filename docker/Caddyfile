@@ -1,7 +1,6 @@
 # Origin web server (spec §16, §18). Cloudflare terminates visitors' TLS and connects here over
 # HTTPS with SSL "Full (strict)", so every site uses the Cloudflare Origin CA certificate.
 # Compression and caching headers come from Next.js and Cloudflare.
-
 {
 	# No automatic certificates: the Origin CA certificate is mounted at /certs.
 	auto_https disable_redirects

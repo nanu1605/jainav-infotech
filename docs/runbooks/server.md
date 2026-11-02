@@ -80,7 +80,8 @@ On the server, in `/srv/jainav`:
     ([licensing.md](licensing.md)). Without them the licensing API answers 503 and paid orders
     can't be fulfilled. The last two must never change once licenses exist.
   - Staging only: `STAGING_BASIC_AUTH=1`, Razorpay test keys and webhook secret
-    ([store.md](store.md)), its own R2 buckets.
+    ([store.md](store.md)), its own R2 buckets and `https://cdn-staging.{{DOMAIN}}`
+    ([cloudflare.md](cloudflare.md#r2)).
   - `chmod 600 .env production.env staging.env`.
 - `certs/origin.pem` and `certs/origin-key.pem`: the Cloudflare Origin CA certificate
   ([cloudflare.md](cloudflare.md#ssl)); `chmod 600 certs/origin-key.pem`.
@@ -149,7 +150,7 @@ drafts there. The legal pages need their approved texts first (spec §8.13).
   never turns healthy, it **rolls back to the previous image** on its own.
   - Every successful deploy is a line in `/srv/jainav/deploys.log`.
   - It then deletes that environment's older images, keeping the new one and the rollback
-    target.
+    target, and keeps only the three newest tools images.
 - Migrations run when the new container starts. Keep them backward-compatible for one release
   (add columns before using them, drop them a release later), so a rollback still works.
 
@@ -188,11 +189,11 @@ environment's settings:
 ```bash
 T=ghcr.io/nanu1605/jainav-infotech:tools-<commit>
 docker run --rm --network jainav_default --env-file production.env $T pnpm payload migrate:status
-docker run --rm --network jainav_default --env-file production.env $T pnpm import:release v0.3.0
+docker run --rm --network jainav_default --env-file production.env $T pnpm import:release <tag>
 ```
 
-The deployed commit's tools image is already on the server. For another commit, sign in to
-GHCR first, then sign out again:
+Deploys keep the three newest tools images on the server. For an older commit (production's,
+after a few staging deploys), sign in to GHCR first, then sign out again:
 
 ```bash
 docker login ghcr.io -u <github-user>     # a token with read:packages only
@@ -207,8 +208,8 @@ from the command line.
 
 ## Rehearsal
 
-The whole stack was rehearsed locally on 2026-10-16 (port 8443, self-signed certificates, a
-local folder for the backup bucket). These all worked:
+The whole stack was rehearsed locally on 2026-10-16, and again on 2026-10-24 (port 8443,
+self-signed certificates, a local folder for the backup bucket). These all worked:
 
 - both apps healthy, with migrations applied under their own roles;
 - production smoke tests 8/8;
