@@ -4,7 +4,7 @@
 #   production.env  the production app's environment (DATABASE_URL, PAYLOAD_SECRET, R2, Resend…)
 #   staging.env     the staging app's environment (test keys; STAGING_BASIC_AUTH=1)
 #   certs/          the Cloudflare Origin CA certificate and key
-# See docs/runbooks/deploy.md.
+# See docs/runbooks/server.md.
 name: jainav
 
 x-app: &app
@@ -57,13 +57,14 @@ services:
     environment:
       DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD}@postgres:5432/umami
       APP_SECRET: ${UMAMI_APP_SECRET:?}
+      DISABLE_TELEMETRY: '1'
     logging: *logging
 
   caddy:
     image: caddy:2.11.6-alpine
     restart: unless-stopped
     # Only 443: Cloudflare connects over HTTPS (SSL Full (strict)); the firewall admits only
-    # Cloudflare's IP ranges (docs/runbooks/vps.md).
+    # Cloudflare's IP ranges (docs/runbooks/server.md §1).
     ports:
       - '443:443'
     environment:
@@ -87,6 +88,8 @@ services:
       PGUSER: postgres
       PGPASSWORD: ${POSTGRES_PASSWORD}
       BACKUP_DATABASES: jainav umami
+      # Empty keeps Umami's data for good (docs/runbooks/retention.md).
+      UMAMI_RETENTION_DAYS: ${UMAMI_RETENTION_DAYS:-}
       BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:?}
       BACKUP_BUCKET: ${BACKUP_BUCKET:?}
       # rclone remote "backups" = the R2 backup bucket.

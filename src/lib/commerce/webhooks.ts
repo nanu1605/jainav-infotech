@@ -29,16 +29,19 @@ import { errorCode, readText } from './http'
 import { disputeWebhook, refundWebhook } from './refunds'
 
 const MAX_BODY = 256 * 1024
-/** Webhook payloads hold the payer's email and phone: kept 90 days (spec §16 logs). */
+/** Stored webhook events are kept 90 days (spec §16 logs). */
 const KEEP_DAYS = 90
 
 const entity = <T extends z.ZodTypeAny>(schema: T) => z.object({ entity: schema }).optional()
 
-/** The parts of Razorpay's event envelope we read; everything else is kept as received. */
+/**
+ * The parts of Razorpay's event envelope we read, and all that gets stored: the payer's email and
+ * phone, the payment method's details and anything Razorpay adds later are dropped on arrival.
+ */
 const envelope = z.object({
   event: z.string().max(100),
   payload: z.object({
-    payment: entity(paymentSchema.passthrough()),
+    payment: entity(paymentSchema.pick({ id: true, order_id: true, error_code: true })),
     refund: entity(refundSchema),
     dispute: entity(disputeSchema),
   }),
@@ -78,7 +81,12 @@ export async function receiveWebhook(req: Request): Promise<Response> {
     return text(400, 'Bad JSON')
   }
   const parsed = envelope.safeParse(body)
-  if (!parsed.success) return text(400, 'Unexpected payload')
+  if (!parsed.success) {
+    // Razorpay retries a 400, so say what didn't fit: field paths, never values.
+    const paths = parsed.error.issues.map((issue) => issue.path.join('.'))
+    console.warn('webhooks/razorpay: unexpected payload:', paths.join(', '))
+    return text(400, 'Unexpected payload')
+  }
   const eventId = req.headers.get('x-razorpay-event-id') || `sha256:${sha256(raw)}`
 
   const payload = await getClient()
@@ -102,7 +110,7 @@ export async function receiveWebhook(req: Request): Promise<Response> {
         provider: 'razorpay',
         eventId,
         event: parsed.data.event,
-        payload: body as Record<string, unknown>,
+        payload: parsed.data,
         status: 'received',
         receivedAt: new Date().toISOString(),
       },

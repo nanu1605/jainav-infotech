@@ -15,6 +15,7 @@ Do these in the Cloudflare dashboard for the domain's zone.
 | `status`            | CNAME                                                                 | the uptime monitor's status page ([monitoring.md](monitoring.md)) | DNS only |
 | `cdn`               | R2 custom domain on the public bucket (media)                         |                                                                   | proxied  |
 | `downloads`         | R2 custom domain on the public bucket (installers under `downloads/`) |                                                                   | proxied  |
+| `cdn-staging`       | R2 custom domain on staging's public bucket (media and installers)    |                                                                   | proxied  |
 | mail records        | see [Email](#email)                                                   |                                                                   | DNS only |
 
 ## SSL
@@ -80,12 +81,16 @@ reach it through a Cloudflare Tunnel.
 
 Create these buckets (R2 → Create bucket, location hint Asia-Pacific):
 
-| Bucket                                            | Public                                 | Used for                    | Env vars                                                 |
-| ------------------------------------------------- | -------------------------------------- | --------------------------- | -------------------------------------------------------- |
-| `jainav-public`                                   | custom domains `cdn.` and `downloads.` | media, installers           | `S3_BUCKET`, `NEXT_PUBLIC_CDN_URL`, `DOWNLOADS_BASE_URL` |
-| `jainav-private`                                  | no                                     | CVs, later invoices         | `S3_PRIVATE_BUCKET`                                      |
-| `jainav-backups`                                  | no                                     | encrypted database dumps    | `BACKUP_BUCKET` (server `.env`)                          |
-| `jainav-staging-public`, `jainav-staging-private` | as above                               | staging's files, kept apart | staging.env                                              |
+| Bucket                                            | Public                                         | Used for                    | Env vars                                                 |
+| ------------------------------------------------- | ---------------------------------------------- | --------------------------- | -------------------------------------------------------- |
+| `jainav-public`                                   | custom domains `cdn.` and `downloads.`         | media, installers           | `S3_BUCKET`, `NEXT_PUBLIC_CDN_URL`, `DOWNLOADS_BASE_URL` |
+| `jainav-private`                                  | no                                             | CVs, later invoices         | `S3_PRIVATE_BUCKET`                                      |
+| `jainav-backups`                                  | no                                             | encrypted database dumps    | `BACKUP_BUCKET` (server `.env`)                          |
+| `jainav-staging-public`, `jainav-staging-private` | custom domain `cdn-staging.` on the public one | staging's files, kept apart | staging.env                                              |
+
+Staging uses `https://cdn-staging.{{DOMAIN}}` for the repository variable `STAGING_CDN_URL` and for
+`NEXT_PUBLIC_CDN_URL` and `DOWNLOADS_BASE_URL` in staging.env (installers sit under `downloads/` in
+the same bucket). Without it, staging's media and installer links 404.
 
 API tokens (R2 → Manage API tokens), each _Object Read & Write_ on the named buckets only:
 

@@ -9,7 +9,10 @@ import * as migration_20261017_040434_phase8_licensing from './20261017_040434_p
 import * as migration_20261017_045458_phase8_email_claims from './20261017_045458_phase8_email_claims';
 import * as migration_20261017_060635_phase9_store_operations from './20261017_060635_phase9_store_operations';
 import * as migration_20261017_065846_phase9_job_tasks from './20261017_065846_phase9_job_tasks';
-import * as migration_20261101_054132_launch_grievance_officer from './20261101_054132_launch_grievance_officer';
+import * as migration_20261101_053510_store_privacy_requests from './20261101_053510_store_privacy_requests';
+import * as migration_20261101_054600_store_unconfirmed_newsletter from './20261101_054600_store_unconfirmed_newsletter';
+import * as migration_20261101_055314_store_retention from './20261101_055314_store_retention';
+import * as migration_20261101_060337_store_chargeback from './20261101_060337_store_chargeback';
 
 export const migrations = [
   {
@@ -68,8 +71,23 @@ export const migrations = [
     name: '20261017_065846_phase9_job_tasks',
   },
   {
-    up: migration_20261101_054132_launch_grievance_officer.up,
-    down: migration_20261101_054132_launch_grievance_officer.down,
-    name: '20261101_054132_launch_grievance_officer'
+    up: migration_20261101_053510_store_privacy_requests.up,
+    down: migration_20261101_053510_store_privacy_requests.down,
+    name: '20261101_053510_store_privacy_requests',
+  },
+  {
+    up: migration_20261101_054600_store_unconfirmed_newsletter.up,
+    down: migration_20261101_054600_store_unconfirmed_newsletter.down,
+    name: '20261101_054600_store_unconfirmed_newsletter',
+  },
+  {
+    up: migration_20261101_055314_store_retention.up,
+    down: migration_20261101_055314_store_retention.down,
+    name: '20261101_055314_store_retention',
+  },
+  {
+    up: migration_20261101_060337_store_chargeback.up,
+    down: migration_20261101_060337_store_chargeback.down,
+    name: '20261101_060337_store_chargeback'
   },
 ];

@@ -45,6 +45,7 @@ import { WaitlistDeliveries, WaitlistEmails } from './collections/WaitlistEmails
 import { WebhookEvents } from './collections/WebhookEvents'
 import { CommerceSettings } from './globals/CommerceSettings'
 import { Navigation } from './globals/Navigation'
+import { RetentionSettings } from './globals/RetentionSettings'
 import { SiteSettings } from './globals/SiteSettings'
 import { revalidateCollection } from './hooks/revalidate'
 import { jobs } from './jobs'
@@ -209,7 +210,7 @@ export default buildConfig({
     CustomerSessions,
     WaitlistDeliveries,
   ],
-  globals: [SiteSettings, CommerceSettings, Navigation],
+  globals: [SiteSettings, CommerceSettings, RetentionSettings, Navigation],
   // Monthly reports (spec §10). Imported on use: server-only modules can't load in the Payload CLI.
   endpoints: [
     {

@@ -195,6 +195,8 @@ export async function sendWaitlistEmail(id: number, batch = BATCH) {
       WITH d AS (
         UPDATE waitlist_deliveries SET sent_at = now() WHERE id = ${claim.delivery}
         RETURNING email_id
+      ), contacted AS (
+        UPDATE leads SET last_activity_at = now() WHERE id = ${claim.lead}
       )
       UPDATE waitlist_emails SET sent = COALESCE(sent, 0) + 1
       FROM d WHERE waitlist_emails.id = d.email_id

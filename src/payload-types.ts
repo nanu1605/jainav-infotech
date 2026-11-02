@@ -179,12 +179,14 @@ export interface Config {
   globals: {
     'site-settings': SiteSetting;
     'commerce-settings': CommerceSetting;
+    'retention-settings': RetentionSetting;
     navigation: Navigation;
     'payload-jobs-stats': PayloadJobsStat;
   };
   globalsSelect: {
     'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
     'commerce-settings': CommerceSettingsSelect<false> | CommerceSettingsSelect<true>;
+    'retention-settings': RetentionSettingsSelect<false> | RetentionSettingsSelect<true>;
     navigation: NavigationSelect<false> | NavigationSelect<true>;
     'payload-jobs-stats': PayloadJobsStatsSelect<false> | PayloadJobsStatsSelect<true>;
   };
@@ -203,6 +205,8 @@ export interface Config {
       reconcileOrders: TaskReconcileOrders;
       cleanup: TaskCleanup;
       sendWaitlistEmail: TaskSendWaitlistEmail;
+      sendDataRequestAck: TaskSendDataRequestAck;
+      remindDataRequests: TaskRemindDataRequests;
       inline: {
         input: unknown;
         output: unknown;
@@ -1562,7 +1566,7 @@ export interface Order {
   id: number;
   orderNumber: string;
   customer: number | Customer;
-  status: 'created' | 'paid' | 'refunded' | 'partially-refunded' | 'disputed' | 'expired';
+  status: 'created' | 'paid' | 'refunded' | 'partially-refunded' | 'disputed' | 'chargeback' | 'expired';
   flags?: 'paid-twice'[] | null;
   paidAt?: string | null;
   amountRefunded: number;
@@ -1861,6 +1865,10 @@ export interface Lead {
   status: 'new' | 'contacted' | 'qualified' | 'won' | 'lost' | 'spam';
   assignedTo?: (number | null) | User;
   notes?: string | null;
+  /**
+   * Saving the lead sets this to today. The Owner can enter an earlier date instead. The lead and its CV are deleted a set time after it (Settings → Retention settings).
+   */
+  lastActivityAt?: string | null;
   type: 'contact' | 'project' | 'waitlist' | 'newsletter' | 'demo' | 'careers' | 'partnership';
   product?: (number | null) | Product;
   name?: string | null;
@@ -2054,11 +2062,35 @@ export interface WaitlistEmail {
  */
 export interface DataRequest {
   id: number;
+  /**
+   * Quoted in the acknowledgement email.
+   */
+  ticketNumber?: string | null;
   email: string;
-  type: 'access' | 'correction' | 'erasure' | 'withdraw-consent' | 'grievance';
+  type: 'access' | 'correction' | 'erasure' | 'withdraw-consent' | 'nomination' | 'grievance';
   details?: string | null;
+  /**
+   * The language of the page it was sent from.
+   */
+  locale?: ('en' | 'hi') | null;
   status: 'new' | 'in-progress' | 'completed' | 'rejected';
+  /**
+   * One month from receipt. A daily reminder goes out until it is closed. Correct it if the request arrived before it was entered.
+   */
+  dueAt?: string | null;
+  /**
+   * Grievances: 48 hours from receipt. Correct it if the complaint arrived before it was entered.
+   */
+  acknowledgeBy?: string | null;
+  /**
+   * Set when the automatic email goes out. If it failed, reply by hand with the ticket number and enter the time.
+   */
+  acknowledgedAt?: string | null;
+  ackClaimedAt?: string | null;
   handledBy?: (number | null) | User;
+  /**
+   * Set when the request is closed. The Owner can enter an earlier date instead.
+   */
   handledAt?: string | null;
   /**
    * Set when the request was sent while signed in to a store account.
@@ -2308,7 +2340,9 @@ export interface PayloadJob {
           | 'sendDeviceEmail'
           | 'reconcileOrders'
           | 'cleanup'
-          | 'sendWaitlistEmail';
+          | 'sendWaitlistEmail'
+          | 'sendDataRequestAck'
+          | 'remindDataRequests';
         taskID: string;
         input?:
           | {
@@ -2352,6 +2386,8 @@ export interface PayloadJob {
         | 'reconcileOrders'
         | 'cleanup'
         | 'sendWaitlistEmail'
+        | 'sendDataRequestAck'
+        | 'remindDataRequests'
       )
     | null;
   queue?: string | null;
@@ -3806,6 +3842,7 @@ export interface LeadsSelect<T extends boolean = true> {
   status?: T;
   assignedTo?: T;
   notes?: T;
+  lastActivityAt?: T;
   type?: T;
   product?: T;
   name?: T;
@@ -3873,10 +3910,16 @@ export interface WaitlistEmailsSelect<T extends boolean = true> {
  * via the `definition` "data-requests_select".
  */
 export interface DataRequestsSelect<T extends boolean = true> {
+  ticketNumber?: T;
   email?: T;
   type?: T;
   details?: T;
+  locale?: T;
   status?: T;
+  dueAt?: T;
+  acknowledgeBy?: T;
+  acknowledgedAt?: T;
+  ackClaimedAt?: T;
   handledBy?: T;
   handledAt?: T;
   customer?: T;
@@ -4297,6 +4340,33 @@ export interface CommerceSetting {
   createdAt?: string | null;
 }
 /**
+ * A daily job applies these. Deleted records can’t be brought back, and the Privacy Policy states these periods: change it with them.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "retention-settings".
+ */
+export interface RetentionSetting {
+  id: number;
+  /**
+   * Counted from each lead’s Last contact.
+   */
+  leadMonths: number;
+  /**
+   * Counted from when each was closed. Empty: they stay.
+   */
+  dataRequestMonths?: number | null;
+  /**
+   * Leave this off until the CA confirms the period in writing.
+   */
+  removeOrders?: boolean | null;
+  /**
+   * Counted after the financial year of an order’s last invoice or credit note. Its license stays.
+   */
+  orderFinancialYears: number;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "navigation".
  */
@@ -4433,6 +4503,19 @@ export interface CommerceSettingsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "retention-settings_select".
+ */
+export interface RetentionSettingsSelect<T extends boolean = true> {
+  leadMonths?: T;
+  dataRequestMonths?: T;
+  removeOrders?: T;
+  orderFinancialYears?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "navigation_select".
  */
 export interface NavigationSelect<T extends boolean = true> {
@@ -4555,6 +4638,24 @@ export interface TaskSendWaitlistEmail {
   input: {
     id: number;
   };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskSendDataRequestAck".
+ */
+export interface TaskSendDataRequestAck {
+  input: {
+    id: number;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskRemindDataRequests".
+ */
+export interface TaskRemindDataRequests {
+  input?: unknown;
   output?: unknown;
 }
 /**

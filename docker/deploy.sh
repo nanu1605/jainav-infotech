@@ -41,6 +41,9 @@ if healthy; then
   docker images --format '{{.Repository}}:{{.Tag}}' "${image%:*}" |
     grep -F ":$tag_prefix" | grep -vxF -e "$image" -e "$previous" |
     xargs -r docker rmi >/dev/null 2>&1 || true
+  # Tools images (tools-<commit>, shared by both environments): the three newest stay.
+  docker images --format '{{.Repository}}:{{.Tag}}' "${image%:*}" | grep -F ':tools-' |
+    tail -n +4 | xargs -r docker rmi >/dev/null 2>&1 || true
   docker image prune -f >/dev/null
   echo "$service is running $image"
 else

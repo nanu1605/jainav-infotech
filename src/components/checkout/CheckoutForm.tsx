@@ -343,7 +343,9 @@ export function CheckoutForm({
             </FormField>
             <FormField
               label={<OptionalLabel>{t('billing.gstin')}</OptionalLabel>}
-              description={t('billing.gstinHint')}
+              description={
+                quote.mode === 'none' ? t('billing.gstinHintOff') : t('billing.gstinHint')
+              }
               error={errorText(errors.gstin)}
             >
               <Input
@@ -366,6 +368,14 @@ export function CheckoutForm({
               {...register('accept')}
             />
           </FormField>
+          <p className="text-sm text-fg-muted">
+            {t.rich('policies', {
+              refunds: (chunks) => (
+                <LegalLink href="/legal/refunds-cancellation">{chunks}</LegalLink>
+              ),
+              delivery: (chunks) => <LegalLink href="/legal/shipping-delivery">{chunks}</LegalLink>,
+            })}
+          </p>
           {problem && (
             <Callout
               role="alert"

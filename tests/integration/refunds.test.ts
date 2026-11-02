@@ -18,6 +18,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import type { Invoice, Order, User } from '@/payload-types'
 import config from '@/payload.config'
 
+import { publishCheckoutPages } from './legalPages'
+
 // after() work waits for settled(), as it waits for the response (and its commit) in Next.
 const pending: (() => unknown)[] = []
 vi.mock('next/server', async (importOriginal) => ({
@@ -30,11 +32,14 @@ const createRoute = (await import('@/app/api/v1/checkout/create/route')).POST
 const verifyRoute = (await import('@/app/api/v1/checkout/verify/route')).POST
 const webhookRoute = (await import('@/app/api/v1/webhooks/razorpay/route')).POST
 const gateway = await import('@/app/api/v1/dev/razorpay/[...path]/route')
+const { anonymizeCustomer } = await import('@/lib/account/profile')
 const { createSession, SESSION_COOKIE } = await import('@/lib/account/session')
 const { findOrCreateCustomer } = await import('@/lib/account/otp')
 const { DEV_GATEWAY, hmacHex } = await import('@/lib/commerce/razorpay')
 const { sendPendingStatusEmails } = await import('@/lib/licensing/deliver')
+const { istDate } = await import('@/lib/format')
 const { financialYear } = await import('@/lib/invoices/numbering')
+const { lostDisputes } = await import('@/lib/reports')
 const { SITE_URL } = await import('@/lib/seo')
 
 let payload: Payload
@@ -192,7 +197,10 @@ const mailsTo = (order: Order, subject: RegExp) =>
   sent.filter((m) => m.to === order.billing.email && subject.test(String(m.subject)))
 
 /** An admin endpoint's handler, as Payload's REST route would call it. */
-const handler = (slug: 'orders' | 'licenses' | 'invoices', path: string): PayloadHandler =>
+const handler = (
+  slug: 'orders' | 'licenses' | 'invoices' | 'customers',
+  path: string,
+): PayloadHandler =>
   payload.collections[slug].config.endpoints
     ? payload.collections[slug].config.endpoints.find((e) => e.path === path)!.handler
     : (() => {
@@ -200,7 +208,7 @@ const handler = (slug: 'orders' | 'licenses' | 'invoices', path: string): Payloa
       })()
 
 async function call(
-  slug: 'orders' | 'licenses' | 'invoices',
+  slug: 'orders' | 'licenses' | 'invoices' | 'customers',
   path: string,
   id: number,
   user: User | null,
@@ -352,6 +360,7 @@ beforeAll(async () => {
     })
     ids.users.push(users[role].id)
   }
+  restore.push(await publishCheckoutPages(payload, `${run}-app`))
 })
 
 beforeEach(async () => {
@@ -559,7 +568,7 @@ describe('refunds (spec §11.6)', () => {
     expect(mailsTo(order, /^Refund for order/)).toHaveLength(1)
   })
 
-  it('alerts on a failed refund and issues nothing', async () => {
+  it('alerts and emails the customer on a failed refund, and issues nothing', async () => {
     const { order, paymentId } = await buy('failed')
     const made = await gw('refund', { payment_id: paymentId, amount: 10_000, outcome: 'failed' })
     await settled()
@@ -570,8 +579,18 @@ describe('refunds (spec §11.6)', () => {
     expect(telegrams).toEqual([
       `Refund ${made.refund.id} for order ${order.orderNumber} failed.\n${SITE_URL}/admin/collections/orders/${order.id}`,
     ])
-    expect(sent).toHaveLength(0)
+    const [mail, ...more] = mailsTo(order, /didn't go through/)
+    expect(more).toHaveLength(0)
+    expect(mail!.text).toContain('₹100')
+    expect(eventTypes(await orderById(order.id))).toContain('refund-failed-emailed')
     expect((await licenseOf(order.id)).status).toBe('active')
+
+    // A redelivered event sends nothing more.
+    const event = await delivered('refund.failed', made.refund.id)
+    await send('refund.failed', (event.payload as { payload: object }).payload)
+    await settled()
+    expect(mailsTo(order, /didn't go through/)).toHaveLength(1)
+    expect(telegrams).toHaveLength(1)
   })
 
   it('refunds a duplicate payment with one click, without a credit note', async () => {
@@ -640,7 +659,7 @@ describe('refunds (spec §11.6)', () => {
 })
 
 describe('disputes (spec §11.6)', () => {
-  it('marks the order disputed, suspends the license and emails once; later stages only alert', async () => {
+  it('marks the order disputed, suspends the license and emails once; its end clears Disputed', async () => {
     const { order, paymentId } = await buy('dispute')
     const opened = await gw('dispute', { payment_id: paymentId, reason_code: 'fraudulent' })
     await settled()
@@ -662,14 +681,116 @@ describe('disputes (spec §11.6)', () => {
     expect(mailsTo(order, /license/)).toHaveLength(1)
     expect(telegrams).toHaveLength(1)
 
+    await gw('dispute', {
+      payment_id: paymentId,
+      dispute_id: opened.dispute.id,
+      event: 'under_review',
+    })
+    await settled()
+    expect((await orderById(order.id)).status).toBe('disputed')
+    expect(telegrams[1]).toContain(`${order.orderNumber}: under review. Nothing changes by itself`)
+
     await gw('dispute', { payment_id: paymentId, dispute_id: opened.dispute.id, event: 'won' })
     await settled()
     fresh = await orderById(order.id)
-    expect(fresh.status).toBe('disputed')
+    expect(fresh.status).toBe('paid')
     expect(eventTypes(fresh)).toContain('payment.dispute.won')
     expect((await licenseOf(order.id)).status).toBe('suspended')
-    expect(telegrams[1]).toContain(`on order ${order.orderNumber}: won. Nothing changes by itself`)
+    expect(telegrams[2]).toContain(`${order.orderNumber}: won. The order is now paid.`)
     expect(sent).toHaveLength(1)
+  })
+
+  it('opens nothing when a dispute’s end is processed before its start', async () => {
+    const { order, paymentId } = await buy('disputeorder')
+    const dispute = { id: 'disp_devorder', payment_id: paymentId, amount: 99_900 }
+    await send('payment.dispute.won', { dispute: { entity: dispute } })
+    await settled()
+    await send('payment.dispute.created', { dispute: { entity: dispute } })
+    await settled()
+    expect((await orderById(order.id)).status).toBe('paid')
+    expect((await licenseOf(order.id)).status).toBe('active')
+    expect(mailsTo(order, /license/)).toHaveLength(0)
+  })
+
+  it('takes a loss processed before its start, and says the license wasn’t suspended', async () => {
+    const { order, paymentId } = await buy('lostfirst')
+    const dispute = { id: 'disp_devlostfirst', payment_id: paymentId, amount: 99_900 }
+    await send('payment.dispute.lost', { dispute: { entity: dispute } })
+    await settled()
+    expect((await orderById(order.id)).status).toBe('chargeback')
+    expect(telegrams.at(-1)).toContain("The license wasn't suspended")
+    await send('payment.dispute.created', { dispute: { entity: dispute } })
+    await settled()
+    expect((await orderById(order.id)).status).toBe('chargeback')
+    expect((await licenseOf(order.id)).status).toBe('active')
+    // The month's CA report shows it, with its invoice.
+    const listed = await lostDisputes(payload, istDate().slice(0, 7))
+    expect(listed).toContainEqual({
+      orderNumber: order.orderNumber,
+      invoiceNumber: expect.any(String),
+      at: expect.any(String),
+      amount: 99_900,
+    })
+    expect(await lostDisputes(payload, '2020-01')).toEqual([])
+  })
+
+  it('keeps a loss through a later partial refund', async () => {
+    const { order, paymentId } = await buy('lostrefund')
+    const opened = await gw('dispute', { payment_id: paymentId })
+    await settled()
+    await gw('dispute', { payment_id: paymentId, dispute_id: opened.dispute.id, event: 'lost' })
+    await settled()
+    await gw('refund', { payment_id: paymentId, amount: 10_000, outcome: 'processed' })
+    await settled()
+    expect(await orderById(order.id)).toMatchObject({
+      status: 'chargeback',
+      amountRefunded: 10_000,
+    })
+    expect(await creditNotes(order.id)).toHaveLength(1)
+    expect((await refund(order.id, { reason: 'Too late' })).status).toBe(409)
+  })
+
+  it('leaves a fully refunded order as it is when a dispute is lost', async () => {
+    const { order, paymentId } = await buy('lostrefunded')
+    await gw('refund', { payment_id: paymentId, amount: order.total, outcome: 'processed' })
+    await settled()
+    const dispute = { id: 'disp_devlostrefunded', payment_id: paymentId, amount: order.total }
+    await send('payment.dispute.lost', { dispute: { entity: dispute } })
+    await settled()
+    expect((await orderById(order.id)).status).toBe('refunded')
+  })
+
+  it('goes back to what the money says when a dispute ends', async () => {
+    const ending = async (name: string, event: string, refund?: number) => {
+      const { order, paymentId } = await buy(name)
+      if (refund)
+        await gw('refund', { payment_id: paymentId, amount: refund, outcome: 'processed' })
+      const opened = await gw('dispute', { payment_id: paymentId })
+      await settled()
+      expect((await orderById(order.id)).status).toBe('disputed')
+      await gw('dispute', { payment_id: paymentId, dispute_id: opened.dispute.id, event })
+      await settled()
+      return { order: await orderById(order.id), paymentId, dispute: opened.dispute.id }
+    }
+    expect((await ending('endclosed', 'closed')).order.status).toBe('paid')
+    expect((await ending('endpartial', 'won', 10_000)).order.status).toBe('partially-refunded')
+
+    const lost = await ending('endlost', 'lost')
+    expect(lost.order.status).toBe('chargeback')
+    expect(lost.order.amountRefunded).toBe(0)
+    expect(await creditNotes(lost.order.id)).toHaveLength(0)
+    expect(telegrams.at(-1)).toContain(
+      `${lost.order.orderNumber}: lost. The order is now chargeback`,
+    )
+    // Not refundable: the bank already returned the money.
+    expect((await refund(lost.order.id, { reason: 'Too late' })).status).toBe(409)
+    // Closing doesn't undo it; a later win does.
+    await gw('dispute', { payment_id: lost.paymentId, dispute_id: lost.dispute, event: 'closed' })
+    await settled()
+    expect((await orderById(lost.order.id)).status).toBe('chargeback')
+    await gw('dispute', { payment_id: lost.paymentId, dispute_id: lost.dispute, event: 'won' })
+    await settled()
+    expect((await orderById(lost.order.id)).status).toBe('paid')
   })
 
   it('alerts the state a dispute left when its first run failed after the suspension', async () => {
@@ -741,6 +862,164 @@ describe('admin actions (spec §10, §9.3)', () => {
     }
   })
 
+  it('tells an account deleted from one marked deleted by hand', async () => {
+    const path = '/:id/delete-account'
+    const customer = await payload.create({
+      collection: 'customers',
+      data: { email: email('marked'), preferredLocale: 'en', status: 'deleted' },
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect((await call('customers', path, customer.id, users.owner)).status).toBe(200)
+    expect((await call('customers', path, customer.id, users.owner)).status).toBe(409)
+  })
+
+  it('leaves the account as it was when a lead can’t be unsubscribed', async () => {
+    const customer = await payload.create({
+      collection: 'customers',
+      data: { email: email('stuck'), preferredLocale: 'en', status: 'active' },
+      depth: 0,
+      overrideAccess: true,
+    })
+    const update = vi
+      .spyOn(payload, 'update')
+      .mockResolvedValueOnce({ docs: [], errors: [{ id: 1, message: 'x' }] } as never)
+    await expect(anonymizeCustomer(payload, customer)).rejects.toThrow('not unsubscribed')
+    update.mockRestore()
+    const fresh = await payload.findByID({
+      collection: 'customers',
+      id: customer.id,
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(fresh).toMatchObject({ email: customer.email, status: 'active' })
+  })
+
+  it('stops marketing when Payload’s own delete removes a customer, not when it refuses', async () => {
+    const lead = (address: string) =>
+      payload.create({
+        collection: 'leads',
+        data: { type: 'waitlist', status: 'new', email: address },
+        depth: 0,
+        overrideAccess: true,
+      })
+    const unsubscribedAt = async (id: number) =>
+      (await payload.findByID({ collection: 'leads', id, depth: 0, overrideAccess: true }))
+        .unsubscribedAt
+    const customer = await payload.create({
+      collection: 'customers',
+      data: { email: email('plain'), preferredLocale: 'en', status: 'active' },
+      depth: 0,
+      overrideAccess: true,
+    })
+    const stopped = await lead(customer.email)
+    await payload.delete({
+      collection: 'customers',
+      id: customer.id,
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(await unsubscribedAt(stopped.id)).toBeTruthy()
+
+    const { order } = await buy('keepsbuyer')
+    const buyerId = typeof order.customer === 'object' ? order.customer.id : order.customer
+    const kept = await lead(order.billing.email)
+    await expect(
+      payload.delete({ collection: 'customers', id: buyerId, depth: 0, overrideAccess: true }),
+    ).rejects.toThrow()
+    expect(await unsubscribedAt(kept.id)).toBeFalsy()
+    for (const id of [stopped.id, kept.id]) {
+      await payload.delete({ collection: 'leads', id, overrideAccess: true })
+    }
+  })
+
+  it('lets only the Owner delete a customer’s account, with its marketing consent', async () => {
+    const path = '/:id/delete-account'
+    const customer = await payload.create({
+      collection: 'customers',
+      data: {
+        email: email('gone'),
+        name: 'Priya',
+        phone: '+91 98765 43210',
+        preferredLocale: 'en',
+        status: 'active',
+      },
+      depth: 0,
+      overrideAccess: true,
+    })
+    await payload.update({
+      collection: 'customers',
+      id: customer.id,
+      data: { marketingConsent: { given: true, at: new Date().toISOString(), textVersion: 'x' } },
+      depth: 0,
+      overrideAccess: true,
+    })
+    await createSession(payload, customer.id, 'test')
+    const lead = await payload.create({
+      collection: 'leads',
+      data: { type: 'waitlist', status: 'new', email: customer.email },
+      depth: 0,
+      overrideAccess: true,
+    })
+    for (const user of [users.support, users.editor, null]) {
+      expect((await call('customers', path, customer.id, user)).status).toBe(403)
+    }
+    expect(await call('customers', path, customer.id, users.owner)).toEqual({
+      status: 200,
+      body: { ok: true },
+    })
+    const gone = await payload.findByID({
+      collection: 'customers',
+      id: customer.id,
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(gone).toMatchObject({
+      email: `deleted-${customer.id}@deleted.invalid`,
+      status: 'deleted',
+      name: null,
+      phone: null,
+    })
+    expect(gone.deletedAt).toBeTruthy()
+    expect(gone.marketingConsent?.given).toBe(true)
+    expect(gone.marketingConsent?.withdrawnAt).toBeTruthy()
+    // Marketing stops for the address, not only for the account.
+    const { unsubscribedAt } = await payload.findByID({
+      collection: 'leads',
+      id: lead.id,
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(unsubscribedAt).toBeTruthy()
+    await payload.delete({ collection: 'leads', id: lead.id, overrideAccess: true })
+    const { totalDocs } = await payload.count({
+      collection: 'customer-sessions',
+      where: { customer: { equals: customer.id } },
+      overrideAccess: true,
+    })
+    expect(totalDocs).toBe(0)
+    // The audit log names who did it.
+    const { docs: audit } = await payload.find({
+      collection: 'audit-log',
+      where: {
+        and: [{ entity: { equals: 'customers' } }, { docId: { equals: `${customer.id}` } }],
+      },
+      sort: '-createdAt',
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(audit[0]?.actor).toBe(users.owner.id)
+    expect((await call('customers', path, customer.id, users.owner)).status).toBe(409)
+    expect((await call('customers', path, 2_000_000_000, users.owner)).status).toBe(404)
+    await payload.delete({
+      collection: 'customers',
+      id: customer.id,
+      depth: 0,
+      overrideAccess: true,
+    })
+  })
+
   it('lets Support resend the license email, with the key', async () => {
     const { order } = await buy('resend')
     const license = await licenseOf(order.id)
@@ -792,10 +1071,21 @@ describe('admin actions (spec §10, §9.3)', () => {
     await asSupport('active')
     await settled()
     expect((await licenseOf(order.id)).statusNotifiedAs).toBeFalsy()
-    expect(mailsTo(order, /license/)).toHaveLength(1)
+    expect(mailsTo(order, /license is active again/)).toHaveLength(1)
+    await sendPendingStatusEmails()
+    expect(mailsTo(order, /license is active again/)).toHaveLength(1)
     await asSupport('suspended')
     await settled()
     expect(mailsTo(order, /license is suspended/)).toHaveLength(2)
+  })
+
+  it('has nothing to say about a reinstatement nobody was told needed one', async () => {
+    const { order } = await buy('nevertold')
+    const { id } = await licenseOf(order.id)
+    await db().execute(sql`UPDATE licenses SET status = 'suspended' WHERE id = ${id}`)
+    await db().execute(sql`UPDATE licenses SET status = 'active' WHERE id = ${id}`)
+    await sendPendingStatusEmails()
+    expect(mailsTo(order, /license/)).toHaveLength(0)
   })
 
   it('sends a status email the request couldn’t send from the sweep', async () => {
@@ -809,7 +1099,7 @@ describe('admin actions (spec §10, §9.3)', () => {
     expect(mailsTo(order, /license/)).toHaveLength(1)
   })
 
-  it('emails a later suspension when the license was reinstated while one was sending', async () => {
+  it('tells the customer a license was reinstated while its suspension email was sending', async () => {
     const { order } = await buy('inflight')
     const { id } = await licenseOf(order.id)
     await db().execute(sql`UPDATE licenses SET status = 'suspended' WHERE id = ${id}`)
@@ -822,8 +1112,12 @@ describe('admin actions (spec §10, §9.3)', () => {
     expect(mailsTo(order, /license is suspended/)).toHaveLength(1)
     const reinstated = await licenseOf(order.id)
     expect(reinstated.status).toBe('active')
-    expect(reinstated.statusNotifiedAs).toBeFalsy()
+    expect(reinstated.statusNotifiedAs).toBe('suspended')
     expect(reinstated.statusClaimedAt).toBeFalsy()
+
+    await sendPendingStatusEmails()
+    expect(mailsTo(order, /license is active again/)).toHaveLength(1)
+    expect((await licenseOf(order.id)).statusNotifiedAs).toBeFalsy()
 
     await db().execute(sql`UPDATE licenses SET status = 'suspended' WHERE id = ${id}`)
     await sendPendingStatusEmails()

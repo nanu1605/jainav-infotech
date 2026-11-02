@@ -49,9 +49,9 @@ shred -u /tmp/age/identity.txt
 ```
 
 It ends with `restore test passed`. Record the date and result in `docs/decisions.md` (or the
-ops log) each month. The first full run was the local rehearsal of 2026-10-16:
+ops log) each month. The last full run was the local rehearsal of 2026-10-24:
 
-- `jainav`: 388 tables, 6 migrations, pages, products and users present;
+- `jainav`: 411 tables, 11 migrations, pages and products present;
 - `umami`: 27 tables.
 
 ## Restore for real (disaster recovery)

@@ -7,6 +7,8 @@ import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 import { getPayload, type Payload, type SendEmailOptions } from 'payload'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { MARKETING_VERSION } from '@/lib/forms/schemas'
+import { addMonthsIST } from '@/lib/licensing/dates'
 import { inboxKey, ipKey } from '@/lib/rateLimit'
 import config from '@/payload.config'
 
@@ -20,6 +22,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }
 const { POST: submit } = await import('@/app/api/v1/forms/[form]/route')
 const { GET: confirm } = await import('@/app/api/v1/forms/newsletter/confirm/route')
 const unsubscribeRoute = await import('@/app/api/v1/forms/unsubscribe/route')
+const { reminders, remindDataRequests, sendDataRequestAck } = await import('@/lib/dataRequests')
 
 let payload: Payload
 const run = `fm${Date.now()}`
@@ -38,7 +41,7 @@ const settled = async () => {
 function post(
   form: string,
   data: object,
-  opts: { ip?: string; meta?: object; cv?: Buffer | null; cvType?: string } = {},
+  opts: { ip?: string; meta?: object; cv?: Buffer<ArrayBuffer> | null; cvType?: string } = {},
 ) {
   const body = new FormData()
   body.set('data', JSON.stringify(data))
@@ -334,6 +337,39 @@ describe('waitlist', () => {
     expect(sent).toHaveLength(0)
   })
 
+  it('counts a repeat sign-up as a contact, for retention', async () => {
+    const waiting = address('repeat-waitlist')
+    const subscribed = address('repeat-newsletter')
+    const join = { product: `${run}-app`, email: waiting, marketing: false }
+    await post('waitlist', join)
+    await settled()
+    await payload.create({
+      collection: 'leads',
+      data: {
+        type: 'newsletter',
+        status: 'new',
+        email: subscribed,
+        confirmedAt: '2024-01-01T00:00:00.000Z',
+        marketingConsent: { given: true },
+      },
+      overrideAccess: true,
+    })
+    const old = '2024-01-01T00:00:00.000Z'
+    const db = (payload.db as unknown as PostgresAdapter).drizzle
+    await db.execute(
+      sql`UPDATE leads SET last_activity_at = ${old} WHERE email IN ${[waiting, subscribed]}`,
+    )
+
+    await post('waitlist', join)
+    await post('newsletter', { email: subscribed })
+    await settled()
+    for (const email of [waiting, subscribed]) {
+      const leads = await leadsFor(email)
+      expect(leads).toHaveLength(1)
+      expect(Date.parse(leads[0]!.lastActivityAt!)).toBeGreaterThan(Date.now() - 60_000)
+    }
+  })
+
   it('takes a new tick after a withdrawal as consent again', async () => {
     const email = address('waitlist-withdrawn')
     const join = { product: `${run}-app`, email, marketing: true }
@@ -363,7 +399,8 @@ describe('newsletter double opt-in and unsubscribe', () => {
     expect((await post('newsletter', { email }, { meta: { locale: 'hi' } })).status).toBe(200)
     await settled()
     const [lead] = await leadsFor(email)
-    expect(lead).toMatchObject({ type: 'newsletter', marketingConsent: { given: true } })
+    // Not consenting until confirmed: reports and CSV exports read `given`.
+    expect(lead).toMatchObject({ type: 'newsletter', marketingConsent: { given: false } })
     expect(lead?.confirmedAt).toBeFalsy()
     // Staff are not alerted for every sign-up.
     expect(telegrams).toHaveLength(0)
@@ -382,6 +419,11 @@ describe('newsletter double opt-in and unsubscribe', () => {
     expect(new URL(confirmed.headers.get('location')!).pathname).toBe('/hi/newsletter/confirmed')
     const [after] = await leadsFor(email)
     expect(after?.confirmedAt).toBeTruthy()
+    expect(after?.marketingConsent).toMatchObject({
+      given: true,
+      at: after?.confirmedAt,
+      textVersion: MARKETING_VERSION,
+    })
 
     // Single use.
     const again = await confirm(
@@ -444,6 +486,31 @@ describe('newsletter double opt-in and unsubscribe', () => {
     expect(tokenFrom(sent.find((m) => m.to === email))).toBeTruthy()
   })
 
+  it.each([
+    ['unsubscribed', { unsubscribedAt: '2026-10-10T10:00:00.000Z' }],
+    ['opted-out', { marketingConsent: { withdrawnAt: '2026-10-10T10:00:00.000Z' } }],
+  ])('refuses a confirmation link once the sign-up is %s', async (name, optOut) => {
+    const email = address(`confirm-${name}`)
+    await post('newsletter', { email })
+    await settled()
+    const token = tokenFrom(sent.find((m) => m.to === email))
+    const [lead] = await leadsFor(email)
+    await payload.update({
+      collection: 'leads',
+      id: lead!.id,
+      data: optOut,
+      depth: 0,
+      overrideAccess: true,
+    })
+    const res = await confirm(
+      new Request(`http://localhost:3000/api/v1/forms/newsletter/confirm?token=${token}`),
+    )
+    expect(new URL(res.headers.get('location')!).pathname).toBe('/newsletter/invalid')
+    const [after] = await leadsFor(email)
+    expect(after?.confirmedAt).toBeFalsy()
+    expect(after?.marketingConsent?.given).toBeFalsy()
+  })
+
   it('rejects confirmation links older than seven days', async () => {
     const email = address('late')
     await post('newsletter', { email })
@@ -502,7 +569,18 @@ describe('careers', () => {
 })
 
 describe('privacy requests', () => {
-  it('creates a data request and alerts the privacy inbox', async () => {
+  const requestOf = async (email: string) =>
+    (
+      await payload.find({
+        collection: 'data-requests',
+        where: { email: { equals: email } },
+        depth: 0,
+        overrideAccess: true,
+      })
+    ).docs[0]!
+  const textTo = (email: string) => sent.filter((m) => m.to === email).map((m) => String(m.text))
+
+  it('gives a request a ticket and a due date, and acknowledges it without repeating it', async () => {
     const email = address('dpdp')
     const res = await post('data-request', {
       type: 'erasure',
@@ -511,14 +589,132 @@ describe('privacy requests', () => {
     })
     expect(res.status).toBe(200)
     await settled()
-    const { docs } = await payload.find({
+    const doc = await requestOf(email)
+    expect(doc).toMatchObject({
+      type: 'erasure',
+      status: 'new',
+      locale: 'en',
+      ticketNumber: expect.stringMatching(/^JT-[0-9A-Z]{8}$/),
+      acknowledgeBy: null,
+    })
+    const monthLater = addMonthsIST(new Date(doc.createdAt), 1).getTime()
+    expect(Math.abs(Date.parse(doc.dueAt!) - monthLater)).toBeLessThan(5_000)
+    expect(doc.acknowledgedAt).toBeTruthy()
+    const [text] = textTo(email)
+    expect(text).toContain(doc.ticketNumber)
+    expect(text).not.toContain('Please delete my data.')
+    expect(telegrams[0]).toContain(doc.ticketNumber)
+    expect(telegrams[0]).toContain('/admin/collections/data-requests/')
+  })
+
+  it('acknowledges a grievance in its language, without its text, with 48 hours to do so', async () => {
+    const email = address('grievance')
+    const details = 'My license key never arrived.'
+    await post('data-request', { type: 'grievance', email, details }, { meta: { locale: 'hi' } })
+    await settled()
+    const doc = await requestOf(email)
+    const window = Date.parse(doc.acknowledgeBy!) - Date.parse(doc.createdAt)
+    expect(Math.abs(window - 48 * 3_600_000)).toBeLessThan(5_000)
+    const mail = sent.find((m) => m.to === email)!
+    expect(mail.subject).toBe(`आपकी शिकायत हमें मिल गई है: ${doc.ticketNumber}`)
+    expect(mail.text).toContain(doc.ticketNumber)
+    expect(mail.text).not.toContain(details)
+  })
+
+  it('takes a nomination', async () => {
+    const email = address('nominee')
+    const res = await post('data-request', { type: 'nomination', email, details: 'My sister.' })
+    expect(res.status).toBe(200)
+    await settled()
+    expect(await requestOf(email)).toMatchObject({ type: 'nomination' })
+  })
+
+  it('retries a failed acknowledgement, and sends it only once', async () => {
+    const email = address('ack')
+    const send = vi.mocked(payload.sendEmail)
+    send.mockImplementationOnce(async () => {
+      throw new Error('mail is down')
+    })
+    const doc = await payload.create({
       collection: 'data-requests',
-      where: { email: { equals: email } },
+      data: { ticketNumber: `JT-${run}`, email, type: 'access', details: 'x', status: 'new' },
       depth: 0,
       overrideAccess: true,
     })
-    expect(docs[0]).toMatchObject({ type: 'erasure', status: 'new' })
-    expect(sent.some((m) => m.to === email)).toBe(true)
-    expect(telegrams[0]).toContain('/admin/collections/data-requests/')
+    await expect(sendDataRequestAck(doc.id)).rejects.toThrow('mail is down')
+    expect((await requestOf(email)).acknowledgedAt).toBeFalsy()
+    await sendDataRequestAck(doc.id)
+    await sendDataRequestAck(doc.id)
+    expect((await requestOf(email)).acknowledgedAt).toBeTruthy()
+    expect(textTo(email)).toHaveLength(1)
+  })
+
+  it('alerts when the reminder job itself fails, as nothing else would say', async () => {
+    const task = payload.config.jobs.tasks?.find((t) => t.slug === 'remindDataRequests')
+    // Only the fields the hook reads, of what Payload passes.
+    await task?.onFail?.({ job: { id: 7 }, taskStatus: { totalTried: 0 } } as never)
+    expect(telegrams.at(-1)).toBe('Job remindDataRequests #7 failed after 1 attempt.')
+  })
+
+  it('says what open requests need, with no personal data, until they are closed', async () => {
+    const email = address('late')
+    const now = new Date('2030-06-15T04:00:00.000Z')
+    const request = {
+      type: 'grievance' as const,
+      createdAt: '2030-05-14T00:00:00.000Z',
+      acknowledgeBy: '2030-05-16T00:00:00.000Z',
+      dueAt: '2030-06-14T00:00:00.000Z',
+      acknowledgedAt: null,
+      ticketNumber: 'JT-OLD',
+    }
+    expect(reminders([request], now)).toEqual([
+      ['JT-OLD (grievance)', expect.stringMatching(/^not acknowledged, due 16 May 2030/)],
+      ['JT-OLD (grievance)', 'overdue since 14 Jun 2030'],
+    ])
+    const answered = { ...request, acknowledgedAt: '2030-05-14T00:00:00.000Z' }
+    expect(reminders([{ ...answered, dueAt: '2030-06-20T00:00:00.000Z' }], now)).toEqual([
+      ['JT-OLD (grievance)', 'due 20 Jun 2030'],
+    ])
+    expect(reminders([{ ...answered, dueAt: '2030-07-20T00:00:00.000Z' }], now)).toEqual([])
+    // Only just received: its automatic email is still on its way.
+    expect(
+      reminders(
+        [{ ...request, createdAt: '2030-06-15T03:30:00.000Z', dueAt: '2030-07-15T03:30:00.000Z' }],
+        now,
+      ),
+    ).toEqual([])
+
+    const doc = await payload.create({
+      collection: 'data-requests',
+      data: {
+        ticketNumber: `JT-LATE${run}`,
+        email,
+        type: 'correction',
+        details: 'x',
+        status: 'new',
+        dueAt: new Date(Date.now() - 86_400_000).toISOString(),
+        acknowledgedAt: new Date().toISOString(),
+      },
+      depth: 0,
+      overrideAccess: true,
+    })
+    await remindDataRequests()
+    const alert = telegrams.find((t) => t.includes(doc.ticketNumber!))!
+    expect(alert).toContain('(correction): overdue since')
+    expect(alert).toContain('/admin/collections/data-requests')
+    expect(alert).not.toContain(email)
+    const inboxMail = sent.find((m) => String(m.text).includes(doc.ticketNumber!))
+    expect(inboxMail?.to).not.toBe(email)
+
+    await payload.update({
+      collection: 'data-requests',
+      id: doc.id,
+      data: { status: 'completed' },
+      depth: 0,
+      overrideAccess: true,
+    })
+    telegrams.length = 0
+    await remindDataRequests()
+    expect(telegrams.join()).not.toContain(doc.ticketNumber)
   })
 })

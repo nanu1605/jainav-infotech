@@ -13,7 +13,7 @@ import {
 } from 'payload'
 import { z } from 'zod'
 
-import { duplicateRefundEmail } from '@/emails'
+import { duplicateRefundEmail, refundFailedEmail, type RenderedEmail } from '@/emails'
 import { formatDate, formatINR } from '@/lib/format'
 import { sendRefundEmail } from '@/lib/invoices/deliver'
 import { financialYear } from '@/lib/invoices/numbering'
@@ -218,6 +218,13 @@ export async function refundWebhook(
         `Refund ${refund.id} for order ${order.orderNumber} failed.\n${adminLink(order.id)}`,
       )
     }
+    await tellCustomer(payload, order, 'refund-failed-emailed', refund.id, () =>
+      refundFailedEmail({
+        locale: order.locale,
+        orderNumber: order.orderNumber,
+        amount: refund.amount,
+      }),
+    )
     return
   }
   if (refund.payment_id === order.razorpayPaymentId) {
@@ -397,10 +404,11 @@ async function creditRefund(payload: Payload, orderId: number, refund: RazorpayR
       await payload.jobs.queue({ task: 'renderInvoicePdf', input: { id: note.id }, req })
     }
 
+    // A partial refund doesn't end a dispute or undo a loss.
     const status = full
       ? 'refunded'
-      : order.status === 'disputed'
-        ? 'disputed'
+      : order.status === 'disputed' || order.status === 'chargeback'
+        ? order.status
         : 'partially-refunded'
     const detail = [
       `${refund.id}: ${refund.amount} paise`,
@@ -442,10 +450,35 @@ async function creditRefund(payload: Payload, orderId: number, refund: RazorpayR
 }
 
 /**
+ * A short email to the order's customer about a refund, once per refund: it is marked after
+ * sending, so a crash in between can send it twice. Nobody to tell once the account is deleted.
+ */
+async function tellCustomer(
+  payload: Payload,
+  order: Order,
+  type: string,
+  refundId: string,
+  message: () => Promise<RenderedEmail>,
+) {
+  if (eventsOf(order).some((e) => e.type === type && e.refundId === refundId)) return
+  const customer = await payload.findByID({
+    collection: 'customers',
+    id: typeof order.customer === 'object' ? order.customer.id : order.customer,
+    depth: 0,
+    overrideAccess: true,
+  })
+  if (customer.status !== 'deleted') {
+    await sendEmail(payload, order.billing.email, await message(), {
+      replyTo: await inboxAddress(payload, 'support'),
+    })
+  }
+  await addOrderEvent(payload, order.id, { type, refundId }, { type, refundId })
+}
+
+/**
  * A processed refund of a duplicate payment (spec §11.3 step 9): no credit note (no invoice was
  * issued for it) and the order is unchanged. The flag goes once every duplicate is refunded in
- * full, and the customer gets a short note, once per refund: it is marked after sending, so a
- * crash in between can send it twice.
+ * full, and the customer gets a short note.
  */
 async function duplicateRefunded(payload: Payload, order: Order, refund: RazorpayRefund) {
   await addOrderEvent(
@@ -465,35 +498,67 @@ async function duplicateRefunded(payload: Payload, order: Order, refund: Razorpa
       sql`DELETE FROM orders_flags WHERE parent_id = ${order.id} AND value = 'paid-twice'`,
     )
   }
-  const marker = { type: 'duplicate-refund-emailed', refundId: refund.id }
-  if (eventsOf(fresh).some((e) => e.type === marker.type && e.refundId === refund.id)) return
-  const customer = await payload.findByID({
-    collection: 'customers',
-    id: typeof fresh.customer === 'object' ? fresh.customer.id : fresh.customer,
-    depth: 0,
-    overrideAccess: true,
-  })
-  // Nobody to tell once the account is deleted.
-  if (customer.status !== 'deleted') {
-    const message = await duplicateRefundEmail({
+  await tellCustomer(payload, fresh, 'duplicate-refund-emailed', refund.id, () =>
+    duplicateRefundEmail({
       locale: fresh.locale,
       orderNumber: fresh.orderNumber,
       amount: refund.amount,
       accountUrl: absoluteUrl(fresh.locale, '/account/orders'),
-    })
-    await sendEmail(payload, fresh.billing.email, message, {
-      replyTo: await inboxAddress(payload, 'support'),
-    })
-  }
-  await addOrderEvent(payload, order.id, marker, marker)
+    }),
+  )
+}
+
+const DISPUTE_LOST = 'payment.dispute.lost'
+
+/**
+ * The events that end a dispute, and the statuses each moves an order on from. Razorpay: won, the
+ * bank accepted our documents; lost, it kept the money for the customer; closed, a fraud dispute
+ * settled by details or a refund. Events can run out of order, so a loss applies to an order not
+ * yet marked disputed. Only a win undoes a loss, and a fully refunded order stays as it is.
+ */
+const DISPUTE_ENDS: Record<string, Order['status'][]> = {
+  'payment.dispute.won': ['disputed', 'chargeback'],
+  [DISPUTE_LOST]: ['paid', 'partially-refunded', 'disputed', 'chargeback'],
+  'payment.dispute.closed': ['disputed'],
+}
+
+/**
+ * An order stops showing `disputed` once its dispute ends: what the money says, so a refund made
+ * during the dispute shows.
+ * ponytail: assumes one open dispute per payment; check the history if a second ever appears.
+ */
+async function endDispute(
+  payload: Payload,
+  orderId: number,
+  lost: boolean,
+  from: Order['status'][],
+) {
+  await drizzle(payload).execute(sql`
+    UPDATE orders
+    SET updated_at = now(), status = (CASE
+      WHEN ${lost} THEN 'chargeback'
+      WHEN amount_refunded > 0 THEN 'partially-refunded'
+      ELSE 'paid'
+    END)::enum_orders_status
+    WHERE id = ${orderId} AND status IN ${from}
+  `)
+  const { status } = await payload.findByID({
+    collection: 'orders',
+    id: orderId,
+    select: { status: true },
+    depth: 0,
+    overrideAccess: true,
+  })
+  return status
 }
 
 /**
  * The dispute webhooks (spec §11.6). A new dispute of the order's own payment marks a paid order
  * `disputed` and suspends its license through the Local API (audited; the email is sent here, so
  * a failure retries the job). A dispute of a duplicate payment changes nothing: the alert says to
- * refund that payment. The later stages (won, lost, closed, under review, action required) only
- * alert: the Owner reinstates or revokes the license by hand. Each stage of a dispute alerts once.
+ * refund that payment. Its end clears `disputed`; no other stage changes anything. The license
+ * never follows by itself: Support or the Owner reinstates it, or the Owner revokes it. Each stage
+ * of a dispute alerts once.
  */
 export async function disputeWebhook(
   payload: Payload,
@@ -504,10 +569,12 @@ export async function disputeWebhook(
   const created = event === 'payment.dispute.created'
   // The webhook also finds an order by its Razorpay order: any other payment on it is a duplicate.
   const duplicate = dispute.payment_id !== order.razorpayPaymentId
+  // Webhooks and their retries can run out of order: a dispute that already ended opens nothing.
+  const over = eventsOf(order).some((e) => e.disputeId === dispute.id && e.type in DISPUTE_ENDS)
   let disputed = false
   let suspended = 0
   let licenseSuspended = false
-  if (created && !duplicate) {
+  if (created && !duplicate && !over) {
     const { rows } = await drizzle(payload).execute(sql`
       UPDATE orders SET status = 'disputed', updated_at = now()
       WHERE id = ${order.id} AND status IN ('paid', 'partially-refunded')
@@ -534,6 +601,9 @@ export async function disputeWebhook(
     // A no-op for licenses whose customer was told already.
     for (const license of docs) await sendLicenseStatusEmail(license.id)
   }
+  const lost = event === DISPUTE_LOST
+  const from = duplicate ? undefined : DISPUTE_ENDS[event]
+  const ended = from ? await endDispute(payload, order.id, lost, from) : null
   const added = await addOrderEvent(
     payload,
     order.id,
@@ -572,9 +642,22 @@ export async function disputeWebhook(
     await alert(
       `Payment dispute ${dispute.id} on order ${order.orderNumber}${reason}${by}. ${done}\n${link}`,
     )
+  } else if (ended) {
+    const { totalDocs: stillSuspended } = await payload.count({
+      collection: 'licenses',
+      where: { and: [{ order: { equals: order.id } }, { status: { equals: 'suspended' } }] },
+      overrideAccess: true,
+    })
+    const license =
+      lost && !stillSuspended
+        ? `The license wasn't suspended: revoke it in the admin if it should stop.`
+        : `The license doesn't change by itself: reinstate or revoke it in the admin.`
+    await alert(
+      `Payment dispute ${dispute.id} on order ${order.orderNumber}: ${stage}. The order is now ${ended}. ${license}\n${link}`,
+    )
   } else {
     await alert(
-      `Payment dispute ${dispute.id} on order ${order.orderNumber}: ${stage}. Nothing changes by itself: reinstate or revoke the license in the admin.\n${link}`,
+      `Payment dispute ${dispute.id} on order ${order.orderNumber}: ${stage}. Nothing changes by itself.\n${link}`,
     )
   }
 }

@@ -6,6 +6,7 @@ import { DeleteAccount } from '@/components/account/DeleteAccount'
 import { SettingsForm } from '@/components/account/SettingsForm'
 import type { Locale } from '@/i18n/routing'
 import { requireCustomer } from '@/lib/account/pages'
+import { getGstPricing } from '@/lib/queries'
 import { pageMetadata } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
@@ -23,7 +24,7 @@ export default async function SettingsPage({ params }: Props) {
   const locale = (await params).locale as Locale
   setRequestLocale(locale)
   const customer = await requireCustomer(locale, '/account/settings')
-  const t = await getTranslations('account')
+  const [t, gst] = await Promise.all([getTranslations('account'), getGstPricing()])
   const consent = customer.marketingConsent
 
   return (
@@ -39,6 +40,7 @@ export default async function SettingsPage({ params }: Props) {
             {t('settings.title')}
           </h2>
           <SettingsForm
+            gstCharged={Boolean(gst)}
             defaults={{
               name: customer.name ?? '',
               phone: customer.phone ?? '',

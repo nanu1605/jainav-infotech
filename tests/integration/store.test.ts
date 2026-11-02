@@ -10,6 +10,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 import config from '@/payload.config'
 
+import { publishCheckoutPages } from './legalPages'
+
 const pending: Promise<unknown>[] = []
 vi.mock('next/server', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/server')>()),
@@ -262,6 +264,7 @@ beforeAll(async () => {
     overrideAccess: true,
   })
   ids.plan = plan.id
+  restore.push(await publishCheckoutPages(payload, `${run}-app`))
 })
 
 beforeEach(async () => {
@@ -561,6 +564,52 @@ describe('checkout (spec §11.3)', () => {
     expect(signedOut.status).toBe(401)
   })
 
+  it('refuses the order while the EULA the checkout links to is unpublished', async () => {
+    const setStatus = (status: 'draft' | 'published') =>
+      payload.update({
+        collection: 'legal-pages',
+        where: { slug: { equals: `eula-${run}-app` } },
+        data: { _status: status },
+        depth: 0,
+        overrideAccess: true,
+        context: { disableRevalidate: true },
+      })
+    await setStatus('draft')
+    const refused = await createOrder(cookie)
+    expect(refused.status).toBe(409)
+    expect(refused.body).toEqual({ error: 'unavailable' })
+    await setStatus('published')
+    expect((await createOrder(cookie)).status).toBe(200)
+  })
+
+  it('alerts when one customer has two paid orders for the same plan', async () => {
+    const buyer = await signIn(email('twoorders'))
+    const pay = async () => {
+      const { body } = await createOrder(buyer)
+      const paid = await gw('pay', {
+        order_id: body.razorpay.order_id,
+        outcome: 'success',
+        webhooks: false,
+      })
+      await verify(buyer, paid.response)
+      await settled()
+      return body.order.number as string
+    }
+    const first = await pay()
+    expect(telegrams.filter((t) => t.includes(first))).toHaveLength(0)
+    const second = await pay()
+    const alert = telegrams.find((t) => t.includes(second))!
+    expect(alert).toContain(first)
+    expect(alert).toContain('refund the extra order')
+    const order = await orderByNumber(second)
+    expect(order.events).toContainEqual(
+      expect.objectContaining({ type: 'repeat-purchase', detail: first }),
+    )
+    // Nothing is refunded by itself: both stay paid, each with its license.
+    expect((await orderByNumber(first)).status).toBe('paid')
+    expect(order.status).toBe('paid')
+  })
+
   it('verifies, fulfils once and runs the invoice and email jobs', async () => {
     const { body } = await createOrder(cookie)
     const paid = await gw('pay', {
@@ -744,7 +793,8 @@ describe('checkout (spec §11.3)', () => {
     expect(order.razorpayPaymentId).toBe(first.response.razorpay_payment_id)
     const flagged = (order.events as { type: string }[]).filter((e) => e.type === 'paid-twice')
     expect(flagged).toHaveLength(1)
-    expect(telegrams.filter((t) => t.includes(body.order.number))).toHaveLength(1)
+    const alerts = telegrams.filter((t) => t.includes(body.order.number) && /paid twice/.test(t))
+    expect(alerts).toHaveLength(1)
     expect(await invoicesFor(order.id)).toHaveLength(1)
   })
 
@@ -823,6 +873,123 @@ describe('checkout (spec §11.3)', () => {
     // Phase 9: the full refund refunded the order (a dispute after it changes nothing more).
     expect(order).toMatchObject({ status: 'refunded', amountRefunded: 99_900 })
     expect(order.creditNotes).toHaveLength(1)
+  })
+
+  it('stores only the webhook fields it reads, and still acts on them', async () => {
+    const { body } = await createOrder(cookie)
+    const order = await orderByNumber(body.order.number)
+    const payer = {
+      email: 'priya@example.test',
+      contact: '+919876543210',
+      vpa: 'priya@okbank',
+      bank: 'BANKNAME',
+      card: { network: 'Visa', last4: '4242', issuer: 'ISSUERNAME' },
+      notes: { address: 'Vijay Nagar' },
+    }
+    const send = (event: string, entities: object) => {
+      const raw = JSON.stringify({ entity: 'event', event, payload: entities, created_at: 0 })
+      return webhookRoute(
+        new Request(`${SITE_URL}/api/v1/webhooks/razorpay`, {
+          method: 'POST',
+          headers: {
+            'x-razorpay-signature': hmacHex(DEV_GATEWAY.webhookSecret, raw),
+            'x-razorpay-event-id': `evt_dev${run}fields${event}`,
+          },
+          body: raw,
+        }),
+      )
+    }
+    const payment = {
+      id: 'pay_devfields',
+      order_id: body.razorpay.order_id,
+      amount: order.total,
+      currency: 'INR',
+      status: 'failed',
+      error_code: 'BAD_REQUEST_ERROR',
+      ...payer,
+    }
+    await send('payment.failed', {
+      payment: { entity: payment },
+      order: { entity: { id: body.razorpay.order_id, notes: payer.notes } },
+    })
+    const refund = {
+      ...payer,
+      id: 'rfnd_devfields',
+      payment_id: 'pay_devfields',
+      amount: 100,
+      currency: 'INR',
+      status: 'created',
+      notes: { orderId: String(order.id), comment: 'Call Priya' },
+    }
+    await send('refund.created', { refund: { entity: refund } })
+    await settled()
+
+    const { docs } = await payload.find({
+      collection: 'webhook-events',
+      where: { eventId: { like: `evt_dev${run}fields` } },
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(docs.map((d) => d.status)).toEqual(['processed', 'processed'])
+    const stored = JSON.stringify(docs.map((d) => d.payload))
+    for (const detail of [
+      'priya',
+      '+919876543210',
+      'okbank',
+      'BANKNAME',
+      'Visa',
+      '4242',
+      'ISSUERNAME',
+      'Vijay',
+      'Priya',
+      'comment',
+      'INR',
+    ]) {
+      expect(stored).not.toContain(detail)
+    }
+    expect(stored).toContain(`"orderId":"${order.id}"`)
+    const failed = docs.find((d) => d.event === 'payment.failed')!
+    expect(failed.payload).toEqual({
+      event: 'payment.failed',
+      payload: {
+        payment: {
+          entity: {
+            id: 'pay_devfields',
+            order_id: body.razorpay.order_id,
+            error_code: 'BAD_REQUEST_ERROR',
+          },
+        },
+      },
+    })
+    const acted = (await orderByNumber(body.order.number)).events as {
+      type: string
+      detail?: string
+    }[]
+    expect(acted).toContainEqual(
+      expect.objectContaining({ type: 'payment-failed', detail: 'BAD_REQUEST_ERROR' }),
+    )
+    // Found through what is left of its notes: this payment isn't the order's.
+    expect(acted).toContainEqual(expect.objectContaining({ type: 'refund.created' }))
+  })
+
+  it('logs which fields of a rejected webhook didn’t fit, never their values', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const raw = JSON.stringify({
+      event: 'payment.failed',
+      payload: { payment: { entity: { id: 42, order_id: 'priya@example.test' } } },
+    })
+    const res = await webhookRoute(
+      new Request(`${SITE_URL}/api/v1/webhooks/razorpay`, {
+        method: 'POST',
+        headers: { 'x-razorpay-signature': hmacHex(DEV_GATEWAY.webhookSecret, raw) },
+        body: raw,
+      }),
+    )
+    const logged = JSON.stringify(warn.mock.calls)
+    warn.mockRestore()
+    expect(res.status).toBe(400)
+    expect(logged).toContain('payload.payment.entity.id')
+    expect(logged).not.toContain('priya')
   })
 
   it('numbers concurrent invoices consecutively, without gaps or repeats', async () => {
