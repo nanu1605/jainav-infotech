@@ -29,6 +29,7 @@ import { PreviewComponent as PreviewComponent_a8a977ebc872c5d5ea7ee689724c0860 }
 import { SlugField as SlugField_2b8867833a34864a02ddf429b0728a40 } from '@payloadcms/next/client'
 import { OrderActions as OrderActions_bd9a3eb0969675b027902d6a22a18ee7 } from '@/components/admin/OrderActions'
 import { InvoiceActions as InvoiceActions_7bcd56d274d3f39f269c02b27204544c } from '@/components/admin/InvoiceActions'
+import { CustomerActions as CustomerActions_9fd8238a1722f59df871ef58a48eb6c2 } from '@/components/admin/CustomerActions'
 import { LicenseActions as LicenseActions_4fedb378ccd4b2c25fe18ad54093fb5e } from '@/components/admin/LicenseActions'
 import { LeadReply as LeadReply_572199583e0959dec94dfd8072f04e24 } from '@/components/admin/LeadReply'
 import { ExportLeads as ExportLeads_800dd0645468dc97bf8dbdd34cb01e71 } from '@/components/admin/ExportLeads'
@@ -74,6 +75,7 @@ export const importMap = {
   "@payloadcms/next/client#SlugField": SlugField_2b8867833a34864a02ddf429b0728a40,
   "@/components/admin/OrderActions#OrderActions": OrderActions_bd9a3eb0969675b027902d6a22a18ee7,
   "@/components/admin/InvoiceActions#InvoiceActions": InvoiceActions_7bcd56d274d3f39f269c02b27204544c,
+  "@/components/admin/CustomerActions#CustomerActions": CustomerActions_9fd8238a1722f59df871ef58a48eb6c2,
   "@/components/admin/LicenseActions#LicenseActions": LicenseActions_4fedb378ccd4b2c25fe18ad54093fb5e,
   "@/components/admin/LeadReply#LeadReply": LeadReply_572199583e0959dec94dfd8072f04e24,
   "@/components/admin/ExportLeads#ExportLeads": ExportLeads_800dd0645468dc97bf8dbdd34cb01e71,

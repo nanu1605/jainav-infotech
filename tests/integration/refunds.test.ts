@@ -32,6 +32,7 @@ const createRoute = (await import('@/app/api/v1/checkout/create/route')).POST
 const verifyRoute = (await import('@/app/api/v1/checkout/verify/route')).POST
 const webhookRoute = (await import('@/app/api/v1/webhooks/razorpay/route')).POST
 const gateway = await import('@/app/api/v1/dev/razorpay/[...path]/route')
+const { anonymizeCustomer } = await import('@/lib/account/profile')
 const { createSession, SESSION_COOKIE } = await import('@/lib/account/session')
 const { findOrCreateCustomer } = await import('@/lib/account/otp')
 const { DEV_GATEWAY, hmacHex } = await import('@/lib/commerce/razorpay')
@@ -194,7 +195,10 @@ const mailsTo = (order: Order, subject: RegExp) =>
   sent.filter((m) => m.to === order.billing.email && subject.test(String(m.subject)))
 
 /** An admin endpoint's handler, as Payload's REST route would call it. */
-const handler = (slug: 'orders' | 'licenses' | 'invoices', path: string): PayloadHandler =>
+const handler = (
+  slug: 'orders' | 'licenses' | 'invoices' | 'customers',
+  path: string,
+): PayloadHandler =>
   payload.collections[slug].config.endpoints
     ? payload.collections[slug].config.endpoints.find((e) => e.path === path)!.handler
     : (() => {
@@ -202,7 +206,7 @@ const handler = (slug: 'orders' | 'licenses' | 'invoices', path: string): Payloa
       })()
 
 async function call(
-  slug: 'orders' | 'licenses' | 'invoices',
+  slug: 'orders' | 'licenses' | 'invoices' | 'customers',
   path: string,
   id: number,
   user: User | null,
@@ -742,6 +746,164 @@ describe('admin actions (spec §10, §9.3)', () => {
         paths.findIndex((e) => e.path === '/:id'),
       )
     }
+  })
+
+  it('tells an account deleted from one marked deleted by hand', async () => {
+    const path = '/:id/delete-account'
+    const customer = await payload.create({
+      collection: 'customers',
+      data: { email: email('marked'), preferredLocale: 'en', status: 'deleted' },
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect((await call('customers', path, customer.id, users.owner)).status).toBe(200)
+    expect((await call('customers', path, customer.id, users.owner)).status).toBe(409)
+  })
+
+  it('leaves the account as it was when a lead can’t be unsubscribed', async () => {
+    const customer = await payload.create({
+      collection: 'customers',
+      data: { email: email('stuck'), preferredLocale: 'en', status: 'active' },
+      depth: 0,
+      overrideAccess: true,
+    })
+    const update = vi
+      .spyOn(payload, 'update')
+      .mockResolvedValueOnce({ docs: [], errors: [{ id: 1, message: 'x' }] } as never)
+    await expect(anonymizeCustomer(payload, customer)).rejects.toThrow('not unsubscribed')
+    update.mockRestore()
+    const fresh = await payload.findByID({
+      collection: 'customers',
+      id: customer.id,
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(fresh).toMatchObject({ email: customer.email, status: 'active' })
+  })
+
+  it('stops marketing when Payload’s own delete removes a customer, not when it refuses', async () => {
+    const lead = (address: string) =>
+      payload.create({
+        collection: 'leads',
+        data: { type: 'waitlist', status: 'new', email: address },
+        depth: 0,
+        overrideAccess: true,
+      })
+    const unsubscribedAt = async (id: number) =>
+      (await payload.findByID({ collection: 'leads', id, depth: 0, overrideAccess: true }))
+        .unsubscribedAt
+    const customer = await payload.create({
+      collection: 'customers',
+      data: { email: email('plain'), preferredLocale: 'en', status: 'active' },
+      depth: 0,
+      overrideAccess: true,
+    })
+    const stopped = await lead(customer.email)
+    await payload.delete({
+      collection: 'customers',
+      id: customer.id,
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(await unsubscribedAt(stopped.id)).toBeTruthy()
+
+    const { order } = await buy('keepsbuyer')
+    const buyerId = typeof order.customer === 'object' ? order.customer.id : order.customer
+    const kept = await lead(order.billing.email)
+    await expect(
+      payload.delete({ collection: 'customers', id: buyerId, depth: 0, overrideAccess: true }),
+    ).rejects.toThrow()
+    expect(await unsubscribedAt(kept.id)).toBeFalsy()
+    for (const id of [stopped.id, kept.id]) {
+      await payload.delete({ collection: 'leads', id, overrideAccess: true })
+    }
+  })
+
+  it('lets only the Owner delete a customer’s account, with its marketing consent', async () => {
+    const path = '/:id/delete-account'
+    const customer = await payload.create({
+      collection: 'customers',
+      data: {
+        email: email('gone'),
+        name: 'Priya',
+        phone: '+91 98765 43210',
+        preferredLocale: 'en',
+        status: 'active',
+      },
+      depth: 0,
+      overrideAccess: true,
+    })
+    await payload.update({
+      collection: 'customers',
+      id: customer.id,
+      data: { marketingConsent: { given: true, at: new Date().toISOString(), textVersion: 'x' } },
+      depth: 0,
+      overrideAccess: true,
+    })
+    await createSession(payload, customer.id, 'test')
+    const lead = await payload.create({
+      collection: 'leads',
+      data: { type: 'waitlist', status: 'new', email: customer.email },
+      depth: 0,
+      overrideAccess: true,
+    })
+    for (const user of [users.support, users.editor, null]) {
+      expect((await call('customers', path, customer.id, user)).status).toBe(403)
+    }
+    expect(await call('customers', path, customer.id, users.owner)).toEqual({
+      status: 200,
+      body: { ok: true },
+    })
+    const gone = await payload.findByID({
+      collection: 'customers',
+      id: customer.id,
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(gone).toMatchObject({
+      email: `deleted-${customer.id}@deleted.invalid`,
+      status: 'deleted',
+      name: null,
+      phone: null,
+    })
+    expect(gone.deletedAt).toBeTruthy()
+    expect(gone.marketingConsent?.given).toBe(true)
+    expect(gone.marketingConsent?.withdrawnAt).toBeTruthy()
+    // Marketing stops for the address, not only for the account.
+    const { unsubscribedAt } = await payload.findByID({
+      collection: 'leads',
+      id: lead.id,
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(unsubscribedAt).toBeTruthy()
+    await payload.delete({ collection: 'leads', id: lead.id, overrideAccess: true })
+    const { totalDocs } = await payload.count({
+      collection: 'customer-sessions',
+      where: { customer: { equals: customer.id } },
+      overrideAccess: true,
+    })
+    expect(totalDocs).toBe(0)
+    // The audit log names who did it.
+    const { docs: audit } = await payload.find({
+      collection: 'audit-log',
+      where: {
+        and: [{ entity: { equals: 'customers' } }, { docId: { equals: `${customer.id}` } }],
+      },
+      sort: '-createdAt',
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(audit[0]?.actor).toBe(users.owner.id)
+    expect((await call('customers', path, customer.id, users.owner)).status).toBe(409)
+    expect((await call('customers', path, 2_000_000_000, users.owner)).status).toBe(404)
+    await payload.delete({
+      collection: 'customers',
+      id: customer.id,
+      depth: 0,
+      overrideAccess: true,
+    })
   })
 
   it('lets Support resend the license email, with the key', async () => {
