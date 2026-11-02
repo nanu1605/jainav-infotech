@@ -163,11 +163,14 @@ export const refundEndpoint: PayloadHandler = async (req) => {
   }
 }
 
+/** Says whether it went: an alert never stops the work around it. */
 async function alert(text: string) {
   try {
     await sendTelegram(text)
+    return true
   } catch (error) {
     console.error('refunds: alert failed:', error instanceof Error ? error.message : error)
+    return false
   }
 }
 
@@ -542,23 +545,17 @@ async function endDispute(
     END)::enum_orders_status
     WHERE id = ${orderId} AND status IN ${from}
   `)
-  const { status } = await payload.findByID({
-    collection: 'orders',
-    id: orderId,
-    select: { status: true },
-    depth: 0,
-    overrideAccess: true,
-  })
-  return status
 }
 
 /**
  * The dispute webhooks (spec §11.6). A new dispute of the order's own payment marks a paid order
- * `disputed` and suspends its license through the Local API (audited; the email is sent here, so
- * a failure retries the job). A dispute of a duplicate payment changes nothing: the alert says to
- * refund that payment. Its end clears `disputed`; no other stage changes anything. The license
- * never follows by itself: Support or the Owner reinstates it, or the Owner revokes it. Each stage
- * of a dispute alerts once.
+ * `disputed` and suspends its license through the Local API (audited). A dispute of a duplicate
+ * payment changes nothing: the alert says to refund that payment. Its end clears `disputed`; no
+ * other stage changes anything. The license never follows by itself: Support or the Owner
+ * reinstates it, or the Owner revokes it. Each stage of a dispute changes things once and alerts
+ * once. The customer's email goes last, so a failed one can't hide the alert and its respond-by
+ * date. A failed email or alert fails the run, and the job's retry sends what is still unsent. An
+ * alert still failing when the retries run out is lost, but the order's history keeps the date.
  */
 export async function disputeWebhook(
   payload: Payload,
@@ -569,28 +566,29 @@ export async function disputeWebhook(
   const created = event === 'payment.dispute.created'
   // The webhook also finds an order by its Razorpay order: any other payment on it is a duplicate.
   const duplicate = dispute.payment_id !== order.razorpayPaymentId
+  const events = eventsOf(order)
   // Webhooks and their retries can run out of order: a dispute that already ended opens nothing.
-  const over = eventsOf(order).some((e) => e.disputeId === dispute.id && e.type in DISPUTE_ENDS)
-  let disputed = false
-  let suspended = 0
+  const over = events.some((e) => e.disputeId === dispute.id && e.type in DISPUTE_ENDS)
+  // A retry or redelivery past this stage changes nothing: staff may have acted on its alert.
+  const recorded = events.some((e) => e.disputeId === dispute.id && e.type === event)
   let licenseSuspended = false
-  if (created && !duplicate && !over) {
-    const { rows } = await drizzle(payload).execute(sql`
-      UPDATE orders SET status = 'disputed', updated_at = now()
-      WHERE id = ${order.id} AND status IN ('paid', 'partially-refunded')
-      RETURNING id
-    `)
-    disputed = rows.length > 0
-    const { docs: changed, errors } = await payload.update({
-      collection: 'licenses',
-      where: { and: [{ order: { equals: order.id } }, { status: { equals: 'active' } }] },
-      data: { status: 'suspended' },
-      overrideAccess: true,
-      depth: 0,
-      context: { skipStatusEmail: true, disableRevalidate: true },
-    })
-    if (errors.length) throw new Error(`refunds: order ${order.id}: the license wasn't suspended`)
-    suspended = changed.length
+  let licenses: number[] = []
+  if (created && !duplicate) {
+    if (!over && !recorded) {
+      await drizzle(payload).execute(sql`
+        UPDATE orders SET status = 'disputed', updated_at = now()
+        WHERE id = ${order.id} AND status IN ('paid', 'partially-refunded')
+      `)
+      const { errors } = await payload.update({
+        collection: 'licenses',
+        where: { and: [{ order: { equals: order.id } }, { status: { equals: 'active' } }] },
+        data: { status: 'suspended' },
+        overrideAccess: true,
+        depth: 0,
+        context: { skipStatusEmail: true, disableRevalidate: true },
+      })
+      if (errors.length) throw new Error(`refunds: order ${order.id}: the license wasn't suspended`)
+    }
     const { docs } = await payload.find({
       collection: 'licenses',
       where: { order: { equals: order.id } },
@@ -598,13 +596,15 @@ export async function disputeWebhook(
       overrideAccess: true,
     })
     licenseSuspended = docs.some((license) => license.status === 'suspended')
-    // A no-op for licenses whose customer was told already.
-    for (const license of docs) await sendLicenseStatusEmail(license.id)
+    if (!over) licenses = docs.map((license) => license.id)
   }
   const lost = event === DISPUTE_LOST
   const from = duplicate ? undefined : DISPUTE_ENDS[event]
-  const ended = from ? await endDispute(payload, order.id, lost, from) : null
-  const added = await addOrderEvent(
+  if (from && !recorded) await endDispute(payload, order.id, lost, from)
+  const respondBy = dispute.respond_by
+    ? `respond by ${formatDate('en', new Date(dispute.respond_by * 1000))}`
+    : ''
+  await addOrderEvent(
     payload,
     order.id,
     {
@@ -613,51 +613,65 @@ export async function disputeWebhook(
       paymentId: dispute.payment_id,
       disputeId: dispute.id,
       amount: dispute.amount,
-      detail: [`${dispute.id}: ${dispute.amount} paise`, dispute.reason_code, dispute.status]
+      detail: [
+        `${dispute.id}: ${dispute.amount} paise`,
+        dispute.reason_code,
+        dispute.status,
+        respondBy,
+      ]
         .filter(Boolean)
         .join(', '),
     },
     { type: event, disputeId: dispute.id },
   )
-  if (!added) return
-  const link = adminLink(order.id)
-  const stage = event.slice('payment.dispute.'.length).replace('_', ' ')
-  if (duplicate) {
-    await alert(
-      created
-        ? `Dispute ${dispute.id} is on a duplicate payment ${dispute.payment_id} of order ${order.orderNumber}: refund that payment; the order and license are unchanged.\n${link}`
-        : `Dispute ${dispute.id} on a duplicate payment ${dispute.payment_id} of order ${order.orderNumber}: ${stage}. The order and license are unchanged.\n${link}`,
-    )
-  } else if (created) {
-    const reason = dispute.reason_code ? ` (${dispute.reason_code})` : ''
-    const by = dispute.respond_by
-      ? `, respond by ${formatDate('en', new Date(dispute.respond_by * 1000))}`
-      : ''
-    // The state this dispute leaves, not this run's changes: a retry after a failed email finds
-    // the order disputed and the license suspended by the first run.
-    const done =
-      disputed || order.status === 'disputed'
-        ? `The order is disputed${licenseSuspended ? ' and its license suspended' : '; it has no active license to suspend'}.`
-        : `The order is already ${order.status}${suspended ? '; its license was suspended' : '; nothing was changed'}.`
-    await alert(
-      `Payment dispute ${dispute.id} on order ${order.orderNumber}${reason}${by}. ${done}\n${link}`,
-    )
-  } else if (ended) {
-    const { totalDocs: stillSuspended } = await payload.count({
-      collection: 'licenses',
-      where: { and: [{ order: { equals: order.id } }, { status: { equals: 'suspended' } }] },
+  // Marked after sending, like tellCustomer's emails: a crash in between, or two runs at once, can
+  // alert twice.
+  const alerted = { type: 'dispute-alerted', disputeId: dispute.id, detail: event }
+  let alertSent = events.some(
+    (e) => e.type === alerted.type && e.disputeId === dispute.id && e.detail === event,
+  )
+  if (!alertSent) {
+    const link = adminLink(order.id)
+    const stage = event.slice('payment.dispute.'.length).replace('_', ' ')
+    // The state this dispute leaves, not this run's changes: a rerun finds what the first run did,
+    // and staff or a later stage may have moved on since.
+    const { status } = await payload.findByID({
+      collection: 'orders',
+      id: order.id,
+      select: { status: true },
+      depth: 0,
       overrideAccess: true,
     })
-    const license =
-      lost && !stillSuspended
-        ? `The license wasn't suspended: revoke it in the admin if it should stop.`
-        : `The license doesn't change by itself: reinstate or revoke it in the admin.`
-    await alert(
-      `Payment dispute ${dispute.id} on order ${order.orderNumber}: ${stage}. The order is now ${ended}. ${license}\n${link}`,
-    )
-  } else {
-    await alert(
-      `Payment dispute ${dispute.id} on order ${order.orderNumber}: ${stage}. Nothing changes by itself.\n${link}`,
-    )
+    let text: string
+    if (duplicate) {
+      text = created
+        ? `Dispute ${dispute.id} is on a duplicate payment ${dispute.payment_id} of order ${order.orderNumber}: refund that payment; the order and license are unchanged.\n${link}`
+        : `Dispute ${dispute.id} on a duplicate payment ${dispute.payment_id} of order ${order.orderNumber}: ${stage}. The order and license are unchanged.\n${link}`
+    } else if (created) {
+      const reason = dispute.reason_code ? ` (${dispute.reason_code})` : ''
+      const done =
+        status === 'disputed'
+          ? `The order is disputed${licenseSuspended ? ' and its license suspended' : '; it has no suspended license'}.`
+          : `The order is already ${status}${licenseSuspended ? '; its license was suspended' : '; nothing was changed'}.`
+      text = `Payment dispute ${dispute.id} on order ${order.orderNumber}${reason}${respondBy && `, ${respondBy}`}. ${done}\n${link}`
+    } else if (from) {
+      const { totalDocs: stillSuspended } = await payload.count({
+        collection: 'licenses',
+        where: { and: [{ order: { equals: order.id } }, { status: { equals: 'suspended' } }] },
+        overrideAccess: true,
+      })
+      const license =
+        lost && !stillSuspended
+          ? `The license wasn't suspended: revoke it in the admin if it should stop.`
+          : `The license doesn't change by itself: reinstate or revoke it in the admin.`
+      text = `Payment dispute ${dispute.id} on order ${order.orderNumber}: ${stage}. The order is now ${status}. ${license}\n${link}`
+    } else {
+      text = `Payment dispute ${dispute.id} on order ${order.orderNumber}: ${stage}. Nothing changes by itself.\n${link}`
+    }
+    alertSent = await alert(text)
+    if (alertSent) await addOrderEvent(payload, order.id, alerted, alerted)
   }
+  // A no-op for licenses whose customer was told already.
+  for (const id of licenses) await sendLicenseStatusEmail(id)
+  if (!alertSent) throw new Error(`refunds: dispute ${dispute.id}: the alert failed`)
 }
