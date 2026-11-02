@@ -8,6 +8,7 @@ import { getPayload, type Payload, type RequiredDataFromCollectionSlug } from 'p
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { istDate } from '@/lib/format'
+import { SITE_URL } from '@/lib/seo'
 import type { Order, User } from '@/payload-types'
 import config from '@/payload.config'
 
@@ -274,7 +275,8 @@ describe('the purge', () => {
     for (const kept of [fresh, justInside, recentSignUp, subscriber]) {
       expect(await exists('leads', kept.id)).toBe(true)
     }
-    expect(telegrams.at(-1)).toMatch(/^Retention: removed \d+ leads\.$/)
+    expect(telegrams.at(-1)).toMatch(/^Retention: removed \d+ leads\.\n/)
+    expect(telegrams.at(-1)).toContain(SITE_URL)
 
     // A shorter period, once the Owner sets one.
     await settings({ leadMonths: 12 })
@@ -314,7 +316,7 @@ describe('the purge', () => {
     await applyRetention()
     remove.mockRestore()
     expect(telegrams).toEqual([
-      'Retention: 1 leads could not be deleted. They stay until this is fixed.',
+      `Retention: 1 leads could not be deleted. They stay until this is fixed.\n${SITE_URL}`,
     ])
   })
 
@@ -390,7 +392,7 @@ describe('the settings', () => {
     const task = payload.config.jobs.tasks?.find((t) => t.slug === 'cleanup')
     // Only the fields the hook reads, of what Payload passes.
     await task?.onFail?.({ job: { id: 7 }, taskStatus: { totalTried: 0 } } as never)
-    expect(telegrams.at(-1)).toBe('Job cleanup #7 failed after 1 attempt.')
+    expect(telegrams.at(-1)).toBe(`Job cleanup #7 failed after 1 attempt.\n${SITE_URL}`)
   })
 })
 

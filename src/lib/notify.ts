@@ -3,6 +3,7 @@ import 'server-only'
 import type { Payload } from 'payload'
 
 import type { RenderedEmail } from '@/emails'
+import { SITE_URL } from '@/lib/seo'
 
 export type Inbox = 'hello' | 'sales' | 'support' | 'careers' | 'privacy'
 
@@ -49,7 +50,8 @@ export async function sendEmail(
 
 /**
  * Telegram alert (spec §13). Keep personal data out of `text`: Telegram is a third party, so
- * alerts say what happened and link to the admin, where the details are.
+ * alerts say what happened and link to the admin, where the details are. One without a link gets
+ * the site's address, so every alert names its site in a chat other projects may share.
  */
 export async function sendTelegram(text: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN
@@ -62,7 +64,11 @@ export async function sendTelegram(text: string) {
   const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text, link_preview_options: { is_disabled: true } }),
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: text.includes(SITE_URL) ? text : `${text}\n${SITE_URL}`,
+      link_preview_options: { is_disabled: true },
+    }),
     signal: AbortSignal.timeout(5000),
   })
   if (!res.ok) throw new Error(`Telegram sendMessage failed: ${res.status}`)
