@@ -38,7 +38,7 @@ const settled = async () => {
 function post(
   form: string,
   data: object,
-  opts: { ip?: string; meta?: object; cv?: Buffer | null; cvType?: string } = {},
+  opts: { ip?: string; meta?: object; cv?: Buffer<ArrayBuffer> | null; cvType?: string } = {},
 ) {
   const body = new FormData()
   body.set('data', JSON.stringify(data))
