@@ -54,7 +54,7 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
 - **No Translation tab on products** (spec §10 lists one): `hiStatus` stays a top-level sidebar field as §6 says, so it works as a list column and filter and is visible on every tab. A Translations view is planned for Phase 11.
 - **Only the Owner can unlock admin accounts**, so the login lockout also protects the Owner from other admins.
 - **`daily-stats.date` is text `YYYY-MM-DD`** (IST business date) so the Phase 3 `INSERT … ON CONFLICT (date, kind, key)` upsert stays simple.
-- **Tests use a separate `jainav_test` database** brought up to date with `payload migrate` in a Vitest global setup (dev schema push disabled via `PAYLOAD_MIGRATING`). `pnpm check:migrations` (also in CI) compares the config's schema with the newest migration snapshot, so a forgotten migration fails the build (spec §18.3).
+- **Tests use a separate `jainav_test` database** brought up to date with `payload migrate` in a Vitest global setup (dev schema push disabled via `PAYLOAD_MIGRATING`). `pnpm check:migrations` (also in CI) compares the config's schema with the newest migration snapshot, so a forgotten migration fails the build (spec §18.3). It also fails on a migration file missing from `src/migrations/index.ts`: `payload migrate` reads the folder, so tests pass without that entry, while production applies only the index.
 - **Migrations were squashed** into one initial migration during Phase 1; nothing had been deployed. From the first deploy on, migrations are only ever added.
 
 ## Phase 2

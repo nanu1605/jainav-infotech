@@ -1,13 +1,17 @@
 /**
- * pnpm check:migrations — fails when the Payload config and the newest committed migration
- * snapshot describe different database schemas (spec §18.3: every schema change ships as a
- * migration; production never uses schema push). Fix with `pnpm payload migrate:create <name>`.
+ * pnpm check:migrations — fails when a migration file is missing from src/migrations/index.ts, the
+ * only list production applies (`prodMigrations`; `payload migrate` reads the folder instead), and
+ * when the Payload config and the newest committed migration snapshot describe different database
+ * schemas (spec §18.3: every schema change ships as a migration; production never uses schema
+ * push). Fix with `pnpm payload migrate:create <name>`. Takes another folder to read, for its test.
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import config from '@payload-config'
 import { getPayload } from 'payload'
+
+import { migrations } from '../src/migrations'
 
 type DrizzleKit = {
   generateDrizzleJson(schema: unknown): Promise<Record<string, unknown>> | Record<string, unknown>
@@ -23,8 +27,22 @@ const stable = (value: unknown): string =>
       : v,
   )
 
-const dir = path.resolve('src/migrations')
-const latest = readdirSync(dir)
+const dir = path.resolve(process.argv[2] ?? 'src/migrations')
+const files = readdirSync(dir)
+
+const indexed = new Set(migrations.map((migration) => migration.name))
+const unindexed = files
+  .filter((file) => /\.[jt]s$/.test(file) && !file.startsWith('index.'))
+  .map((file) => path.parse(file).name)
+  .filter((name) => !indexed.has(name))
+if (unindexed.length) {
+  console.error(
+    `check:migrations failed. src/migrations/index.ts, the only list production applies, is missing:\n  ${unindexed.join('\n  ')}`,
+  )
+  process.exit(1)
+}
+
+const latest = files
   .filter((file) => file.endsWith('.json'))
   .sort()
   .at(-1)
