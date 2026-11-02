@@ -333,3 +333,13 @@ Spec §8.13 has Phase 3 draft the legal pages, but the seed only held a one-line
 - **Razorpay's current list differs from spec §20:** activation asks for About us, Contact us, Pricing, Terms, Privacy and Refunds, plus a sample invoice. Shipping isn't on it, and stays live anyway. Get written confirmation that one-time software licenses are accepted before applying.
 - **The law moves on dates that matter here:** the E-Commerce (Amendment) Rules start on 2027-01-01, and the DPDP duties for ordinary companies around 2027-05-13. Recheck both before the store opens.
 - **The review notes for the Owner, the lawyer and the CA are not in this repository,** which is public.
+
+## The store against the legal drafts (2026-11-01)
+
+The drafted legal pages (above) describe what the store does. This work changes the code and copy where the two differ, before paid sales start. The drafts change with the code in the same pull request, in both languages.
+
+- **The checkout refuses orders until its legal pages are live** (`checkoutPagesPublished`): Terms, the product's EULA, Refunds and Cancellation, Shipping and Delivery, read as a visitor reads them. Buy buttons don't check: the checkout page says the plan can't be bought right now, and the create endpoint answers `unavailable`. The EULA is the one that matters today, but a broken Terms or refunds link is the same problem and costs nothing more to check.
+- **Refunds and delivery are linked beside the Pay button**, outside the acceptance box: the box accepts the Terms and the EULA, and the Terms already make those two pages part of them.
+- **`/checkout/failed` promises no outcome.** It checks nothing at Razorpay and a late capture can complete an expired order, so it says what can happen to the money. An order that turned out paid goes to the success page.
+- **Copy no longer says what the app does right now.** Emails and the Licenses page say the key can't be activated and that Pro features stop when the app next checks the license: an offline device keeps Pro until its token ends (`docs/licensing-api.md`).
+- **GST hints depend on GST being charged.** While it is off, the GSTIN field says it is printed on the invoice and sets the state, and that there is no GST to claim.

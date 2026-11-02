@@ -21,6 +21,7 @@ How to switch on accounts and checkout on staging with Razorpay's test mode. Pro
 4. **Admin** (staging, as Owner):
    - Settings → Commerce settings: the SAC code, invoice prefixes and, once the CA confirms, "Charge GST" (needs the company GSTIN in Site settings first); the current Terms and EULA versions (they are recorded with every order).
    - Products → Plans: VYRO Pro's price (paise, GST-inclusive) and "Active".
+   - Content → Legal pages: publish Terms, the VYRO EULA (`eula-vyro`), Refunds and Cancellation, and Shipping and Delivery. Until all four are live, the checkout shows "can't be bought right now" and refuses orders.
    - Settings → Site settings → Site: "Store enabled".
 5. **Content security policy:** keep the browser console open during the test purchase (step 6), starting from the pricing page. Any `Content-Security-Policy` violation naming a Razorpay host goes into `src/lib/csp.ts` (`RAZORPAY`).
 

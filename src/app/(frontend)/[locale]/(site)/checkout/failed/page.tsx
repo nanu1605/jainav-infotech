@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/content/PageHeader'
 import { Container } from '@/components/layout/Container'
 import { Button } from '@/components/ui/Button'
-import { Link } from '@/i18n/navigation'
+import { Link, redirect } from '@/i18n/navigation'
 import type { Locale } from '@/i18n/routing'
 import { getCustomer } from '@/lib/account/session'
 import { getClient } from '@/lib/cms'
@@ -26,7 +26,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return pageMetadata({ locale, path: '/checkout/failed', title: t('title'), noindex: true })
 }
 
-/** A payment that didn't complete (spec §11.3 step 11): reassurance and a retry. */
+/**
+ * A payment we couldn't confirm (spec §11.3 step 11): what happens to the money, and a retry. It
+ * checks nothing at Razorpay, and a late capture can still complete an expired order, so the page
+ * promises no outcome.
+ */
 export default async function CheckoutFailedPage({ params, searchParams }: Props) {
   const locale = (await params).locale as Locale
   setRequestLocale(locale)
@@ -38,6 +42,13 @@ export default async function CheckoutFailedPage({ params, searchParams }: Props
     customer && typeof param === 'string' && param
       ? await customerOrder(payload, customer, param, locale)
       : null
+  // Paid after all: a late capture, or an old link.
+  if (order && order.status !== 'created' && order.status !== 'expired') {
+    return redirect({
+      href: { pathname: '/checkout/success', query: { order: order.orderNumber } },
+      locale,
+    })
+  }
   const item = order?.items[0]
   const retry =
     item && typeof item.product === 'object' && typeof item.plan === 'object'
@@ -55,7 +66,7 @@ export default async function CheckoutFailedPage({ params, searchParams }: Props
       <Container size="prose" className="grid gap-8 py-12 sm:py-16">
         <div className="grid gap-3 text-lg text-fg">
           {order && <p className="text-fg-muted">{t('order', { number: order.orderNumber })}</p>}
-          <p>{t('noCharge')}</p>
+          <p>{t('ifCharged')}</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <Button asChild size="lg">

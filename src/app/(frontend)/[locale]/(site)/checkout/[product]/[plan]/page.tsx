@@ -5,13 +5,20 @@ import { notFound } from 'next/navigation'
 import { CheckoutForm } from '@/components/checkout/CheckoutForm'
 import { PageHeader } from '@/components/content/PageHeader'
 import { Container } from '@/components/layout/Container'
+import { Callout } from '@/components/ui/Callout'
 import { redirect } from '@/i18n/navigation'
 import type { Locale } from '@/i18n/routing'
 import { getCustomer } from '@/lib/account/session'
 import { getClient } from '@/lib/cms'
 import { quote } from '@/lib/commerce/pricing'
 import type { QuoteView } from '@/lib/commerce/schemas'
-import { findPurchasable, getCommerceSettings, storeOpen, taxSettings } from '@/lib/commerce/store'
+import {
+  checkoutPagesPublished,
+  findPurchasable,
+  getCommerceSettings,
+  storeOpen,
+  taxSettings,
+} from '@/lib/commerce/store'
 import { formatINR } from '@/lib/format'
 import { pageMetadata } from '@/lib/seo'
 
@@ -45,14 +52,27 @@ export default async function CheckoutPage({ params }: Props) {
   if (!item) notFound()
   const { product, plan } = item
   const path = `/checkout/${product.slug}/${plan.code}`
+  const t = await getTranslations('checkout')
+  const crumbs = [
+    { label: product.name, href: `/products/${product.slug}` },
+    { label: t('title'), href: path },
+  ]
+  // Nothing to sign in for: the create endpoint refuses these orders too.
+  if (!(await checkoutPagesPublished(payload, product.slug))) {
+    return (
+      <main id="main" className="scroll-mt-16">
+        <PageHeader title={t('title')} crumbs={crumbs} locale={locale} />
+        <Container className="py-12 sm:py-16">
+          <Callout tone="warning">{t('problems.unavailable')}</Callout>
+        </Container>
+      </main>
+    )
+  }
   const customer = await getCustomer()
   if (!customer)
     return redirect({ href: { pathname: '/account/sign-in', query: { next: path } }, locale })
 
-  const [settings, t] = await Promise.all([
-    getCommerceSettings(payload),
-    getTranslations('checkout'),
-  ])
+  const settings = await getCommerceSettings(payload)
   const price = plan.priceINR ?? 0
   const quoteState = customer.state || settings.homeStateCode
   const { subtotal, discount, tax, total } = quote(price, null, quoteState, taxSettings(settings))
@@ -72,15 +92,7 @@ export default async function CheckoutPage({ params }: Props) {
 
   return (
     <main id="main" className="scroll-mt-16">
-      <PageHeader
-        title={t('title')}
-        intro={t('intro', names)}
-        crumbs={[
-          { label: product.name, href: `/products/${product.slug}` },
-          { label: t('title'), href: path },
-        ]}
-        locale={locale}
-      />
+      <PageHeader title={t('title')} intro={t('intro', names)} crumbs={crumbs} locale={locale} />
       <Container className="py-12 sm:py-16">
         <CheckoutForm
           product={{ slug: product.slug, name: product.name }}

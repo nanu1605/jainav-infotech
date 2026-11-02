@@ -27,7 +27,14 @@ type Output = z.output<typeof profileSchema>
  * Profile and billing details (spec §11.2). A valid GSTIN sets the state and locks it (spec §11.4);
  * the server derives it again. Name and business name are printed on invoices in a Latin font.
  */
-export function SettingsForm({ defaults }: { defaults: ProfileValues }) {
+export function SettingsForm({
+  defaults,
+  gstCharged,
+}: {
+  defaults: ProfileValues
+  /** Whether the store charges GST: while it doesn't, a GSTIN gives no input tax credit. */
+  gstCharged: boolean
+}) {
   const t = useTranslations('account.settings')
   const router = useRouter()
   const errorText = useErrorText()
@@ -123,7 +130,7 @@ export function SettingsForm({ defaults }: { defaults: ProfileValues }) {
           </FormField>
           <FormField
             label={t('gstin')}
-            description={t('gstinHint')}
+            description={gstCharged ? t('gstinHint') : t('gstinHintOff')}
             error={errorText(errors.gstin)}
           >
             <Input

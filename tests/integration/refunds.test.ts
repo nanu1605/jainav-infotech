@@ -18,6 +18,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import type { Invoice, Order, User } from '@/payload-types'
 import config from '@/payload.config'
 
+import { publishCheckoutPages } from './legalPages'
+
 // after() work waits for settled(), as it waits for the response (and its commit) in Next.
 const pending: (() => unknown)[] = []
 vi.mock('next/server', async (importOriginal) => ({
@@ -352,6 +354,7 @@ beforeAll(async () => {
     })
     ids.users.push(users[role].id)
   }
+  restore.push(await publishCheckoutPages(payload, `${run}-app`))
 })
 
 beforeEach(async () => {
