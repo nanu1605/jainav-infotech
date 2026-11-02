@@ -39,7 +39,9 @@ Phase 6 in order (spec §20). Each step names who does it. Details are in the ot
    - tag `v1.0.0`, approve the deploy, seed;
    - create the Owner account in the admin;
    - in Settings → Site settings, enter the CIN and the Grievance Officer's name and title, in
-     English and Hindi: until then the footer leaves them out without saying so;
+     English and Hindi: until then the footer leaves them out without saying so. The Privacy,
+     Privacy Requests, Terms and Refunds pages name the officer in their text too, so a new officer
+     means publishing new versions of them as well;
    - publish the reviewed content.
 8. **Legal pages:**
    - on staging, in a fresh browser profile, list the cookies and storage on the main pages and

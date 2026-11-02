@@ -70,11 +70,13 @@ journalctl -o short-iso | head -1   # the oldest line: at least 180 days old, or
 df -h /var/log/journal              # Avail above 5% of Size (4G at most) plus what the journal can still grow to 8G
 ```
 
-If Avail is below that, free the disk (`docker images`: old `tools-*` images, keeping the deployed
-commits'). Below it journald deletes its oldest files at any usage, with no message, and raising its
-limits does nothing. Otherwise, if the oldest line is younger than that, or usage nears the limit,
-raise `SystemMaxUse` and `SystemMaxFiles` ([server.md §1](server.md#1-provision-the-vps)) while the
-disk has room. Left alone, the privacy policy's period stops being true.
+If Avail is below that, free the disk: `docker system df` shows what holds it. Deploys already trim
+the app and tools images, so look at the Postgres volume ([retention.md](retention.md#analytics-umami)),
+retired Umami or Caddy images and build cache. Below it journald deletes its oldest files at any
+usage, with no message, and raising its limits does nothing. Otherwise, if the oldest line is younger
+than that, or usage nears the limit, raise `SystemMaxUse` and `SystemMaxFiles`
+([server.md §1](server.md#1-provision-the-vps)) while the disk has room. Left alone, the privacy
+policy's period stops being true.
 
 ## Umami (analytics)
 
