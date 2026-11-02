@@ -71,11 +71,11 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@axe-core/playwright": "4.13.0",
-    "@commitlint/cli": "^21.2.3",
-    "@commitlint/config-conventional": "^21.2.3",
+    "@axe-core/playwright": "4.14.0",
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
     "@lhci/cli": "0.15.1",
-    "@playwright/test": "1.63.0",
+    "@playwright/test": "1.64.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/culori": "^4.0.1",
     "@types/node": "^24.19.2",
@@ -88,13 +88,13 @@
     "eslint-config-next": "16.4.2",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
-    "postcss": "^8.5.30",
+    "postcss": "^8.5.31",
     "prettier": "^3.9.10",
     "tailwindcss": "^4.3.3",
     "tsx": "4.23.15",
     "typescript": "5.7.3",
     "vite-tsconfig-paths": "6.1.1",
-    "vitest": "5.0.3"
+    "vitest": "5.0.5"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [
