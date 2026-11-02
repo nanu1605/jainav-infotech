@@ -10,7 +10,7 @@ Our forms and sign-in use Cloudflare Turnstile as a spam check. It loads without
 
 ## Analytics and error reports
 
-Umami (analytics, on our own server) and Sentry (error reports) set no cookies, and Sentry stores nothing in your browser. When switched on, both still receive details of your visit, as our [Privacy Policy](/legal/privacy) explains.
+Umami (analytics, on our own server) and Sentry (error reports) set no cookies, and Sentry stores nothing in your browser. When switched on, Umami still receives details of your visit, and Sentry receives details only when an error happens, as our [Privacy Policy](/legal/privacy) explains.
 
 ## Store accounts
 

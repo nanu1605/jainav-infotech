@@ -44,9 +44,9 @@ If you hold a license or use a trial through our licensing service:
 
 - **Spam check:** Cloudflare Turnstile loads without a click when a form nears your screen, which can happen on any page. Cloudflare gets your IP address and browser signals, and also uses them to improve its own bot detection. Why: to block bots.
 - **Abuse limits:** keyed hashes of your IP address and sometimes your email, account or license key. Why: to stop repeated attempts.
-- **Server logs:** the time, result and full page address of each request, without your IP address or browser details. Error logs can occasionally include an email address or other details you entered, such as a name or phone number. Why: to run the site and fix faults.
+- **Server logs:** the time, result and page address of each request, without anything after a question mark in that address and without your IP address or browser details. Error logs can occasionally include an email address or other details you entered, such as a name or phone number. Why: to run the site and fix faults.
 - **Analytics:** when switched on, Umami, on our own server, records full page addresses, referring pages, your browser, device, language and approximate location, and actions such as sending a form, not what you typed. Your IP address is used for location and for an identifier that changes monthly, and Umami's database does not store it. Why: to see how the site is used.
-- **Error reports:** when switched on, Sentry receives technical details of errors, the page address, cut at any question mark, your browser type, language and time zone, and a record with a random id for each page load. It sees your IP address, and we ask it not to store that. We do not filter error messages, so one could include something you typed. Why: to find and fix faults.
+- **Error reports:** when switched on, and only when an error happens, Sentry receives technical details of the error, the address of the page and of the pages and requests before the error, cut at any question mark, and your browser type. It sees your IP address, and we ask it not to store that. We filter error messages, but one could still include something you typed. Why: to find and fix faults.
 
 For cookies and browser storage, see the [Cookie Policy](/legal/cookies).
 
@@ -78,7 +78,7 @@ Our server is in {{SERVER_LOCATION}}. We ask Cloudflare to store files in its As
 - **Orders, invoices and credit notes:** as long as tax and company law require, currently eight financial years {{CONFIRM_WITH_CA}}. Deletion after that is a target, not an automatic job.
 - **What we keep of Razorpay's payment messages:** a daily job deletes it 90 days after receipt.
 - **License, device and trial records:** no end date at present, so a license keeps working and a device cannot restart a trial.
-- **Server logs:** {{LOG_RETENTION}}.
+- **Server logs:** about six months (between 180 and 187 days).
 - **Analytics:** no end date at present.
 - **Backups:** encrypted nightly database copies, 30 daily and about 12 monthly. Deleted data can stay in a backup for up to about a year, and restoring one could bring it back.
 - **Other copies:** staff alert emails, staff downloads, and emails and WhatsApp messages you send us have no fixed period, and providers set their own periods.
