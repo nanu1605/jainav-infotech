@@ -11,9 +11,11 @@ import type { User } from '@/payload-types'
 
 /**
  * The Payload client. `cron` starts the jobs queue's autoRun in the server process (spec §2);
- * Payload skips it during builds, and tests run their jobs themselves.
+ * Payload skips it during builds, tests run their jobs themselves, and on Vercel, where instances
+ * come and go, /api/v1/cron runs them.
  */
-export const getClient = () => getPayload({ config, cron: process.env.NODE_ENV !== 'test' })
+export const getClient = () =>
+  getPayload({ config, cron: process.env.NODE_ENV !== 'test' && !process.env.VERCEL })
 
 export type Viewer = { draft: boolean; user: User | null; locale: Locale }
 

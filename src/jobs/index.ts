@@ -1,4 +1,4 @@
-import type { JobsConfig, TaskConfig, TaskHandler } from 'payload'
+import type { JobsConfig, Payload, TaskConfig, TaskHandler } from 'payload'
 
 import { hasRole } from '@/access/roles'
 
@@ -68,29 +68,36 @@ const idTask = (slug: string, run: (id: number) => Promise<void>): TaskConfig<Id
 })
 
 /**
+ * Payload never re-claims a job a crash or restart left "processing", and a stuck scheduled job
+ * stops its schedule for good. Our jobs take seconds: release any still processing after 30
+ * minutes, every tick, before the run.
+ */
+export async function releaseStuckJobs(payload: Payload) {
+  await payload.update({
+    collection: 'payload-jobs',
+    where: {
+      and: [
+        { processing: { equals: true } },
+        { updatedAt: { less_than: new Date(Date.now() - 30 * 60_000).toISOString() } },
+      ],
+    },
+    data: { processing: false },
+    overrideAccess: true,
+    depth: 0,
+  })
+}
+
+/**
  * Background work (spec §2, §11.3). Handlers import their code on first use, so the Payload
- * config stays light. autoRun ticks every minute once crons start (instrumentation.ts); route
- * handlers also run the queue right after a payment so emails don't wait for the tick.
+ * config stays light. autoRun ticks every minute once crons start (instrumentation.ts), or
+ * /api/v1/cron does the same on Vercel; route handlers also run the queue right after a payment
+ * so emails don't wait for the tick.
  */
 export const jobs: JobsConfig = {
   access: { run: ({ req }) => hasRole(req.user, 'owner') },
   autoRun: [{ cron: '* * * * *', queue: 'default' }],
-  // Payload never re-claims a job a crash or restart left "processing", and a stuck scheduled job
-  // stops its schedule for good. Our jobs take seconds: release any still processing after 30
-  // minutes, every tick, before the run.
   shouldAutoRun: async (payload) => {
-    await payload.update({
-      collection: 'payload-jobs',
-      where: {
-        and: [
-          { processing: { equals: true } },
-          { updatedAt: { less_than: new Date(Date.now() - 30 * 60_000).toISOString() } },
-        ],
-      },
-      data: { processing: false },
-      overrideAccess: true,
-      depth: 0,
-    })
+    await releaseStuckJobs(payload)
     return true
   },
   // Owner can look at the queue (failed jobs and their errors) under System.
