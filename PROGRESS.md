@@ -174,4 +174,4 @@ Input still missing: a signed VYRO build that uses the licensing API. v1.4.0 (20
 
 ## Anytime — Brand swap
 
-- [ ] Follow spec Appendix B when the logo arrives.
+- [x] Follow spec Appendix B when the logo arrives (2026-11-07: the logo mark, an ink and champagne palette, favicons and app icons, share image, email header and admin branding; no brand fonts were given). Open: an SVG of the logo, if one exists.
