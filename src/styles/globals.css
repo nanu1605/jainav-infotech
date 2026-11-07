@@ -96,8 +96,8 @@
   }
 }
 
-/* CMS rich text (legal pages, posts, docs, RichText blocks). Links are text-colored and
-   underlined: the primary color only reaches 3:1 on the page, too little for body text. */
+/* CMS rich text (legal pages, posts, docs, RichText blocks). Links are text-colored with an
+   underline in the ring color: primary is the text's own ink, so the underline is the cue. */
 @layer components {
   .prose {
     max-width: 70ch;
@@ -129,7 +129,7 @@
   .prose :where(a) {
     font-weight: 500;
     text-decoration: underline;
-    text-decoration-color: var(--primary);
+    text-decoration-color: var(--ring);
     text-decoration-thickness: 2px;
     text-underline-offset: 4px;
   }

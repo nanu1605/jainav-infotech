@@ -19,7 +19,7 @@ export function Quote({ children, name, role, company, image, className, ...prop
   const detail = [role, company].filter(Boolean).join(', ')
   return (
     <figure className={cn('flex flex-col gap-6', className)} {...props}>
-      <QuoteMark aria-hidden className="size-8 text-primary" />
+      <QuoteMark aria-hidden className="size-8 text-brand-accent" />
       <blockquote className="font-display text-lg leading-relaxed text-fg sm:text-xl">
         {children}
       </blockquote>

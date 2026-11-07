@@ -53,7 +53,7 @@ export async function ChangelogList({
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     {item.kind === 'release' ? (
-                      <Badge tone="primary">
+                      <Badge tone="accent">
                         {item.channel === 'beta' ? t('beta') : t('release')}
                       </Badge>
                     ) : (
