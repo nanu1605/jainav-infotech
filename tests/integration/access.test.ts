@@ -117,13 +117,26 @@ describe('content editing', () => {
       draft: true,
       ...as('editor'),
     })
+    // Visitors read with `draft: false`: src/lib/cms.ts sets it only for signed-in staff.
     const live = await payload.findByID({
       collection: 'products',
       id: product.id,
-      draft: true,
+      draft: false,
       ...anonymous,
     })
     expect(live.tagline).toBe('English tagline')
+    // Since Payload 3.91 a draft read checks access on the newest version and doesn't fall back
+    // to the published row (payloadcms/payload#18000), so an anonymous one is a 404, not the draft.
+    await expect(
+      payload.findByID({ collection: 'products', id: product.id, draft: true, ...anonymous }),
+    ).rejects.toMatchObject({ status: 404 })
+    const preview = await payload.findByID({
+      collection: 'products',
+      id: product.id,
+      draft: true,
+      ...as('editor'),
+    })
+    expect(preview.tagline).toBe('Unpublished change')
   })
 
   it('blocks support from editing content', async () => {
