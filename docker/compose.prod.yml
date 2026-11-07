@@ -6,7 +6,19 @@
 #   staging.env     the staging app's environment (test keys; STAGING_BASIC_AUTH=1)
 # Caddy runs in its own project (docker/edge) and reaches the apps over the edge networks below.
 # See docs/runbooks/server.md.
+#
+# Every service has a memory, CPU and OOM limit, because the server is shared: a leak or a runaway
+# dies inside its own cgroup. mem_limit is a hard cap; memswap_limit lets the web apps swap a little
+# and keeps databases and jobs off swap; cpus stays at 1.5 or less, so one runaway can't use the
+# whole CPU credit baseline; cpu_shares favour production; oom_score_adj says who the kernel kills
+# first (restore tests, staging, Umami, backups, then the production app, Postgres last). The limits
+# of every app on the server, plus 1.5 GiB for the host, stay under its memory.
 name: jainav
+
+# No Linux capabilities unless a service adds some back, and no way to gain privileges.
+x-hardened: &hardened
+  cap_drop: [ALL]
+  security_opt: ['no-new-privileges:true']
 
 x-app: &app
   restart: unless-stopped
@@ -21,28 +33,61 @@ x-app: &app
 
 services:
   app:
-    <<: *app
+    <<: [*app, *hardened]
     image: ${APP_IMAGE:?set APP_IMAGE in images.env}
     env_file: production.env
+    environment:
+      # The V8 heap stays at about 65% of mem_limit, so Node's own out-of-memory error comes
+      # before the cgroup's kill.
+      NODE_OPTIONS: --max-old-space-size=1024
     networks:
       default:
       edge-jainav:
         aliases: [jainav-app]
+    mem_limit: 1536m
+    memswap_limit: 1792m
+    mem_reservation: 768m
+    cpus: 1.5
+    cpu_shares: 1024
+    oom_score_adj: -300
+    pids_limit: 512
 
   app-staging:
-    <<: *app
+    <<: [*app, *hardened]
     image: ${STAGING_IMAGE:?set STAGING_IMAGE in images.env}
     env_file: staging.env
+    environment:
+      NODE_OPTIONS: --max-old-space-size=640
     # Staging has a network of its own, shared with Postgres only: it can't reach production's
     # containers.
     networks:
       staging:
       edge-jainav-staging:
         aliases: [jainav-app-staging]
+    mem_limit: 1024m
+    memswap_limit: 1280m
+    cpus: 1.0
+    cpu_shares: 256
+    oom_score_adj: 500
+    pids_limit: 512
 
   postgres:
+    <<: *hardened
     image: postgres:17-alpine
     restart: unless-stopped
+    # The entrypoint starts as root, fixes the data directory's owner and drops to postgres.
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
+    # Sized for the 1 GiB limit: shared_buffers is a quarter of it.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - max_connections=50
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
       # Read once by postgres/roles.sh when the volume is empty.
@@ -59,9 +104,17 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    mem_limit: 1024m
+    memswap_limit: 1024m
+    mem_reservation: 512m
+    cpus: 1.0
+    cpu_shares: 1024
+    oom_score_adj: -900
+    pids_limit: 256
     logging: *logging
 
   umami:
+    <<: *hardened
     image: ghcr.io/umami-software/umami:3.4.1
     restart: unless-stopped
     depends_on:
@@ -73,15 +126,36 @@ services:
       DISABLE_TELEMETRY: '1'
       # Caddy sets X-Real-IP to the visitor's address and nothing else does.
       CLIENT_IP_HEADER: x-real-ip
+      NODE_OPTIONS: --max-old-space-size=320
     networks:
       default:
       edge-jainav:
         aliases: [jainav-umami]
+    # The image has none: without one, a hung Umami looks fine. Node, because it is there.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/heartbeat').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    mem_limit: 512m
+    memswap_limit: 640m
+    cpus: 0.5
+    cpu_shares: 256
+    oom_score_adj: 300
+    pids_limit: 256
     logging: *logging
 
   backup:
+    <<: *hardened
     build: ./backup
     restart: unless-stopped
+    # crond changes user for each job, even root's.
+    cap_add: [SETUID, SETGID]
     depends_on:
       postgres:
         condition: service_healthy
@@ -103,16 +177,35 @@ services:
       RCLONE_CONFIG_BACKUPS_NO_CHECK_BUCKET: 'true'
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+    mem_limit: 384m
+    memswap_limit: 384m
+    cpus: 0.5
+    cpu_shares: 256
+    oom_score_adj: 200
+    pids_limit: 128
     logging: *logging
 
   # Monthly restore test (docs/runbooks/backups.md): restores the newest dump into a throwaway
   # Postgres that keeps its data in memory, checks it, and is removed afterwards.
   restore-db:
+    <<: *hardened
     image: postgres:17-alpine
     profiles: [restore-test]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
+    # Nothing here has to survive a crash, so no fsync and a small WAL. The 1 GiB of memory the
+    # data directory may use counts against mem_limit.
+    command:
+      - postgres
+      - -c
+      - fsync=off
+      - -c
+      - full_page_writes=off
+      - -c
+      - max_wal_size=64MB
     environment:
       POSTGRES_PASSWORD: restore-test
-    tmpfs: /var/lib/postgresql/data
+    tmpfs:
+      - /var/lib/postgresql/data:size=1g
     # It holds a decrypted copy of production: reachable from restore-test only.
     networks: [restore]
     healthcheck:
@@ -120,8 +213,15 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+    mem_limit: 1536m
+    memswap_limit: 1536m
+    cpus: 1.0
+    cpu_shares: 256
+    oom_score_adj: 600
+    pids_limit: 256
 
   restore-test:
+    <<: *hardened
     build: ./backup
     profiles: [restore-test]
     depends_on:
@@ -142,6 +242,12 @@ services:
       RCLONE_CONFIG_BACKUPS_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:?}
       RCLONE_CONFIG_BACKUPS_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:?}
       RCLONE_CONFIG_BACKUPS_NO_CHECK_BUCKET: 'true'
+    mem_limit: 384m
+    memswap_limit: 384m
+    cpus: 0.5
+    cpu_shares: 256
+    oom_score_adj: 600
+    pids_limit: 256
 
 networks:
   # Caddy's way in, one network per environment. The admin creates them as internal networks
