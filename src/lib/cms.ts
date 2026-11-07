@@ -54,7 +54,9 @@ export async function read<T>(
   const exec = async () => run(await getClient(), viewer)
   // Development renders every request anyway, and seeds and scripts can't expire tags.
   if (viewer.draft || process.env.NODE_ENV === 'development') return exec()
-  return unstable_cache(exec, ['cms', locale, ...key.map(String)], {
+  // Vercel's cache outlives a deployment, and the next one's code may read a different shape.
+  const deployment = process.env.VERCEL_DEPLOYMENT_ID ?? ''
+  return unstable_cache(exec, ['cms', deployment, locale, ...key.map(String)], {
     tags,
     revalidate: opts.revalidate,
   })()

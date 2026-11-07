@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["bom1"],
+  "buildCommand": "SKIP_DB_AT_BUILD=1 pnpm build && { [ -z \"$DATABASE_MIGRATE_URL\" ] || DATABASE_URL=\"$DATABASE_MIGRATE_URL\" pnpm payload migrate; }",
+  "crons": [{ "path": "/api/v1/cron", "schedule": "*/5 * * * *" }],
+  "git": { "deploymentEnabled": { "**": false, "preview/**": true } }
+}

@@ -54,8 +54,10 @@ const RULES = {
 export type Rule = keyof typeof RULES
 
 /**
- * The visitor's IP. Production sits behind Cloudflare and its origin only accepts Cloudflare's
- * ranges, so CF-Connecting-IP is trustworthy there; the fallbacks are for local runs.
+ * The visitor's IP. Production sits behind Cloudflare and its origin only accepts requests that
+ * come through Cloudflare, so CF-Connecting-IP is trustworthy there; the fallbacks are for local
+ * runs. On Vercel that takes a firewall rule refusing direct requests, before any deployment there
+ * is public.
  */
 export const clientIp = (headers: Headers) =>
   headers.get('cf-connecting-ip') ||
@@ -84,9 +86,14 @@ async function createLimiters() {
   await pool.query(
     'CREATE TABLE IF NOT EXISTS rate_limit.hits (key varchar(255) PRIMARY KEY, points integer NOT NULL DEFAULT 0, expire bigint)',
   )
+  // The limiter names its statements, which Supabase's transaction pooler doesn't support.
+  const unnamed = {
+    query: ({ text, values }: { text: string; values?: unknown[] }) => pool.query(text, values),
+  }
   const limiter = (rule: Rule) =>
     new RateLimiterPostgres({
-      storeClient: pool,
+      storeClient: unnamed,
+      storeType: 'pool',
       schemaName: 'rate_limit',
       tableName: 'hits',
       tableCreated: true,

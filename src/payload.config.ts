@@ -51,13 +51,13 @@ import { revalidateCollection } from './hooks/revalidate'
 import { jobs } from './jobs'
 import { outboxAdapter } from './lib/outbox'
 import { docPaths, publicPath, type RoutedCollection } from './lib/routes'
+import { SITE_URL } from './lib/seo'
 import { migrations } from './migrations'
 import { auditPlugin } from './plugins/audit'
 import { defaultLocaleRequiredPlugin } from './plugins/defaultLocaleRequired'
 import { liveDocPlugin } from './plugins/liveDoc'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
 const SEO_COLLECTIONS = [
   'pages',
@@ -140,6 +140,8 @@ const publicFileURL =
     `${base ?? ''}/${[prefix, encodeURIComponent(filename)].filter(Boolean).join('/')}`
 
 const INSTALLER_MAX_BYTES = 512 * 1024 * 1024
+
+const onVercel = Boolean(process.env.VERCEL)
 
 export default buildConfig({
   serverURL: SITE_URL,
@@ -256,8 +258,20 @@ export default buildConfig({
   db: postgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URL || '',
+      // Encrypted and checked against Supabase's own CA. On Vercel, no CA means no connection. An
+      // sslmode in the URL would replace this with a check against the system's CAs.
+      ...(process.env.DATABASE_CA || onVercel
+        ? { ssl: { ca: process.env.DATABASE_CA?.replace(/\\n/g, '\n') } }
+        : {}),
+      // pg's default of 10 per function instance, in front of Supabase's pooler. Supabase advises 1,
+      // but Payload holds one client for good and concurrent transactions need more. Vercel advises
+      // a short idle timeout. A full pool fails a request after 10 s rather than hanging it for the
+      // function's 5 minutes.
+      // ponytail: sockets of a sleeping instance stay open; add attachDatabasePool if they add up.
+      ...(onVercel ? { idleTimeoutMillis: 5_000, connectionTimeoutMillis: 10_000 } : {}),
     },
-    prodMigrations: migrations,
+    // Instances could race on a new migration at cold start, so Vercel's build applies them.
+    prodMigrations: onVercel ? undefined : migrations,
   }),
   // Installers are tens of MB: stream uploads to disk instead of buffering them in memory.
   upload: {
