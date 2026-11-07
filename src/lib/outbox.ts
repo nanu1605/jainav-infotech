@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import type { EmailAdapter } from 'payload'
@@ -43,10 +43,9 @@ export const outboxAdapter: EmailAdapter = () => ({
       }
     })
     await mkdir(OUTBOX_DIR, { recursive: true })
-    const file = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`
-    await writeFile(
-      path.join(OUTBOX_DIR, file),
-      JSON.stringify({ ...message, attachments }, null, 2),
-    )
+    const file = path.join(OUTBOX_DIR, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
+    // Written under a temporary name, then renamed: a reader never sees half an email.
+    await writeFile(`${file}.tmp`, JSON.stringify({ ...message, attachments }, null, 2))
+    await rename(`${file}.tmp`, `${file}.json`)
   },
 })

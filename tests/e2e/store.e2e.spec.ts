@@ -7,6 +7,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 
+import { settle } from './helpers/settle'
 import { address, fillCheckout, mailTo, newPage, pay, signIn, useOwnIp } from './helpers/store'
 
 test.skip(!!process.env.E2E_BASE_URL, 'The stand-in gateway exists only in development')
@@ -132,6 +133,7 @@ test('store pages render in Hindi and pass axe', async ({ page }) => {
     await expect(page.locator('html')).toHaveAttribute('lang', url.startsWith('/hi') ? 'hi' : 'en')
     await expect(page.locator('h1')).toHaveCount(1)
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/)
+    await settle(page)
     const axe = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
       .exclude('nav li > span[aria-hidden="true"][tabindex="0"]:empty')
