@@ -1,0 +1,1227 @@
+#!/bin/bash
+# Host checks for the shared server, run as root (docs/runbooks/monitoring.md):
+#   hostwatch run           every 5 minutes (hostwatch.timer): checks, Telegram alerts, heartbeat
+#   hostwatch check         the same checks printed for the admin: no alerts, nothing saved
+#   hostwatch daily         once a day (hostwatch-daily.timer): reports and housekeeping
+#   hostwatch alert <text>  one Telegram line prefixed [server]; other scripts call it best effort
+# A problem is sent once, repeated every 6 h while it lasts and followed by a "resolved" line.
+# State lives in /var/lib/hostwatch; the bot token, chat id and heartbeat URL come from
+# /etc/hostwatch.env. Nothing here prints or logs them, a container's environment, or the adapted
+# Caddy config. Besides Ubuntu's own tools it needs docker, jq and curl.
+set -euo pipefail
+umask 022
+PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
+LC_ALL=C; export LC_ALL
+
+ENV_FILE=/etc/hostwatch.env
+APPS_DIR=/etc/apps
+STATE_DIR=/var/lib/hostwatch            # alerts, streaks and cursors: root only
+FLAG_DIR=/run/hostwatch
+THROTTLED_FLAG=$FLAG_DIR/throttled      # app-deploy and the restore test wait while it exists
+LOCK_DIR=/run/lock
+PROC_STAT=/proc/stat
+PROC_MEMINFO=/proc/meminfo
+CGROUP_DIR=/sys/fs/cgroup
+JOURNAL_DIR=/var/log/journal
+REBOOT_FILE=/var/run/reboot-required
+SSHD_DIR=/etc/ssh/sshd_config.d
+BOOTSTRAP_SSH=/etc/cf-ranges/bootstrap-ssh
+CF_RANGES=/usr/local/sbin/cf-ranges
+APP_APPLY=/usr/local/sbin/app-apply
+CADDY_CONTAINER=edge-caddy-1
+TUNNEL_METRICS=http://127.0.0.1:20241/metrics
+EDGE_DIR=/srv/edge                      # only if /etc/apps/edge.conf can't say
+
+# Thresholds and budgets (design §6, §7, §10).
+REPEAT_SECS=21600                       # a problem that lasts is sent again every 6 h
+DISK_WARN=80 DISK_CRIT=90               # percent of / used
+MEM_LOW_MIB=1536 MEM_LOW_RUNS=3         # MemAvailable under 1.5 GiB for 3 runs in a row
+SWAP_MAX_MIB=2048
+CPU_BUSY_PCT=55 CPU_BUSY_RUNS=6         # of all 4 vCPUs; 6 runs of 5 minutes = 30 minutes
+STEAL_HIGH_PCT=10 STEAL_HIGH_RUNS=2     # steal above this for 2 runs = throttled
+STEAL_LOW_PCT=5 STEAL_LOW_RUNS=6        # ...until it stays under this for 30 minutes
+TUNNEL_RUNS=2                           # runs with no tunnel connection before an alert
+HOST_RESERVE_MIB=1536                   # limits plus 1.5 GiB stay below MemTotal
+PEAK_PCT=80                             # memory.peak over this share of its limit is reported
+LINE_BUDGETS='jainav=30000 menumesh=45000 edge=10000'   # journal lines a day; edge takes the host's
+JOURNAL_CAP_DEFAULT=24G RETENTION_DEFAULT_DAYS=187      # used when journald's config can't be read
+JOURNAL_FULL_PCT=95                     # the journal is full: size now decides how long lines stay
+JOURNAL_PROJECTION_PCT=90               # warn when the 187-day projection reaches this much of the cap
+LAYER_WARN_MB=1024                      # a writable layer this large (the Next image cache is capped at 500)
+CERT_WARN_DAYS=60 CERT_CRIT_DAYS=14
+CLOUDFLARED_WARN_DAYS=300 CLOUDFLARED_CRIT_DAYS=350     # Cloudflare supports versions under a year old
+TG_MAX_FAILS=2                          # give up on Telegram for this run after this many failures
+
+RE_TOKEN='^[0-9]+:[A-Za-z0-9_-]+$'
+RE_CHAT='^(-?[0-9]+|@[A-Za-z0-9_]+)$'
+RE_URL='^https?://[^[:space:]"\\]+$'
+
+# docker inspect's JSON holds every container's environment and command line, secrets included. It
+# only ever goes through these jq filters, and jq's own errors are dropped because they can quote
+# what it read. One line per container, fields split by |: id, name, restarting, restart count,
+# health (none without a healthcheck), memory limit, NanoCpus, CpuQuota, compose project, compose
+# service, the published ports (port=hostports;) and the networks (name=aliases,;).
+INSPECT_JQ='.[] | [
+  .Id,
+  (.Name | ltrimstr("/")),
+  (.State.Restarting | tostring),
+  (.RestartCount | tostring),
+  (.State.Health.Status // "none"),
+  (.HostConfig.Memory | tostring),
+  (.HostConfig.NanoCpus | tostring),
+  (.HostConfig.CpuQuota | tostring),
+  (.Config.Labels["com.docker.compose.project"] // ""),
+  (.Config.Labels["com.docker.compose.service"] // ""),
+  ([(.NetworkSettings.Ports // {}) | to_entries[] | select(.value != null)
+    | .key + "=" + ([.value[].HostPort] | join(",")) + ";"] | join("")),
+  ([(.NetworkSettings.Networks // {}) | to_entries[]
+    | .key + "=" + ([(.value.Aliases // [])[], ""] | join(",")) + ";"] | join(""))
+] | join("|")'
+# One network: whether it is internal, and the compose project that made it (none for the admin's).
+NETWORK_JQ='.[0] | [(.Internal | tostring), (.Labels["com.docker.compose.project"] // "")] | join("|")'
+
+MODE=
+PROBLEMS=0
+CLEAR_RUNS=2                            # clean runs in a row before "resolved" (the daily run uses 1)
+TG_FAILS=0
+BOT_TOKEN= CHAT_ID= HEARTBEAT_URL=
+CONTAINERS=
+CPU_BUSY=0 CPU_STEAL=0
+a_since= a_last= a_level=0 a_items= a_ok=0 a_text=
+DIGEST=()
+
+# ---------------------------------------------------------------------------------------------
+# Helpers
+
+# Under "alert" there is no terminal to talk to: app-deploy's output may reach a public CI log.
+say() {
+  if [ "$MODE" = alert ]; then logger -t hostwatch -- "$*"; else printf '%s\n' "$*"; fi
+}
+die() { printf 'hostwatch: %s\n' "$*" >&2; exit 1; }
+usage() {
+  printf 'usage: hostwatch run | check | daily | alert <text>\n' >&2
+  exit 2
+}
+is_num() { case $1 in '' | *[!0-9]*) return 1 ;; esac; }
+dock() { timeout 60 docker "$@"; }
+# A check that dies on something unforeseen must not take the others down with it.
+failed() { say "hostwatch: $1 failed unexpectedly (exit $?)"; }
+
+fmt_dur() {  # seconds -> "2 d 3 h", "4 h 5 min", "12 min"
+  local s=$1
+  if [ "$s" -ge 86400 ]; then
+    printf '%d d %d h' $((s / 86400)) $((s % 86400 / 3600))
+  elif [ "$s" -ge 3600 ]; then
+    printf '%d h %d min' $((s / 3600)) $((s % 3600 / 60))
+  else
+    printf '%d min' $((s / 60))
+  fi
+}
+gib() { awk -v b="$1" 'BEGIN { printf "%.1f GiB", b / 1073741824 }'; }
+first_lines() { printf '%s\n' "$1" | sed -n '1,3p' | tr '\n' ' ' | sed 's/ *$//' | cut -c1-300; }
+
+# The apps' settings are read in a subshell: every conf defines the same variables and env_config().
+conf_get() {  # app VARIABLE -> its value, or nothing
+  local app=$1 var=$2
+  (
+    set +u
+    # shellcheck source=/dev/null
+    . "$APPS_DIR/$app.conf" 2>/dev/null
+    printf '%s' "${!var-}"
+  )
+}
+apps() {  # the configured apps, one per line; edge is the proxy, not an app
+  local f n
+  for f in "$APPS_DIR"/*.conf; do
+    [ -e "$f" ] || continue
+    n=${f##*/}
+    n=${n%.conf}
+    case $n in '' | edge | *[!a-z0-9]*) continue ;; esac
+    printf '%s\n' "$n"
+  done
+}
+
+# /etc/hostwatch.env is read, not sourced: a heartbeat URL has & and ? in it.
+load_env() {
+  local line key val
+  BOT_TOKEN= CHAT_ID= HEARTBEAT_URL=
+  [ -r "$ENV_FILE" ] || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    line=${line%$'\r'}
+    case $line in '' | '#'*) continue ;; esac
+    key=${line%%=*}
+    val=${line#*=}
+    key=${key#export }
+    key=${key//[[:space:]]/}
+    case $val in
+      \"*\") val=${val#\"}; val=${val%\"} ;;
+      \'*\') val=${val#\'}; val=${val%\'} ;;
+    esac
+    case $key in
+      BOT_TOKEN) BOT_TOKEN=$val ;;
+      CHAT_ID) CHAT_ID=$val ;;
+      HEARTBEAT_URL) HEARTBEAT_URL=$val ;;
+    esac
+  done <"$ENV_FILE"
+  if [ -n "$BOT_TOKEN" ] && ! [[ $BOT_TOKEN =~ $RE_TOKEN ]]; then
+    say "hostwatch: BOT_TOKEN in $ENV_FILE is not a bot token; Telegram is off"
+    BOT_TOKEN=
+  fi
+  if [ -n "$CHAT_ID" ] && ! [[ $CHAT_ID =~ $RE_CHAT ]]; then
+    say "hostwatch: CHAT_ID in $ENV_FILE is not a chat id; Telegram is off"
+    CHAT_ID=
+  fi
+  if [ -n "$HEARTBEAT_URL" ] && ! [[ $HEARTBEAT_URL =~ $RE_URL ]]; then
+    say "hostwatch: HEARTBEAT_URL in $ENV_FILE is not a URL; no heartbeat"
+    HEARTBEAT_URL=
+  fi
+}
+
+# ---------------------------------------------------------------------------------------------
+# Telegram and the heartbeat. curl reads the URL (it holds the token) from stdin, so it never
+# shows in a process list, and its own error text is dropped.
+
+tg_send() {  # text [silent] -> 0 sent, 1 failed, 3 Telegram not set up
+  local text=$1 silent=${2-} rc=0
+  local -a extra=()
+  if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then return 3; fi
+  if [ "$TG_FAILS" -ge "$TG_MAX_FAILS" ]; then return 1; fi
+  if [ -n "$silent" ]; then extra=(--data-urlencode 'disable_notification=true'); fi
+  text=$(printf '%s' "$text" | tr -cd '\11\12\40-\176' | cut -c1-3500)
+  printf 'url = "https://api.telegram.org/bot%s/sendMessage"\n' "$BOT_TOKEN" |
+    curl -fsS --max-time 15 -o /dev/null --config - \
+      --data-urlencode "chat_id=$CHAT_ID" --data-urlencode "text=[server] $text" \
+      "${extra[@]}" 2>/dev/null || rc=$?
+  if [ "$rc" -eq 0 ]; then return 0; fi
+  TG_FAILS=$((TG_FAILS + 1))
+  say "hostwatch: Telegram did not take the message (curl exit $rc)"
+  return 1
+}
+
+# Without a bot the journal line is all there is, and that counts as delivered.
+notify() {  # text [silent]
+  local rc=0
+  say "alert: $1"
+  tg_send "$1" "${2-}" || rc=$?
+  if [ "$rc" -eq 3 ]; then rc=0; fi
+  return "$rc"
+}
+
+heartbeat() {
+  local rc=0
+  if [ -z "$HEARTBEAT_URL" ]; then return 0; fi
+  printf 'url = "%s"\n' "$HEARTBEAT_URL" |
+    curl -fsS --max-time 10 -o /dev/null --config - 2>/dev/null || rc=$?
+  if [ "$rc" -ne 0 ]; then say "hostwatch: heartbeat not delivered (curl exit $rc)"; fi
+}
+
+# ---------------------------------------------------------------------------------------------
+# Alert state, one small file per check: when it started, when it was last sent, its worst level,
+# the offenders seen, how many clean runs have followed.
+
+state_init() { install -d -m 0700 "$STATE_DIR" "$STATE_DIR/alerts" "$STATE_DIR/streaks"; }
+
+load_alert() {
+  local f=$STATE_DIR/alerts/$1 k v
+  a_since= a_last= a_level=0 a_items= a_ok=0 a_text=
+  [ -r "$f" ] || return 0
+  while IFS='=' read -r k v; do
+    case $k in
+      since) a_since=$v ;;
+      last) a_last=$v ;;
+      level) a_level=$v ;;
+      items) a_items=$v ;;
+      ok) a_ok=$v ;;
+      text) a_text=$v ;;
+    esac
+  done <"$f"
+  is_num "$a_since" || a_since=
+  is_num "$a_last" || a_last=0
+  is_num "$a_level" || a_level=0
+  is_num "$a_ok" || a_ok=0
+}
+
+save_alert() {  # key since last level items ok text
+  local f=$STATE_DIR/alerts/$1
+  printf 'since=%s\nlast=%s\nlevel=%s\nitems=%s\nok=%s\ntext=%s\n' "$2" "$3" "$4" "$5" "$6" "$7" >"$f.tmp"
+  mv -f "$f.tmp" "$f"
+}
+
+# Every check ends in judge. level 0 is fine, 1 a warning, 2 critical; text starts with the
+# check's name and a colon; items are the offenders by name (a new one is sent at once, an old one
+# only when the 6 h are up). An episode keeps its worst level and its offenders until it has been
+# clean for CLEAR_RUNS runs. "check" only prints.
+judge() {  # key level text [items]
+  local key=$1 level=$2 text=$3 items=${4-} now shown msg item tag send=0 fresh=0
+  local -a list=()
+  text=${text//$'\n'/ }
+  if [ "$MODE" = check ]; then
+    case $level in 0) tag=ok ;; 1) tag=WARN ;; *) tag=CRIT ;; esac
+    printf '%-5s %s\n' "$tag" "$text"
+    if [ "$level" -gt 0 ]; then PROBLEMS=$((PROBLEMS + 1)); fi
+    return 0
+  fi
+  now=$(date +%s)
+  load_alert "$key"
+  if [ "$level" -eq 0 ]; then
+    if [ -z "$a_since" ]; then return 0; fi
+    a_ok=$((a_ok + 1))
+    if [ "$a_ok" -lt "$CLEAR_RUNS" ]; then
+      save_alert "$key" "$a_since" "$a_last" "$a_level" "$a_items" "$a_ok" "$a_text"
+    elif notify "resolved: ${a_text%%:*} (clear after $(fmt_dur $((now - a_since))))" silent; then
+      rm -f "$STATE_DIR/alerts/$key"
+    fi
+    return 0
+  fi
+  PROBLEMS=$((PROBLEMS + 1))
+  read -ra list <<<"$items"
+  for item in "${list[@]}"; do
+    case " $a_items " in *" $item "*) ;; *) fresh=1; a_items+=" $item" ;; esac
+  done
+  if [ "$level" -lt "$a_level" ]; then level=$a_level; fi
+  shown=$text
+  if [ "$level" -ge 2 ]; then shown="CRITICAL $text"; fi
+  msg=$shown
+  if [ -z "$a_since" ]; then
+    a_since=$now
+    send=1
+  elif [ "$level" -gt "$a_level" ] || [ "$fresh" -eq 1 ]; then
+    send=1
+  elif [ $((now - a_last)) -ge "$REPEAT_SECS" ]; then
+    msg="still: $shown (for $(fmt_dur $((now - a_since))))"
+    send=1
+  fi
+  if [ "$send" -eq 0 ]; then
+    save_alert "$key" "$a_since" "$a_last" "$level" "$a_items" 0 "$text"
+  elif notify "$msg"; then
+    save_alert "$key" "$a_since" "$now" "$level" "$a_items" 0 "$text"
+  fi
+}
+
+# Consecutive bad runs. "check" has no history, so one bad reading is enough.
+streak() {  # key bad(0|1) runs -> true when it has lasted that many runs
+  local f=$STATE_DIR/streaks/$1 n=0
+  if [ "$MODE" = check ]; then [ "$2" -eq 1 ]; return; fi
+  if [ -r "$f" ]; then n=$(<"$f"); fi
+  is_num "$n" || n=0
+  if [ "$2" -eq 1 ]; then n=$((n + 1)); else n=0; fi
+  printf '%s\n' "$n" >"$f"
+  [ "$n" -ge "$3" ]
+}
+
+# ---------------------------------------------------------------------------------------------
+# Containers
+
+docker_up() { timeout 20 docker info >/dev/null 2>&1; }
+
+load_containers() {
+  local ids n
+  local -a list=()
+  CONTAINERS=
+  ids=$(dock ps -q) || return 1
+  if [ -z "$ids" ]; then return 0; fi
+  mapfile -t list <<<"$ids"
+  CONTAINERS=$(dock inspect --type container "${list[@]}" | jq -r "$INSPECT_JQ" 2>/dev/null) || { CONTAINERS=; return 1; }
+  # One line each, or the filter does not fit what this Docker prints: say so, don't read zeros.
+  n=$(printf '%s\n' "$CONTAINERS" | grep -c .) || n=0
+  if [ "$n" -ne "${#list[@]}" ]; then CONTAINERS=; return 1; fi
+}
+
+container_name() {  # full id -> name, from the containers read this run
+  local n
+  n=$(printf '%s\n' "$CONTAINERS" | awk -F'|' -v id="$1" '$1 == id { sub(/^\//, "", $2); print $2; exit }')
+  printf '%s' "${n:-${1:0:12}}"
+}
+
+# ---------------------------------------------------------------------------------------------
+# Every 5 minutes
+
+check_disk() {
+  local pct level=0
+  pct=$(df --output=pcent / 2>/dev/null | awk 'NR == 2 { gsub(/[ %]/, ""); print }') || pct=
+  if ! is_num "$pct"; then judge disk 1 "disk: could not read how full / is"; return 0; fi
+  if [ "$pct" -ge "$DISK_WARN" ]; then level=1; fi
+  if [ "$pct" -ge "$DISK_CRIT" ]; then level=2; fi
+  judge disk "$level" "disk: / is ${pct}% used (warning at ${DISK_WARN}%, critical at ${DISK_CRIT}%)"
+}
+
+meminfo_mib() { awk -v k="$1:" '$1 == k { print int($2 / 1024); exit }' "$PROC_MEMINFO"; }
+
+check_memory() {
+  local avail swap_total swap_free used low=0 level=0
+  avail=$(meminfo_mib MemAvailable) || avail=
+  swap_total=$(meminfo_mib SwapTotal) || swap_total=
+  swap_free=$(meminfo_mib SwapFree) || swap_free=
+  if ! is_num "$avail" || ! is_num "$swap_total" || ! is_num "$swap_free"; then
+    judge memory 1 "memory: could not read $PROC_MEMINFO"
+    return 0
+  fi
+  if [ "$avail" -lt "$MEM_LOW_MIB" ]; then low=1; fi
+  if streak memory "$low" "$MEM_LOW_RUNS"; then level=1; fi
+  if [ "$level" -eq 0 ]; then
+    judge memory 0 "memory: MemAvailable $(gib $((avail * 1048576))) (alert under $(gib $((MEM_LOW_MIB * 1048576))) for $MEM_LOW_RUNS runs in a row)"
+  else
+    judge memory 1 "memory: MemAvailable $(gib $((avail * 1048576))), under $(gib $((MEM_LOW_MIB * 1048576))) for $MEM_LOW_RUNS runs in a row"
+  fi
+  used=$((swap_total - swap_free))
+  level=0
+  if [ "$used" -gt "$SWAP_MAX_MIB" ]; then level=1; fi
+  judge swap "$level" "swap: $(gib $((used * 1048576))) in use (alert above $(gib $((SWAP_MAX_MIB * 1048576))))"
+}
+
+# Kernel OOM kills since the last run, named by container. They are events, not a state: each batch
+# is sent once, with no "resolved". The journal cursor keeps a kill from being counted twice.
+oom_kills() { sed -n 's/^oom-kill:.*constraint=\([A-Z_]*\),.*task_memcg=\([^,]*\),task=\([^,]*\),.*$/\1 \2 \3/p'; }
+
+oom_last_cursor() { sed -n 's/^-- cursor: //p' | tail -n 1; }
+oom_save() { if [ -n "$1" ]; then printf '%s\n' "$1" >"$STATE_DIR/oom-cursor"; fi; }
+
+check_oom() {
+  local out cursor= next= constraint memcg task id name why summary= key
+  local -A seen=()
+  if [ "$MODE" = check ]; then
+    out=$(timeout 60 journalctl --quiet --no-pager -k -o cat --since '-1 hour' 2>/dev/null) || out=
+  else
+    if [ -r "$STATE_DIR/oom-cursor" ]; then cursor=$(<"$STATE_DIR/oom-cursor"); fi
+    if [ -z "$cursor" ]; then  # first run: note where the kernel log ends, report nothing older
+      next=$(timeout 60 journalctl --no-pager -k -n 1 --show-cursor -o cat 2>/dev/null | oom_last_cursor) || next=
+      oom_save "$next"
+      return 0
+    fi
+    if ! out=$(timeout 60 journalctl --no-pager -k --after-cursor="$cursor" --show-cursor -o cat 2>/dev/null); then
+      say "hostwatch: could not read the kernel log after the saved cursor; starting again from its end"
+      rm -f "$STATE_DIR/oom-cursor"
+      return 0
+    fi
+    next=$(printf '%s\n' "$out" | oom_last_cursor)
+  fi
+  while read -r constraint memcg task; do
+    id=$(printf '%s' "$memcg" | grep -oE '[0-9a-f]{64}' | sed -n '1p') || id=
+    if [ -n "$id" ]; then name=$(container_name "$id"); else name="host:${memcg##*/}"; fi
+    name=${name//[^A-Za-z0-9_.:-]/_}
+    task=${task//[^A-Za-z0-9_.:-]/_}
+    case $constraint in
+      CONSTRAINT_MEMCG) why="hit its memory limit" ;;
+      CONSTRAINT_NONE) why="the host ran out of memory" ;;
+      *) why=${constraint//[^A-Za-z0-9_]/_} ;;
+    esac
+    key="$name ($task, $why)"
+    seen[$key]=$((${seen[$key]-0} + 1))
+  done < <(printf '%s\n' "$out" | oom_kills)
+  for key in "${!seen[@]}"; do
+    summary+="${summary:+; }$key"
+    if [ "${seen[$key]}" -gt 1 ]; then summary+=" x${seen[$key]}"; fi
+  done
+  if [ "$MODE" = check ]; then
+    if [ -z "$summary" ]; then judge oom 0 "oom: no kernel OOM kill in the last hour"; else judge oom 2 "oom: kernel killed $summary"; fi
+    return 0
+  fi
+  if [ -z "$summary" ]; then
+    oom_save "$next"
+    return 0
+  fi
+  # The cursor moves only once the alert is out, so a failed send is tried again next run.
+  PROBLEMS=$((PROBLEMS + 1))
+  if notify "oom: kernel killed $summary"; then oom_save "$next"; fi
+}
+
+# Busy and steal as whole percent of all vCPUs since the last sample (run), or over 2 seconds (check).
+cpu_sample() {  # -> busy total steal, in jiffies since boot
+  awk '$1 == "cpu" { busy = $2 + $3 + $4 + $7 + $8; print busy, busy + $5 + $6 + $9, $9 + 0; exit }' "$PROC_STAT"
+}
+
+cpu_rates() {
+  local now b t s pe= pb= pt= ps= dt
+  now=$(date +%s)
+  read -r b t s <<<"$(cpu_sample)" || return 1
+  if ! is_num "$b" || ! is_num "$t" || ! is_num "$s"; then return 1; fi
+  if [ "$MODE" = check ]; then
+    pe=$now pb=$b pt=$t ps=$s
+    sleep 2
+    now=$(date +%s)
+    read -r b t s <<<"$(cpu_sample)" || return 1
+  else
+    if [ -r "$STATE_DIR/cpu" ]; then read -r pe pb pt ps <"$STATE_DIR/cpu" || true; fi
+    printf '%s %s %s %s\n' "$now" "$b" "$t" "$s" >"$STATE_DIR/cpu"
+  fi
+  if ! is_num "$pe" || ! is_num "$pb" || ! is_num "$pt" || ! is_num "$ps"; then return 1; fi
+  dt=$((t - pt))
+  # No rate after a reboot (the counters restart) or a long gap.
+  if [ "$dt" -le 0 ] || [ "$b" -lt "$pb" ] || [ "$s" -lt "$ps" ] || [ $((now - pe)) -gt 900 ]; then return 1; fi
+  CPU_BUSY=$(((b - pb) * 100 / dt))
+  CPU_STEAL=$(((s - ps) * 100 / dt))
+}
+
+# run counts runs; check only has 2 seconds of samples, so it prints the reading and goes by what
+# run has counted so far.
+streak_saved() {  # key runs -> true when run's count for it has reached that many
+  local n=0
+  if [ -r "$STATE_DIR/streaks/$1" ]; then n=$(<"$STATE_DIR/streaks/$1"); fi
+  is_num "$n" || n=0
+  [ "$n" -ge "$2" ]
+}
+
+check_cpu() {
+  local level=0 busy=0 steal=0 calm=0 high_long=0 calm_long=0 throttled=0 text
+  if ! cpu_rates; then
+    # The first run, a reboot and a long gap have no rate; a check that took two samples must have one.
+    if [ "$MODE" = check ]; then judge cpu 1 "cpu: could not take two samples from $PROC_STAT"; fi
+    return 0
+  fi
+  if [ "$CPU_BUSY" -gt "$CPU_BUSY_PCT" ]; then busy=1; fi
+  if [ "$MODE" = check ]; then
+    if streak_saved cpu-busy "$CPU_BUSY_RUNS"; then level=1; fi
+  elif streak cpu-busy "$busy" "$CPU_BUSY_RUNS"; then
+    level=1
+  fi
+  if [ "$level" -eq 0 ]; then
+    text="cpu: busy ${CPU_BUSY}% of all vCPUs (alert above ${CPU_BUSY_PCT}% for 30 minutes)"
+  else
+    text="cpu: busy ${CPU_BUSY}% of all vCPUs, above ${CPU_BUSY_PCT}% for 30 minutes: CPU credits are burning (the plan sustains 60%)"
+  fi
+  judge cpu "$level" "$text"
+
+  # Steal is the hypervisor taking the CPU back. The flag is the state: it is set after two high
+  # runs and cleared after 30 minutes of calm.
+  if [ -e "$THROTTLED_FLAG" ]; then throttled=1; fi
+  if [ "$MODE" = run ]; then
+    if [ "$CPU_STEAL" -gt "$STEAL_HIGH_PCT" ]; then steal=1; fi
+    if [ "$CPU_STEAL" -lt "$STEAL_LOW_PCT" ]; then calm=1; fi
+    if streak steal-high "$steal" "$STEAL_HIGH_RUNS"; then high_long=1; fi
+    if streak steal-calm "$calm" "$STEAL_LOW_RUNS"; then calm_long=1; fi
+    if [ "$high_long" -eq 1 ] && [ "$throttled" -eq 0 ]; then
+      install -d -m 0755 "$FLAG_DIR"
+      printf '%s steal=%s%%\n' "$(date -u +%FT%TZ)" "$CPU_STEAL" >"$THROTTLED_FLAG"
+      throttled=1
+    elif [ "$calm_long" -eq 1 ] && [ "$throttled" -eq 1 ]; then
+      rm -f "$THROTTLED_FLAG"
+      throttled=0
+    fi
+  fi
+  if [ "$throttled" -eq 1 ]; then
+    judge throttled 2 "throttled: steal ${CPU_STEAL}%, so the server earns no CPU credits. Stop busy staging; staging deploys and restore tests wait, production deploys still run"
+  elif [ "$MODE" = check ] && [ "$CPU_STEAL" -gt "$STEAL_HIGH_PCT" ]; then
+    judge throttled 1 "throttled: steal ${CPU_STEAL}% right now; the flag is set after $STEAL_HIGH_RUNS runs above ${STEAL_HIGH_PCT}%"
+  else
+    judge throttled 0 "throttled: no (steal ${CPU_STEAL}%; over ${STEAL_HIGH_PCT}% for $STEAL_HIGH_RUNS runs sets it)"
+  fi
+}
+
+check_containers() {
+  local id name restarting restarts health unhealthy= looping= risen= saved=
+  local -A prev=()
+  if [ -r "$STATE_DIR/restarts" ]; then
+    while read -r id restarts; do prev[$id]=$restarts; done <"$STATE_DIR/restarts"
+  fi
+  while IFS='|' read -r id name restarting restarts health _; do
+    if [ -z "$id" ]; then continue; fi
+    name=${name#/}
+    if [ "$health" = unhealthy ]; then unhealthy+=" $name"; fi
+    if [ "$restarting" = true ]; then looping+=" $name"; fi
+    if is_num "$restarts" && is_num "${prev[$id]-}" && [ "$restarts" -gt "${prev[$id]}" ]; then
+      risen+=" $name"
+    fi
+    saved+="$id $restarts"$'\n'
+  done <<<"$CONTAINERS"
+  if [ "$MODE" = run ]; then printf '%s' "$saved" >"$STATE_DIR/restarts"; fi
+  if [ -n "$unhealthy" ]; then
+    judge unhealthy 2 "unhealthy:${unhealthy}" "$unhealthy"
+  else
+    judge unhealthy 0 "unhealthy: no container is unhealthy"
+  fi
+  if [ -n "$looping$risen" ]; then
+    judge restarts 2 "restarts: restarting or restarted since the last run:${looping}${risen}" "$looping$risen"
+  else
+    judge restarts 0 "restarts: no container restarted since the last run"
+  fi
+}
+
+check_tunnel() {
+  local state conns bad=0 level=0
+  state=$(systemctl is-active cloudflared 2>/dev/null) || true
+  if [ "$state" != active ]; then
+    streak tunnel 0 "$TUNNEL_RUNS" || true
+    judge tunnel 2 "tunnel: cloudflared is ${state:-not installed}"
+    return 0
+  fi
+  conns=$(curl -fsS --max-time 5 "$TUNNEL_METRICS" 2>/dev/null |
+    awk '$1 == "cloudflared_tunnel_ha_connections" { printf "%d", $2; exit }') || true
+  is_num "$conns" || conns=0
+  if [ "$conns" -lt 1 ]; then bad=1; fi
+  if streak tunnel "$bad" "$TUNNEL_RUNS"; then level=2; fi
+  if [ "$level" -eq 0 ]; then
+    judge tunnel 0 "tunnel: cloudflared is active with $conns connection(s)"
+  else
+    judge tunnel 2 "tunnel: cloudflared is active but holds no connection to Cloudflare for $TUNNEL_RUNS runs: no SSH, no deploys"
+  fi
+}
+
+# Invariants (design §10).
+
+check_limits() {
+  local name mem nano quota bad=
+  while IFS='|' read -r _ name _ _ _ mem nano quota _; do
+    if [ -z "$name" ]; then continue; fi
+    name=${name#/}
+    is_num "$mem" || mem=0
+    is_num "$nano" || nano=0
+    is_num "$quota" || quota=0
+    if [ "$mem" -eq 0 ]; then bad+=" $name:no-memory-limit"; fi
+    if [ "$nano" -eq 0 ] && [ "$quota" -eq 0 ]; then bad+=" $name:no-cpu-limit"; fi
+  done <<<"$CONTAINERS"
+  if [ -n "$bad" ]; then
+    judge limits 2 "limits: running without a limit:${bad}" "$bad"
+  else
+    judge limits 0 "limits: every running container has memory and CPU limits"
+  fi
+}
+
+check_ports() {
+  local name ports spec port hosts host bad=
+  local -a specs=() hostlist=()
+  while IFS='|' read -r _ name _ _ _ _ _ _ _ _ ports _; do
+    if [ -z "$ports" ]; then continue; fi
+    name=${name#/}
+    IFS=';' read -ra specs <<<"$ports"
+    for spec in "${specs[@]}"; do
+      port=${spec%%=*}
+      hosts=${spec#*=}
+      if [ "$name" != "$CADDY_CONTAINER" ] || [ "$port" != 443/tcp ]; then
+        bad+=" $name:$port"
+        continue
+      fi
+      IFS=',' read -ra hostlist <<<"$hosts"
+      for host in "${hostlist[@]}"; do
+        if [ "$host" != 443 ]; then bad+=" $name:$port->$host"; fi
+      done
+    done
+  done <<<"$CONTAINERS"
+  if [ -n "$bad" ]; then
+    judge ports 2 "ports: published beyond $CADDY_CONTAINER's 443/tcp:${bad}" "$bad"
+  else
+    judge ports 0 "ports: only $CADDY_CONTAINER publishes a port, 443/tcp"
+  fi
+}
+
+# TCP only. Loopback is fine, and so is Docker's own socket for the published 443 if it holds one.
+check_listeners() {
+  local out bad
+  out=$(ss -H -tlnp 2>/dev/null) || { judge listeners 1 "listeners: ss failed"; return 0; }
+  bad=$(printf '%s\n' "$out" | awk '
+    { n = split($4, a, ":"); port = a[n]; addr = substr($4, 1, length($4) - length(port) - 1) }
+    addr ~ /^127\./ || addr == "[::1]" || addr ~ /^\[::ffff:127\./ { next }
+    port == 443 && $0 ~ /"(dockerd|docker-proxy)"/ { next }
+    { print $4 }' | sort -u | tr '\n' ' ') || bad=
+  bad=${bad% }
+  if [ -n "$bad" ]; then
+    judge listeners 2 "listeners: TCP listening beyond loopback: $bad" "$bad"
+  else
+    judge listeners 0 "listeners: nothing listens on TCP beyond loopback"
+  fi
+}
+
+# cf-ranges verify covers the chains; the INPUT policies are read here as well, because a v6 hole
+# is the one a missing rule never shows (design §3.3).
+check_firewall() {
+  local out pol bad= items=
+  if ! out=$(timeout 60 "$CF_RANGES" verify 2>&1); then
+    bad+="cf-ranges verify failed ($(first_lines "$out")); "
+    items+=" cf-ranges-verify"
+  fi
+  pol=$(iptables -S INPUT 2>/dev/null) || pol=
+  if [ "${pol%%$'\n'*}" != "-P INPUT DROP" ]; then
+    bad+="IPv4 INPUT policy is not DROP; "
+    items+=" ipv4-policy"
+  fi
+  pol=$(ip6tables -S INPUT 2>/dev/null) || pol=
+  if [ "${pol%%$'\n'*}" != "-P INPUT DROP" ]; then
+    bad+="IPv6 INPUT policy is not DROP; "
+    items+=" ipv6-policy"
+  fi
+  if [ -n "$bad" ]; then
+    judge firewall 2 "firewall: ${bad%; }" "$items"
+  else
+    judge firewall 0 "firewall: cf-ranges verify passes and INPUT drops on IPv4 and IPv6"
+  fi
+}
+
+# Design §4. Each app's edge networks hold Caddy and that app's upstreams, nothing else.
+check_networks() {
+  local app net u name id project service networks entry owner al other raw prop is_upstream bad=
+  local -a app_list=() nets=() aliases=() ups=()
+  local -A net_app=() upstream=()
+  mapfile -t app_list < <(apps)
+  for app in "${app_list[@]}"; do
+    read -ra nets <<<"$(conf_get "$app" EDGE_NETWORKS)"
+    read -ra ups <<<"$(conf_get "$app" UPSTREAMS)"
+    upstream[$app]=
+    for u in "${ups[@]}"; do upstream[$app]+=" ${u%%:*} "; done
+    for net in "${nets[@]}"; do
+      net_app[$net]=$app
+      if ! raw=$(dock network inspect "$net" 2>/dev/null); then
+        bad+=" $net:missing"
+        continue
+      fi
+      prop=$(printf '%s' "$raw" | jq -r "$NETWORK_JQ" 2>/dev/null) || prop=
+      if [ -z "$prop" ]; then
+        bad+=" $net:unreadable"
+        continue
+      fi
+      if [ "${prop%%|*}" != true ]; then bad+=" $net:not-internal"; fi
+      if [ -n "${prop#*|}" ]; then bad+=" $net:made-by-compose"; fi
+    done
+  done
+  # Per container on an edge network: whose it is, what it is called, whether Caddy proxies to it.
+  # Docker adds the service name and the short id as aliases on its own.
+  while IFS='|' read -r id name _ _ _ _ _ _ project service _ networks; do
+    if [ -z "$id" ]; then continue; fi
+    name=${name#/}
+    if [ "$name" = "$CADDY_CONTAINER" ]; then continue; fi
+    IFS=';' read -ra nets <<<"$networks"
+    for entry in "${nets[@]}"; do
+      net=${entry%%=*}
+      case $net in edge-*) ;; *) continue ;; esac
+      owner=${net_app[$net]-}
+      if [ -z "$owner" ]; then bad+=" $name@$net:unknown-edge-network"; continue; fi
+      if [ "$project" != "$owner" ]; then bad+=" $name@$net:wrong-project"; fi
+      for other in "${app_list[@]}"; do
+        if [ "$other" = "$owner" ]; then continue; fi
+        case $service in "$other"-*) bad+=" $name@$net:service-named-for-$other" ;; esac
+      done
+      case $service in edge-*) bad+=" $name@$net:service-named-edge" ;; esac
+      IFS=',' read -ra aliases <<<"${entry#*=}"
+      is_upstream=0
+      for al in "${aliases[@]}"; do
+        if [ "$al" = "$service" ] || [ "$al" = "${id:0:12}" ]; then continue; fi
+        case $al in "$owner"-*) ;; *) bad+=" $name@$net:alias-$al" ;; esac
+        case "${upstream[$owner]}" in *" $al "*) is_upstream=1 ;; esac
+      done
+      if [ "$is_upstream" -eq 0 ]; then bad+=" $name@$net:not-an-upstream"; fi
+    done
+  done <<<"$CONTAINERS"
+  if [ -n "$bad" ]; then
+    judge networks 2 "networks: edge network rules broken:${bad}" "$bad"
+  else
+    judge networks 0 "networks: edge networks hold only Caddy and their app's upstreams"
+  fi
+}
+
+check_ntp() {
+  local sync
+  sync=$(timedatectl show -p NTPSynchronized --value 2>/dev/null) || sync=
+  if [ "$sync" = yes ]; then
+    judge ntp 0 "ntp: the clock is synchronised"
+  else
+    judge ntp 1 "ntp: the clock is not synchronised (timedatectl says ${sync:-nothing})"
+  fi
+}
+
+# The bootstrap and break-glass files are for the work in hand only (design §3.4).
+check_breakglass() {
+  local left=
+  if [ ! -e "$SSHD_DIR/00-hardening.conf" ]; then
+    judge breakglass 0 "breakglass: not hardened yet, so the bootstrap files are expected"
+    return 0
+  fi
+  if [ -e "$BOOTSTRAP_SSH" ]; then left+=" $BOOTSTRAP_SSH"; fi
+  if [ -e "$SSHD_DIR/01-breakglass.conf" ]; then left+=" $SSHD_DIR/01-breakglass.conf"; fi
+  if [ -n "$left" ]; then
+    judge breakglass 2 "breakglass: still there after hardening, undo it:${left}" "$left"
+  else
+    judge breakglass 0 "breakglass: no bootstrap or break-glass file"
+  fi
+}
+
+run_checks() {
+  local up=0
+  if docker_up; then
+    judge docker 0 "docker: the daemon answers"
+    if load_containers; then
+      up=1
+      judge containers 0 "containers: the running containers were read"
+    else
+      judge containers 1 "containers: could not read the running containers (docker ps, docker inspect or jq failed), so their checks are skipped"
+    fi
+  else
+    judge docker 2 "docker: the daemon does not answer, so containers are not checked"
+  fi
+  check_disk || failed check_disk
+  check_memory || failed check_memory
+  check_oom || failed check_oom
+  check_cpu || failed check_cpu
+  check_tunnel || failed check_tunnel
+  check_ntp || failed check_ntp
+  check_breakglass || failed check_breakglass
+  check_listeners || failed check_listeners
+  check_firewall || failed check_firewall
+  if [ "$up" -eq 1 ]; then
+    check_containers || failed check_containers
+    check_limits || failed check_limits
+    check_ports || failed check_ports
+    check_networks || failed check_networks
+  fi
+}
+
+# ---------------------------------------------------------------------------------------------
+# Every day. Each report line goes to the journal and into one silent Telegram message; a problem
+# is also judged, so it is sent loud, repeated daily and cleared like the 5-minute ones.
+
+digest() { DIGEST+=("$1"); say "$1"; }
+
+daily_since() {  # when the last daily run was: at most 3 days back, at least 2 h
+  local now last=0
+  now=$(date +%s)
+  if [ -r "$STATE_DIR/daily-last" ]; then last=$(<"$STATE_DIR/daily-last"); fi
+  is_num "$last" || last=0
+  if [ "$last" -lt $((now - 259200)) ] || [ "$last" -gt $((now - 7200)) ]; then last=$((now - 86400)); fi
+  printf '%s' "$last"
+}
+
+daily_suppressed() {
+  local out n
+  out=$(timeout 60 journalctl --quiet --no-pager -o cat -u systemd-journald --since "@$(daily_since)" 2>/dev/null |
+    { grep -E '^Suppressed [0-9]+ messages' || true; }) || out=
+  if [ -z "$out" ]; then
+    judge suppressed 0 "suppressed: journald dropped no lines"
+    return 0
+  fi
+  n=$(printf '%s\n' "$out" | awk '{ n += $2 } END { print n }')
+  judge suppressed 1 "suppressed: journald dropped $n lines to its rate limit ($(first_lines "$out")): raise LogRateLimitBurst or quiet the noisy container"
+}
+
+journald_setting() {  # name -> its last value in journald's merged config
+  systemd-analyze cat-config systemd/journald.conf 2>/dev/null | sed -n "s/^$1=//p" | tail -n 1
+}
+
+retention_days() {  # "187day", "6month", "1year" or seconds -> whole days
+  local v=$1 n
+  if [[ $v =~ ^([0-9]+)(d|day|days)$ ]]; then
+    n=${BASH_REMATCH[1]}
+  elif [[ $v =~ ^([0-9]+)(w|week|weeks)$ ]]; then
+    n=$((BASH_REMATCH[1] * 7))
+  elif [[ $v =~ ^([0-9]+)(month|months)$ ]]; then
+    n=$((BASH_REMATCH[1] * 30))
+  elif [[ $v =~ ^([0-9]+)(y|year|years)$ ]]; then
+    n=$((BASH_REMATCH[1] * 365))
+  elif [[ $v =~ ^([0-9]+)$ ]]; then
+    n=$((BASH_REMATCH[1] / 86400))
+  else
+    n=$RETENTION_DEFAULT_DAYS
+  fi
+  if [ "$n" -le 0 ]; then n=$RETENTION_DEFAULT_DAYS; fi
+  printf '%s' "$n"
+}
+
+# The privacy policies promise lines are kept for the retention period (180-187 days). That holds
+# only while the size cap doesn't delete them first: project today's growth to the full period.
+daily_journal() {
+  local usage oldest now cap_txt cap ret days proj level=0 text
+  now=$(date +%s)
+  usage=$(du -sb "$JOURNAL_DIR" 2>/dev/null | awk '{ print $1 }') || usage=
+  oldest=$(timeout 60 journalctl --quiet --no-pager -o short-unix 2>/dev/null | awk 'NR == 1 { print int($1); exit }') || true
+  if ! is_num "$usage" || ! is_num "$oldest" || [ "$oldest" -le 0 ]; then
+    judge journal 1 "journal: could not read its size or its oldest line"
+    return 0
+  fi
+  cap_txt=$(journald_setting SystemMaxUse) || cap_txt=
+  cap=$(numfmt --from=iec "${cap_txt:-$JOURNAL_CAP_DEFAULT}" 2>/dev/null) || cap=
+  is_num "$cap" || cap=$(numfmt --from=iec "$JOURNAL_CAP_DEFAULT")
+  ret=$(retention_days "$(journald_setting MaxRetentionSec)") || ret=$RETENTION_DEFAULT_DAYS
+  read -r days proj <<<"$(awk -v u="$usage" -v o="$oldest" -v n="$now" -v r="$ret" \
+    'BEGIN { d = (n - o) / 86400; printf "%.1f %.0f\n", d, (d >= 3 ? u / d * r : 0) }')"
+  text="journal: $(gib "$usage") of $(gib "$cap"), oldest line $days days old, $(gib "$proj") projected at $ret days"
+  if [ $((usage * 100 / cap)) -ge "$JOURNAL_FULL_PCT" ] && [ "${days%.*}" -lt $((ret - 7)) ]; then
+    level=2
+    text="$text: the journal is full and keeps lines only $days days, the privacy policy promises $((ret - 7))-$ret; raise SystemMaxUse (disk permitting) or cut the noisiest sources"
+  elif [ "$proj" -gt 0 ] && [ $((proj / (cap / 100))) -ge "$JOURNAL_PROJECTION_PCT" ]; then
+    level=1
+    text="$text, over ${JOURNAL_PROJECTION_PCT}% of the cap: raise SystemMaxUse or cut the noisiest sources (log_skip)"
+  fi
+  judge journal "$level" "$text"
+  digest "$text"
+}
+
+count_lines() {  # journal entries of the last 24 h that match the arguments
+  timeout 120 journalctl --quiet --no-pager -o json --output-fields=_PID --since '-24 hours' "$@" 2>/dev/null |
+    wc -l | tr -d ' '
+}
+
+caddy_hosts() {  # "count host", busiest first, from Caddy's access log lines of the last 24 h
+  timeout 120 journalctl --quiet --no-pager -o cat --since '-24 hours' "CONTAINER_NAME=$CADDY_CONTAINER" 2>/dev/null |
+    { grep -oE '"host":"[^"]*"' || true; } | sed 's/^"host":"//; s/"$//' | sort | uniq -c | sort -rn
+}
+
+# Lines a day per app against its budget. Caddy's access lines count for the app whose zone the
+# host is in; what is left of the edge's lines, plus every line from outside a container, is
+# "edge+host".
+daily_lines() {
+  local app p total n host zone budget label over= summary= top= rest used=0 shown=0
+  local -a app_list=() projects=() entries=()
+  local -A count=() zones=() budgets=()
+  mapfile -t app_list < <(apps)
+  projects=("${app_list[@]}" edge)
+  for p in "${projects[@]}"; do
+    count[$p]=$(count_lines "COM_DOCKER_COMPOSE_PROJECT=$p") || count[$p]=0
+    is_num "${count[$p]}" || count[$p]=0
+    used=$((used + count[$p]))
+  done
+  total=$(count_lines) || total=0
+  if ! is_num "$total" || [ "$total" -eq 0 ]; then
+    judge lines 1 "lines: could not count the journal's lines"
+    return 0
+  fi
+  for app in "${app_list[@]}"; do zones[$app]=$(conf_get "$app" ZONE); done
+  while read -r n host; do
+    if [ "$shown" -lt 3 ]; then top+="${top:+, }$host $n"; shown=$((shown + 1)); fi
+    for app in "${app_list[@]}"; do
+      zone=${zones[$app]}
+      if [ -n "$zone" ] && { [ "$host" = "$zone" ] || [ "${host%."$zone"}" != "$host" ]; }; then
+        count[$app]=$((count[$app] + n))
+        count[edge]=$((count[edge] - n))
+        break
+      fi
+    done
+  done < <(caddy_hosts)
+  if [ "${count[edge]}" -lt 0 ]; then count[edge]=0; fi
+  rest=$((total - used))
+  if [ "$rest" -lt 0 ]; then rest=0; fi
+  count[edge]=$((count[edge] + rest))
+  read -ra entries <<<"$LINE_BUDGETS"
+  for p in "${entries[@]}"; do budgets[${p%%=*}]=${p#*=}; done
+  for p in "${projects[@]}"; do
+    budget=${budgets[$p]-}
+    n=${count[$p]}
+    label=$p
+    if [ "$p" = edge ]; then label=edge+host; fi
+    summary+="${summary:+, }$label $n"
+    if is_num "$budget"; then
+      summary+="/$budget"
+      if [ "$n" -gt "$budget" ]; then over+=" $p"; fi
+    fi
+  done
+  summary="lines (24 h, against budget): $summary of $total${top:+; busiest Caddy hosts $top}"
+  if [ -n "$over" ]; then
+    judge lines 1 "lines: over budget:${over}. $summary. A journal that outgrows its budgets drops lines before the retention period is up: log_skip the noisy successful routes" "$over"
+  else
+    judge lines 0 "lines: within budget"
+  fi
+  digest "$summary"
+}
+
+daily_reboot() {
+  local pkgs
+  if [ -e "$REBOOT_FILE" ]; then
+    pkgs=$(tr '\n' ' ' <"$REBOOT_FILE.pkgs" 2>/dev/null | cut -c1-200) || pkgs=
+    judge reboot 1 "reboot: needed (${pkgs:-no package list}). Unattended upgrades never reboot; validate the edge first, then reboot between 01:00 and 07:00 IST"
+  else
+    judge reboot 0 "reboot: none pending"
+  fi
+}
+
+daily_limit_sum() {
+  local mem sum=0 unlimited=0 total need
+  while IFS='|' read -r _ _ _ _ _ mem _; do
+    if ! is_num "$mem"; then continue; fi
+    if [ "$mem" -eq 0 ]; then unlimited=$((unlimited + 1)); fi
+    sum=$((sum + mem / 1048576))
+  done <<<"$CONTAINERS"
+  total=$(meminfo_mib MemTotal) || total=
+  if ! is_num "$total"; then judge limitsum 1 "limitsum: could not read MemTotal"; return 0; fi
+  need=$((sum + HOST_RESERVE_MIB))
+  if [ "$need" -ge "$total" ]; then
+    judge limitsum 2 "limitsum: running limits $sum MiB plus $HOST_RESERVE_MIB MiB for the host is $need MiB, not below MemTotal $total MiB"
+  else
+    judge limitsum 0 "limitsum: ok"
+  fi
+  digest "limits: $sum MiB running, $need MiB with the host's $HOST_RESERVE_MIB, MemTotal $total MiB$(if [ "$unlimited" -gt 0 ]; then printf ' (%d without a memory limit)' "$unlimited"; fi)"
+}
+
+cg_file() {  # full container id, file -> the cgroup file, under either cgroup driver
+  local f
+  for f in "$CGROUP_DIR/system.slice/docker-$1.scope/$2" "$CGROUP_DIR/docker/$1/$2"; do
+    if [ -r "$f" ]; then printf '%s' "$f"; return 0; fi
+  done
+  return 1
+}
+
+# memory.peak per container since it was created: the data for sizing the next app (open question 2).
+daily_peaks() {
+  local id name mem peak f pct high=
+  while IFS='|' read -r id name _ _ _ mem _; do
+    if [ -z "$id" ]; then continue; fi
+    name=${name#/}
+    if ! is_num "$mem" || [ "$mem" -eq 0 ]; then continue; fi
+    f=$(cg_file "$id" memory.peak) || continue
+    peak=$(<"$f")
+    is_num "$peak" || continue
+    pct=$((peak * 100 / mem))
+    say "peak $name $((peak / 1048576)) MiB of $((mem / 1048576)) MiB ($pct%)"
+    if [ "$pct" -ge "$PEAK_PCT" ]; then high+="${high:+, }$name $pct%"; fi
+  done <<<"$CONTAINERS"
+  digest "memory.peak over ${PEAK_PCT}% of the limit: ${high:-none}"
+}
+
+# docker ps -s: writable layers, because Next's image cache lives in one (design §6, disk).
+daily_layers() {
+  local out top big=
+  out=$(timeout 300 docker ps -s --format '{{.Names}}|{{.Size}}' 2>/dev/null) || {
+    judge layers 1 "layers: docker ps -s failed"
+    return 0
+  }
+  top=$(printf '%s\n' "$out" | awk -F'|' '
+    { split($2, a, " "); v = a[1]; u = v; sub(/^[0-9.]+/, "", u); sub(/[A-Za-z]+$/, "", v)
+      m = 1; if (u == "kB") m = 1e3; else if (u == "MB") m = 1e6; else if (u == "GB") m = 1e9; else if (u == "TB") m = 1e12
+      printf "%.0f %s\n", v * m, $1 }' | sort -rn | sed -n '1,3p')
+  big=$(printf '%s\n' "$top" | awk -v max="$((LAYER_WARN_MB * 1000000))" '$1 > max { printf "%s%s", (n++ ? " " : ""), $2 }')
+  if [ -n "$big" ]; then
+    judge layers 1 "layers: writable layer over ${LAYER_WARN_MB} MB: $big" "$big"
+  else
+    judge layers 0 "layers: no writable layer over ${LAYER_WARN_MB} MB"
+  fi
+  digest "largest writable layers: $(printf '%s\n' "$top" | awk '{ printf "%s%s %.0f MB", (n++ ? ", " : ""), $2, $1 / 1e6 }')"
+}
+
+norm_ref() {  # an image reference -> repo:tag the way docker image ls shows it
+  local r=${1%%@*}
+  r=${r#docker.io/}
+  r=${r#library/}
+  case ${r##*/} in *:*) ;; *) r=$r:latest ;; esac
+  printf '%s' "$r"
+}
+
+compose_images() {  # app -> the images its compose file names, every profile; fails if it can't tell
+  local app=$1 dir file f
+  local -a envs=() args=()
+  dir=$(conf_get "$app" PROJECT_DIR)
+  file=$(conf_get "$app" APP_COMPOSE_FILE)
+  read -ra envs <<<"$(conf_get "$app" ENV_FILES)"
+  if [ -z "$dir" ] || [ -z "$file" ]; then return 1; fi
+  args=(--project-directory "$dir" -f "$dir/$file")
+  for f in "${envs[@]}"; do args+=(--env-file "$dir/$f"); done
+  dock compose "${args[@]}" --profile '*' config --images 2>/dev/null
+}
+
+# Dangling images go every day. A third-party image goes when no container uses it and no
+# installed compose file (any app or the edge) names it: a bumped version leaves the old one behind.
+# The apps' own repositories are app-deploy's. If any compose file can't be read, nothing is
+# removed: an empty list would otherwise say every image is unused.
+daily_images() {
+  local out freed app ref repo size listing removed=0 names= dfline
+  local -a app_list=() imgs=()
+  local -A protect=() repos=()
+  mapfile -t app_list < <(apps)
+  out=$(dock image prune -f 2>&1) || { judge images 1 "images: docker image prune failed"; return 0; }
+  freed=$(printf '%s\n' "$out" | sed -n 's/^Total reclaimed space: //p')
+  for app in "${app_list[@]}" edge; do
+    if ! out=$(compose_images "$app"); then
+      judge images 1 "images: could not list the images of $app's compose file, so no unused image was removed"
+      return 0
+    fi
+    mapfile -t imgs <<<"$out"
+    for ref in "${imgs[@]}"; do
+      if [ -n "$ref" ]; then protect[$(norm_ref "$ref")]=1; fi
+    done
+    repo=$(conf_get "$app" REPO)
+    if [ -n "$repo" ]; then repos[$repo]=1; fi
+  done
+  ref=$(conf_get edge CADDY_IMAGE)
+  if [ -n "$ref" ]; then protect[$(norm_ref "$ref")]=1; fi
+  if [ "${#protect[@]}" -eq 0 ]; then
+    judge images 1 "images: no compose file names an image, so no unused image was removed"
+    return 0
+  fi
+  listing=$(dock image ls --format '{{.Repository}}:{{.Tag}}|{{.Size}}') || listing=
+  while IFS='|' read -r ref size; do
+    case $ref in '' | *'<none>'*) continue ;; esac
+    if [ -n "${repos[${ref%:*}]-}" ] || [ -n "${protect[$ref]-}" ]; then continue; fi
+    if dock image rm "$ref" >/dev/null 2>&1; then
+      removed=$((removed + 1))
+      names+="${names:+, }$ref ($size)"
+    fi
+  done <<<"$listing"
+  dfline=$(dock system df --format '{{.Type}} {{.Size}} (reclaimable {{.Reclaimable}})' 2>/dev/null | tr '\n' ';') || dfline=
+  judge images 0 "images: pruned"
+  digest "images: dangling prune freed ${freed:-nothing}; removed $removed unused${names:+: $names}; docker df: ${dfline%;}"
+}
+
+daily_edge_validate() {
+  local out
+  if out=$(timeout 600 "$APP_APPLY" edge validate 2>&1); then
+    judge edge-validate 0 "edge-validate: the live edge config validates"
+    digest "edge config: validates"
+  else
+    judge edge-validate 2 "edge-validate: app-apply edge validate failed: $(first_lines "$out")"
+    digest "edge config: does not validate, see the alert"
+  fi
+}
+
+daily_certs() {
+  local dir f end exp now days name near= near_days= bad= detail= level=0
+  dir=$(conf_get edge PROJECT_DIR)
+  dir=${dir:-$EDGE_DIR}
+  now=$(date +%s)
+  for f in "$dir"/certs/*/*.pem; do
+    if [ ! -e "$f" ]; then continue; fi
+    case ${f##*/} in *key*) continue ;; esac  # a private key is never opened
+    name=${f#"$dir"/certs/}
+    end=$(openssl x509 -noout -enddate -in "$f" 2>/dev/null) || end=
+    exp=
+    case $end in notAfter=?*) exp=$(date -u -d "${end#notAfter=}" +%s 2>/dev/null) || exp= ;; esac
+    if ! is_num "$exp"; then
+      bad+=" $name"
+      detail+=" $name is unreadable;"
+      if [ "$level" -lt 1 ]; then level=1; fi
+      continue
+    fi
+    days=$(((exp - now) / 86400))
+    if [ -z "$near_days" ] || [ "$days" -lt "$near_days" ]; then near_days=$days near=$name; fi
+    if [ "$days" -lt "$CERT_CRIT_DAYS" ]; then
+      level=2
+      bad+=" $name"
+      detail+=" $name expires in $days days;"
+    elif [ "$days" -lt "$CERT_WARN_DAYS" ]; then
+      if [ "$level" -lt 1 ]; then level=1; fi
+      bad+=" $name"
+      detail+=" $name expires in $days days;"
+    fi
+  done
+  if [ -z "$near" ] && [ -z "$bad" ]; then
+    judge certs 1 "certs: no certificate found under $dir/certs"
+    digest "certificates: none found"
+    return 0
+  fi
+  if [ "$level" -gt 0 ]; then
+    judge certs "$level" "certs:${detail%;}" "$bad"
+  else
+    judge certs 0 "certs: none expires within ${CERT_WARN_DAYS} days"
+  fi
+  if [ -n "$near" ]; then digest "certificates: nearest expiry $near in $near_days days"; fi
+}
+
+cloudflared_bin() {
+  local p
+  p=$(systemctl show cloudflared -p ExecStart --value 2>/dev/null | sed -n 's/^{ path=\([^ ;]*\) .*/\1/p') || p=
+  if [ ! -x "$p" ]; then p=/usr/local/bin/cloudflared; fi
+  printf '%s' "$p"
+}
+
+# Cloudflare supports a cloudflared version for a year after the latest release: its build date
+# says how old the installed one is.
+daily_cloudflared() {
+  local bin ver built day age=
+  bin=$(cloudflared_bin)
+  ver=$("$bin" --version 2>/dev/null) || ver=
+  if [[ $ver =~ built\ ([0-9]{4}-[0-9]{2}-[0-9]{2}) ]]; then
+    built=${BASH_REMATCH[1]}
+  elif [[ $ver =~ ([0-9]{4})\.([0-9]{1,2})\. ]]; then
+    printf -v built '%04d-%02d-01' "${BASH_REMATCH[1]}" "$((10#${BASH_REMATCH[2]}))"
+  else
+    judge cloudflared 1 "cloudflared: could not read its version from $bin"
+    return 0
+  fi
+  day=$(date -u -d "$built" +%s 2>/dev/null) || day=
+  if ! is_num "$day"; then judge cloudflared 1 "cloudflared: could not read its build date ($built)"; return 0; fi
+  age=$((($(date +%s) - day) / 86400))
+  if [ "$age" -ge "$CLOUDFLARED_CRIT_DAYS" ]; then
+    judge cloudflared 2 "cloudflared: built $built, $age days ago; Cloudflare supports a version for a year: update it on the server and in both workflows"
+  elif [ "$age" -ge "$CLOUDFLARED_WARN_DAYS" ]; then
+    judge cloudflared 1 "cloudflared: built $built, $age days ago; update it before it is a year old, on the server and in both workflows"
+  else
+    judge cloudflared 0 "cloudflared: built $built, $age days ago"
+  fi
+  digest "cloudflared: built $built, $age days ago"
+}
+
+# ---------------------------------------------------------------------------------------------
+# Commands
+
+lock() {  # name: one run at a time; a second one gives up
+  exec 9>"$LOCK_DIR/hostwatch-$1.lock"
+  flock -n 9 || { say "hostwatch $1 is still running; skipped"; exit 0; }
+}
+
+cmd_run() {
+  CLEAR_RUNS=2
+  state_init
+  lock run
+  load_env || say "hostwatch: $ENV_FILE is missing or unreadable; alerts go to the journal only"
+  run_checks
+  heartbeat
+}
+
+cmd_check() {
+  run_checks
+  if [ "$PROBLEMS" -eq 0 ]; then
+    printf 'hostwatch check: clean\n'
+  else
+    printf 'hostwatch check: %d problem(s)\n' "$PROBLEMS"
+    exit 1
+  fi
+}
+
+cmd_daily() {
+  local up=0
+  CLEAR_RUNS=1
+  state_init
+  lock daily
+  load_env || say "hostwatch: $ENV_FILE is missing or unreadable; alerts go to the journal only"
+  if docker_up && load_containers; then up=1; fi
+  daily_suppressed
+  daily_journal
+  daily_lines
+  daily_reboot
+  if [ "$up" -eq 1 ]; then
+    daily_limit_sum
+    daily_peaks
+    daily_layers
+    daily_images
+  else
+    digest "docker did not answer or its containers could not be read: limits, peaks, layers and images were skipped"
+  fi
+  daily_edge_validate
+  daily_certs
+  daily_cloudflared
+  tg_send "daily report $(date -u +%F)"$'\n'"$(printf '%s\n' "${DIGEST[@]}")" silent || true
+  date +%s >"$STATE_DIR/daily-last"
+}
+
+cmd_alert() {  # text
+  local rc=0
+  if ! load_env; then
+    say "alert not sent, $ENV_FILE is unreadable: $1"
+    return 1
+  fi
+  tg_send "$1" || rc=$?
+  case $rc in
+    0) ;;
+    3) say "alert not sent, BOT_TOKEN or CHAT_ID is not set: $1" ;;
+    *) say "alert not sent, Telegram did not take it: $1" ;;
+  esac
+  # Quiet unless the admin is at a terminal, trying it out.
+  if [ -t 2 ]; then
+    if [ "$rc" -eq 0 ]; then
+      printf 'hostwatch: sent\n' >&2
+    else
+      printf 'hostwatch: not sent (journalctl -t hostwatch says why)\n' >&2
+    fi
+  fi
+  if [ "$rc" -ne 0 ]; then return 1; fi
+}
+
+main() {
+  local cmd=${1-}
+  case $cmd in
+    run | check | daily) [ $# -eq 1 ] || usage ;;
+    alert) [ $# -ge 2 ] || usage ;;
+    *) usage ;;
+  esac
+  [ "$(id -u)" -eq 0 ] || die "run as root: sudo hostwatch $cmd"
+  MODE=$cmd
+  case $cmd in
+    run) cmd_run ;;
+    check) cmd_check ;;
+    daily) cmd_daily ;;
+    alert) shift; cmd_alert "$*" ;;
+  esac
+}
+main "$@"

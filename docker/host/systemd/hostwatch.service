@@ -1,0 +1,14 @@
+# Host checks every 5 minutes: hostwatch.timer starts it (docker/host/hostwatch). install.sh copies it
+# to /etc/systemd/system/.
+[Unit]
+Description=Host checks (disk, memory, CPU, containers, tunnel, invariants)
+# After, not Requires: with Docker down hostwatch still runs, and says so.
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hostwatch run
+SyslogIdentifier=hostwatch
+# A oneshot has no timeout by default. A hung docker call must not hold its slot for long; the script
+# also holds a lock, so a late run is skipped rather than stacked.
+TimeoutStartSec=4min
