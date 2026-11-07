@@ -1,0 +1,111 @@
+#!/bin/bash
+# Encrypts one app's settings into <PROJECT_DIR>/backup-out/config-<UTC stamp>.tar.age and keeps
+# the newest 3: app-config-archive <app>. A root timer (app-config-archive@<app>.timer) runs it
+# shortly before the app's backup, which mounts backup-out read-only and uploads the newest archive.
+# So the backup container only ever sees ciphertext, and the secrets never enter it.
+# The files are CONFIG_ARCHIVE_FILES in /etc/apps/<app>.conf, paths below PROJECT_DIR (a directory
+# takes everything in it), as they are at that moment; the key is BACKUP_RECIPIENT, an age public
+# key. A failure is alerted through hostwatch. Nothing from the files is printed or logged.
+set -euo pipefail
+umask 022
+PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
+LC_ALL=C; export LC_ALL
+
+APPS_DIR=/etc/apps
+LOCK_DIR=/run/lock
+HOSTWATCH=/usr/local/sbin/hostwatch
+KEEP=3
+
+say() {
+  logger -t app-config-archive -- "$*"
+  if [ -t 1 ]; then printf '%s\n' "$*"; fi
+}
+usage() {
+  printf 'usage: app-config-archive <app>\n' >&2
+  exit 2
+}
+fail() {
+  say "failed, $app: $*"
+  "$HOSTWATCH" alert "app-config-archive $app: $*" || true
+  exit 1
+}
+
+[ $# -eq 1 ] || usage
+app=$1
+case $app in '' | *[!a-z0-9]*) usage ;; esac
+[ -f "$APPS_DIR/$app.conf" ] || { say "refused: there is no $APPS_DIR/$app.conf"; exit 2; }
+# shellcheck source=/dev/null
+. "$APPS_DIR/$app.conf"
+
+exec 9>"$LOCK_DIR/app-config-archive-$app.lock"
+flock -n 9 || { say "$app: an archive run is already in progress"; exit 0; }
+
+project=${PROJECT_DIR-}
+recipient=${BACKUP_RECIPIENT-}
+[ -d "$project" ] || fail "PROJECT_DIR in $APPS_DIR/$app.conf is not a directory"
+[ -n "$recipient" ] || fail "BACKUP_RECIPIENT in $APPS_DIR/$app.conf is empty: set the age public key, nothing is archived without it"
+[[ $recipient =~ ^age1[0-9a-z]+$ ]] || fail "BACKUP_RECIPIENT is not an age public key (age1...)"
+
+read -ra entries <<<"${CONFIG_ARCHIVE_FILES-}"
+[ "${#entries[@]}" -gt 0 ] || fail "CONFIG_ARCHIVE_FILES is empty: there is nothing to archive"
+present=()
+missing=()
+for f in "${entries[@]}"; do
+  # Plain paths below PROJECT_DIR only: a typo in the list must not archive another tree.
+  if ! [[ $f =~ ^[A-Za-z0-9._][A-Za-z0-9._/-]*$ ]] || [[ $f == *..* ]]; then
+    fail "CONFIG_ARCHIVE_FILES has '$f', which is not a plain path below PROJECT_DIR"
+  fi
+  if [ -e "$project/$f" ]; then present+=("$f"); else missing+=("$f"); fi
+done
+[ "${#present[@]}" -gt 0 ] || fail "none of the files in CONFIG_ARCHIVE_FILES exists"
+
+# The image references go in the log, so a restored archive can be matched to the images it ran.
+# Only lines shaped like NAME=repo:tag[@sha256:digest] are logged: nothing else may reach the log.
+images=
+ref_re='^[A-Z][A-Z0-9_]*=[a-z0-9][a-z0-9./_-]*:[A-Za-z0-9._-]+(@sha256:[0-9a-f]{64})?$'
+if [[ " ${present[*]} " == *" images.env "* ]]; then
+  while IFS= read -r line; do
+    if [[ $line =~ $ref_re ]]; then images+="$line"$'\n'; fi
+  done <"$project/images.env"
+fi
+
+out_dir=$project/backup-out
+install -d -m 0700 "$out_dir"
+rm -f -- "$out_dir"/.config-*.partial   # a run killed by its timeout leaves one; the lock says it is stale
+stamp=$(date -u +%Y-%m-%dT%H%MZ)
+final=$out_dir/config-$stamp.tar.age
+partial=$out_dir/.config-$stamp.partial   # no config-*.tar.age name: backup never picks up half a file
+trap 'rm -f -- "$partial"' EXIT
+
+# tar exits 1 when a file changed while it was read (a deploy at that very second); 2 is fatal.
+set +e
+umask 077
+tar --numeric-owner -C "$project" -cf - -- "${present[@]}" | age --encrypt --recipient "$recipient" --output "$partial"
+status=("${PIPESTATUS[@]}")
+umask 022
+set -e
+case ${status[0]} in
+  0) ;;
+  1) say "$app: a file changed while it was archived; the archive holds it as it was read" ;;
+  *) fail "tar exited with ${status[0]}" ;;
+esac
+[ "${status[1]}" -eq 0 ] || fail "age exited with ${status[1]}"
+size=$(stat -c %s "$partial")
+# tar pads even one small file to 10 KiB: anything under 1 KiB is broken.
+[ "$size" -gt 1024 ] || fail "the archive is only $size bytes"
+mv -f -- "$partial" "$final"
+
+old=()
+for f in "$out_dir"/config-*.tar.age; do
+  if [ -e "$f" ]; then old+=("$f"); fi
+done
+if [ "${#old[@]}" -gt "$KEEP" ]; then rm -f -- "${old[@]:0:${#old[@]}-KEEP}"; fi
+
+say "$app: archived ${present[*]} into config-$stamp.tar.age ($size bytes), newest $KEEP kept"
+while IFS= read -r line; do
+  if [ -n "$line" ]; then say "$app: image $line"; fi
+done <<<"$images"
+if [ "${#missing[@]}" -gt 0 ]; then
+  say "$app: not in the archive, they do not exist: ${missing[*]}"
+  "$HOSTWATCH" alert "app-config-archive $app: archived without ${missing[*]}, which do not exist" || true
+fi
