@@ -14,6 +14,7 @@ import * as migration_20261101_054600_store_unconfirmed_newsletter from './20261
 import * as migration_20261101_055314_store_retention from './20261101_055314_store_retention';
 import * as migration_20261101_060337_store_chargeback from './20261101_060337_store_chargeback';
 import * as migration_20261102_135031_launch_grievance_officer from './20261102_135031_launch_grievance_officer';
+import * as migration_20261107_053201_payload_3_92 from './20261107_053201_payload_3_92';
 
 export const migrations = [
   {
@@ -94,6 +95,11 @@ export const migrations = [
   {
     up: migration_20261102_135031_launch_grievance_officer.up,
     down: migration_20261102_135031_launch_grievance_officer.down,
-    name: '20261102_135031_launch_grievance_officer'
+    name: '20261102_135031_launch_grievance_officer',
+  },
+  {
+    up: migration_20261107_053201_payload_3_92.up,
+    down: migration_20261107_053201_payload_3_92.down,
+    name: '20261107_053201_payload_3_92'
   },
 ];
