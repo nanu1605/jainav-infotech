@@ -88,7 +88,7 @@ On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/la
 - [ ] SPF / DKIM / DMARC; mail-tester ≥ 9/10.
 - [ ] Legal review (docs/decisions.md, "Legal drafts"): blanks filled, then the Owner publishes every legal page but the EULA (§8.13). Final content check.
 - [ ] VYRO download in production: `pnpm import:release <tag>` (v1.4.0 was imported into dev as a draft on 2026-10-18; the latest is now v2.0.4, whose features the seeded copy doesn't mention), then the Owner publishes it.
-- [ ] Lighthouse on the production URLs (§15). Locally `pnpm lhci` serves HTTP/1.1 and reads LCP above 2.5 s; over HTTP/2 the four pages are under it (docs/decisions.md, "LCP budget").
+- [ ] Lighthouse on the production URLs (§15); LCP is judged only there. Locally `pnpm lhci` serves HTTP/1.1, reads LCP above 2.5 s and only warns on it; over HTTP/2 the four pages are under it (docs/decisions.md, "LCP budget").
 
 ## Milestone C — VYRO store live (Launch 2)
 
