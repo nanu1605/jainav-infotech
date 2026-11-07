@@ -4,7 +4,7 @@ import createNextIntlPlugin from 'next-intl/plugin'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-import { contentSecurityPolicy, securityHeaders } from './src/lib/csp'
+import { adminOnlyClientHints, contentSecurityPolicy, securityHeaders } from './src/lib/csp'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 // Media URLs point at the R2 CDN in staging and production (payload.config.ts generateFileURL).
@@ -75,4 +75,12 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default withPayload(withNextIntl(nextConfig), { devBundleServerPackages: false })
+const config = withPayload(withNextIntl(nextConfig), { devBundleServerPackages: false })
+const withPayloadHeaders = config.headers
+
+// withPayload asks every response for a colour-scheme client hint that only its admin reads;
+// on public pages it costs each first visit a second request (src/lib/csp.ts).
+export default {
+  ...config,
+  headers: async () => adminOnlyClientHints((await withPayloadHeaders?.()) ?? []),
+} satisfies NextConfig
