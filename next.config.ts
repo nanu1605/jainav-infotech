@@ -59,7 +59,7 @@ const nextConfig: NextConfig = {
     ]
   },
   images: {
-    localPatterns: [{ pathname: '/api/media/file/**' }, { pathname: '/brand/**' }],
+    localPatterns: [{ pathname: '/api/media/file/**' }],
     remotePatterns: cdn ? [new URL(`${cdn}/**`)] : [],
   },
   webpack: (webpackConfig) => {

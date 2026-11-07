@@ -1,15 +1,11 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { ImageResponse } from 'next/og'
 
+import { LogoMark } from '@/components/layout/LogoMark'
 import { tokens } from '@/styles/tokens.generated'
 
 export const OG_SIZE = { width: 1200, height: 630 }
 
 const t = tokens.light
-// The black mark, for this light surface. Read from the project root, where Next's file
-// tracing finds it (opengraph-image docs, "Using Node.js runtime with local assets").
-const MARK = `data:image/png;base64,${readFileSync(path.join(process.cwd(), 'public/brand/logo-mark-light.png')).toString('base64')}`
 
 /**
  * Share image template (spec §15): page title and eyebrow on the brand surface, with an accent
@@ -57,8 +53,7 @@ export function ogImage({
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 20, fontSize: 32 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- Satori draws <img>, not next/image */}
-        <img src={MARK} alt="" width={60} height={56} />
+        <LogoMark height={56} fill={t.fg} />
         <div style={{ display: 'flex', fontWeight: 600 }}>Jainav Infotech</div>
       </div>
     </div>,
