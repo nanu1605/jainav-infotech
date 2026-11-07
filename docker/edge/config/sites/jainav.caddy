@@ -1,0 +1,53 @@
+# Jainav's sites, installed by the admin with `app-apply jainav site` (docs/runbooks/edge.md), which
+# accepts only the directives that file lists. {$JAINAV_*} values come from edge.env.
+# Every block caps a request body at 110 MB: installer uploads in the admin (Cloudflare's free plan
+# caps a request at 100 MB anyway).
+
+https://{$JAINAV_DOMAIN} {
+	import site_common
+	import tls_jainav
+	request_body {
+		max_size 110MB
+	}
+	reverse_proxy jainav-app:3000 {
+		import upstream
+	}
+}
+
+https://www.{$JAINAV_DOMAIN} {
+	import site_common
+	import tls_jainav
+	request_body {
+		max_size 110MB
+	}
+	redir https://{$JAINAV_DOMAIN}{uri} 308
+}
+
+# Staging: basic auth everywhere except the machine-to-machine APIs (spec §18.1), and never
+# indexed. JAINAV_STAGING_AUTH_HASH comes from `caddy hash-password` (see edge.env.example).
+https://staging.{$JAINAV_DOMAIN} {
+	import site_common
+	import tls_jainav
+	request_body {
+		max_size 110MB
+	}
+	header X-Robots-Tag "noindex, nofollow"
+	@protected not path /api/v1/webhooks/* /api/v1/licensing/* /api/v1/updates/* /api/v1/downloads/*
+	basic_auth @protected {
+		{$JAINAV_STAGING_AUTH_USER} {$JAINAV_STAGING_AUTH_HASH}
+	}
+	reverse_proxy jainav-app-staging:3000 {
+		import upstream
+	}
+}
+
+https://analytics.{$JAINAV_DOMAIN} {
+	import site_common
+	import tls_jainav
+	request_body {
+		max_size 110MB
+	}
+	reverse_proxy jainav-umami:3000 {
+		import upstream
+	}
+}

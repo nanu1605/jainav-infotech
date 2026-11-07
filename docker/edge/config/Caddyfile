@@ -1,0 +1,20 @@
+# The edge (spec §16, §18): the one Caddy on the server. Cloudflare terminates visitors' TLS and
+# connects here over HTTPS with SSL "Full (strict)", so every site uses its zone's Cloudflare Origin
+# CA certificate. Compression and caching headers come from Next.js and Cloudflare.
+# The admin edits this file and snippets.caddy; each app's site file is installed by app-apply.
+import /etc/caddy/snippets.caddy
+
+# Global options. This comment also keeps caddy fmt from joining the brace to the import line.
+{
+	# No automatic certificates or redirects: the Origin CA certificates are mounted at /certs.
+	auto_https off
+	# Every other log, because upstream errors (e.g. an app restarting) log the whole request.
+	log default {
+		output stdout
+		format filter {
+			import log_fields
+		}
+	}
+}
+
+import /etc/caddy/sites/*.caddy

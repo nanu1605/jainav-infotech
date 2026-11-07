@@ -1,0 +1,57 @@
+# The edge: the one Caddy on the server and the only container with a published port. It is a Compose
+# project of its own, so a site change never touches an app's stack. Lives in /srv/edge with:
+#   edge.env   the values the site files read as {$JAINAV_…}: the domain, staging's login
+#   config/    Caddyfile, snippets.caddy, cloudflare-ranges.caddy and sites/<app>.caddy
+#   certs/     <app>/origin.pem, origin-key.pem (Cloudflare Origin CA) and aop-ca.pem
+# Directories are mounted, not single files: a file replaced by rename is seen on the next reload.
+# See docs/runbooks/edge.md.
+name: edge
+
+services:
+  caddy:
+    image: caddy:2.11.7-alpine
+    restart: unless-stopped
+    # Only 443: Cloudflare connects over HTTPS (SSL Full (strict)); the firewall admits only
+    # Cloudflare's IP ranges (docs/runbooks/server.md).
+    ports:
+      - '443:443/tcp'
+    env_file: edge.env
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    volumes:
+      - ./config:/etc/caddy:ro
+      - ./certs:/certs:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - default
+      - edge-jainav
+      - edge-jainav-staging
+      - edge-menumesh
+      - edge-menumesh-staging
+    # The admin API stays on its default, localhost:2019 inside this container: nothing publishes
+    # it. 127.0.0.1 because the edge networks have no IPv6 and wget tries one address. The answer
+    # holds the loaded config, secrets included, so it is thrown away.
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:2019/config/']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  # Every app's edge networks, created by the admin as internal networks (docker network create
+  # --internal <name>). Each holds only Caddy and that app's own services.
+  edge-jainav:
+    external: true
+  edge-jainav-staging:
+    external: true
+  edge-menumesh:
+    external: true
+  edge-menumesh-staging:
+    external: true
+
+volumes:
+  caddy_data:
+  caddy_config:
