@@ -44,8 +44,8 @@ services:
       - edge-menumesh
       - edge-menumesh-staging
     # The admin API stays on its default, localhost:2019 inside this container: nothing publishes
-    # it. 127.0.0.1 because the edge networks have no IPv6 and wget tries one address. The answer
-    # holds the loaded config, secrets included, so it is thrown away.
+    # it. The check says 127.0.0.1 because busybox's wget resolves localhost to ::1, where Caddy
+    # doesn't listen. The answer holds the loaded config, secrets included, so it is thrown away.
     healthcheck:
       test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:2019/config/']
       interval: 30s
