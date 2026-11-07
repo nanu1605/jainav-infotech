@@ -55,7 +55,9 @@ export type Rule = keyof typeof RULES
 
 /**
  * The visitor's IP. Production sits behind Cloudflare and its origin only accepts Cloudflare's
- * ranges, so CF-Connecting-IP is trustworthy there; the fallbacks are for local runs.
+ * ranges. Caddy sets CF-Connecting-IP (and X-Forwarded-For) itself, from the header Cloudflare sent
+ * on a connection from one of those ranges, so a client can't forge it. The fallbacks are for local
+ * runs.
  */
 export const clientIp = (headers: Headers) =>
   headers.get('cf-connecting-ip') ||

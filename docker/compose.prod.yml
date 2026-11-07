@@ -71,6 +71,8 @@ services:
       DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD}@postgres:5432/umami
       APP_SECRET: ${UMAMI_APP_SECRET:?}
       DISABLE_TELEMETRY: '1'
+      # Caddy sets X-Real-IP to the visitor's address and nothing else does.
+      CLIENT_IP_HEADER: x-real-ip
     networks:
       default:
       edge-jainav:

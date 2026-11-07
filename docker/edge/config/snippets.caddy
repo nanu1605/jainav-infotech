@@ -2,13 +2,15 @@
 # import site_common, its own tls_<app> and upstream, and nothing else.
 
 # What a log line keeps of a request: its time, method, host, path, status, size and duration, and
-# Cloudflare's address (Caddy trusts no proxy). Gone are request headers (visitor IPs, Access
-# identities), response headers (Location holds 5-minute signed file URLs), staging's login name,
-# the whole query string (newsletter tokens, order numbers, form prefills) and the token in Payload's
-# password reset path. A path can still identify a record.
+# Cloudflare's address (remote_ip). Gone are request headers (visitor IPs, Access identities), the
+# visitor's address Caddy resolved from them (client_ip), response headers (Location holds 5-minute
+# signed file URLs), staging's login name, the whole query string (newsletter tokens, order numbers,
+# form prefills) and the token in Payload's password reset path. A path can still identify a record.
+# Another app's token-bearing paths are added as more alternatives in the uri pattern.
 (log_fields) {
 	wrap json
 	request>headers delete
+	request>client_ip delete
 	request>uri regexp (/admin/reset)/[^?]*|\?.* ${1}
 	resp_headers delete
 	headers delete
@@ -24,8 +26,20 @@
 	}
 }
 
-# Inside every reverse_proxy. The retries hide an app that is restarting for a deploy.
+# Inside every reverse_proxy. An app gets one client address, the one Cloudflare sent in
+# CF-Connecting-IP (trusted only from Cloudflare's ranges), and nothing a client sent in its place.
+# Caddy keeps incoming X-Forwarded-* values from a trusted peer, hence the explicit overrides (it
+# still logs "Unnecessary header_up X-Forwarded-Host" on every load: that line is needed). The
+# retries hide an app that is restarting for a deploy.
 (upstream) {
+	header_up X-Real-IP {client_ip}
+	header_up X-Forwarded-For {client_ip}
+	header_up CF-Connecting-IP {client_ip}
+	header_up Sb-Forwarded-For {client_ip}
+	header_up X-Forwarded-Host {host}
+	header_up -True-Client-IP
+	header_up -X-Client-IP
+	header_up -Forwarded
 	lb_try_duration 30s
 	lb_try_interval 250ms
 	transport http {
