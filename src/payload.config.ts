@@ -51,13 +51,13 @@ import { revalidateCollection } from './hooks/revalidate'
 import { jobs } from './jobs'
 import { outboxAdapter } from './lib/outbox'
 import { docPaths, publicPath, type RoutedCollection } from './lib/routes'
+import { SITE_URL } from './lib/seo'
 import { migrations } from './migrations'
 import { auditPlugin } from './plugins/audit'
 import { defaultLocaleRequiredPlugin } from './plugins/defaultLocaleRequired'
 import { liveDocPlugin } from './plugins/liveDoc'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
 const SEO_COLLECTIONS = [
   'pages',
