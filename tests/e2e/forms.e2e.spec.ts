@@ -28,8 +28,12 @@ async function mailTo(to: string): Promise<Mail> {
   for (let i = 0; i < 40; i++) {
     const files = await readdir(OUTBOX).catch(() => [] as string[])
     for (const file of files.sort().reverse()) {
-      const mail = JSON.parse(await readFile(path.join(OUTBOX, file), 'utf8')) as Mail
-      if (mail.to === to) return mail
+      // Skip emails still being written (.tmp, see src/lib/outbox.ts) and files that don't parse.
+      if (!file.endsWith('.json')) continue
+      const mail = await readFile(path.join(OUTBOX, file), 'utf8')
+        .then((json) => JSON.parse(json) as Mail)
+        .catch(() => null)
+      if (mail?.to === to) return mail
     }
     await new Promise((r) => setTimeout(r, 250))
   }
