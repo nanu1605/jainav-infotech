@@ -1,4 +1,6 @@
-@import 'tailwindcss';
+/* Classes come from src/ only: Tailwind otherwise reads every file in the repository, so a test
+   or a doc naming a class (`dark:hidden` in docs/decisions.md) added CSS to every page. */
+@import 'tailwindcss' source('..');
 @import './tokens.css';
 
 /* Light islands inside a dark page (nested data-theme wrappers) stay light. */
