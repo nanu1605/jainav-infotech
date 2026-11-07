@@ -1,0 +1,10 @@
+{
+  "log-driver": "journald",
+  "log-opts": {
+    "tag": "{{.Name}}",
+    "labels": "com.docker.compose.project,com.docker.compose.service"
+  },
+  "userland-proxy": false,
+  "live-restore": true,
+  "no-new-privileges": true
+}
