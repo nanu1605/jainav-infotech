@@ -40,6 +40,11 @@ next-env.d.ts
 
 .env
 
+# Server settings files (edge.env, images.env, production.env…) and certificate folders: they hold
+# secrets on the VPS and only their .example files belong in git.
+*.env
+certs/
+
 /media
 /installers
 
