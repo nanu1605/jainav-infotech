@@ -1,0 +1,6 @@
+// Admin branding (src/components/admin): Payload sets data-theme on <html>, so show the mark
+// drawn for that theme.
+html[data-theme='dark'] .jainav-mark--light,
+html:not([data-theme='dark']) .jainav-mark--dark {
+  display: none;
+}

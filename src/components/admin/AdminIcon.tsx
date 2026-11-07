@@ -1,5 +1,5 @@
-import { Monogram } from './AdminLogo'
+import { Mark } from './AdminLogo'
 
 export function AdminIcon() {
-  return <Monogram size={24} />
+  return <Mark height={24} />
 }

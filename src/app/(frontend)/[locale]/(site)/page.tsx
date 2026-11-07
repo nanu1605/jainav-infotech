@@ -60,6 +60,7 @@ export default async function HomePage({ params }: Props) {
               name: company?.legalName || 'Jainav Infotech Private Limited',
               alternateName: 'Jainav Infotech',
               url: absoluteUrl('en', '/'),
+              logo: `${SITE_URL}/brand/logo-mark-light.png`,
               ...(company?.phone && { telephone: company.phone }),
               ...(company?.emails?.hello && { email: company.emails.hello }),
               ...(company?.registeredAddress && {

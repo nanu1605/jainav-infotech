@@ -3,14 +3,17 @@ import 'server-only'
 import {
   Body,
   Button,
+  Column,
   Container,
   Head,
   Heading,
   Hr,
   Html,
+  Img,
   Link,
   Preview,
   render,
+  Row,
   Section,
   Text,
 } from '@react-email/components'
@@ -19,6 +22,7 @@ import type { CSSProperties, ReactElement, ReactNode } from 'react'
 
 import type { Locale } from '@/i18n/routing'
 import { formatDate, formatINR } from '@/lib/format'
+import { SITE_URL } from '@/lib/seo'
 import type { DataRequest } from '@/payload-types'
 import { tokens } from '@/styles/tokens.generated'
 
@@ -58,6 +62,8 @@ const button: CSSProperties = {
   borderRadius: '6px',
   backgroundColor: c.primary,
   color: c['primary-fg'],
+  // The ink fill vanishes on the dark backgrounds some clients swap in; the edge keeps its shape.
+  border: `1px solid ${c['border-strong']}`,
   fontSize: '16px',
   fontWeight: 600,
   textDecoration: 'none',
@@ -88,9 +94,25 @@ function Layout({
             borderRadius: '8px',
           }}
         >
-          <Text style={{ margin: '0 0 24px', fontSize: '18px', fontWeight: 700, color: c.fg }}>
-            {translator(locale)('brand')}
-          </Text>
+          <Section style={{ margin: '0 0 24px' }}>
+            <Row>
+              <Column style={{ width: '44px' }}>
+                {/* The app icon: a filled tile stays visible when a client darkens the mail. */}
+                <Img
+                  src={`${SITE_URL}/brand/icon-192.png`}
+                  alt=""
+                  width="32"
+                  height="32"
+                  style={{ display: 'block' }}
+                />
+              </Column>
+              <Column>
+                <Text style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: c.fg }}>
+                  {translator(locale)('brand')}
+                </Text>
+              </Column>
+            </Row>
+          </Section>
           {children}
           {footer && (
             <>

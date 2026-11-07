@@ -1,6 +1,6 @@
-import { tokens } from '@/styles/tokens.generated'
+import Image from 'next/image'
 
-/** Placeholder admin branding until the brand kit arrives (spec §10, Appendix B). */
+/** Login-page branding (spec §10, Appendix B): the mark beside the company name. */
 export function AdminLogo() {
   return (
     <span
@@ -12,31 +12,34 @@ export function AdminLogo() {
         fontWeight: 700,
       }}
     >
-      <Monogram size={40} />
+      <Mark height={40} />
       Jainav Infotech
     </span>
   )
 }
 
-export function Monogram({ size = 24 }: { size?: number }) {
+/**
+ * The black and the white mark; (payload)/custom.scss hides the one that doesn't match the theme
+ * Payload sets on <html>.
+ */
+export function Mark({ height }: { height: number }) {
+  const width = Math.round((height * 1024) / 963)
   return (
-    <span
-      aria-hidden
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: size,
-        height: size,
-        borderRadius: size / 4,
-        background: tokens.light.primary,
-        color: tokens.light['primary-fg'],
-        fontWeight: 700,
-        fontSize: size * 0.55,
-        lineHeight: 1,
-      }}
-    >
-      J
-    </span>
+    <>
+      <Image
+        src="/brand/logo-mark-light.png"
+        alt=""
+        width={width}
+        height={height}
+        className="jainav-mark jainav-mark--light"
+      />
+      <Image
+        src="/brand/logo-mark-dark.png"
+        alt=""
+        width={width}
+        height={height}
+        className="jainav-mark jainav-mark--dark"
+      />
+    </>
   )
 }
