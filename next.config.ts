@@ -59,6 +59,9 @@ const nextConfig: NextConfig = {
     ]
   },
   images: {
+    // The optimizer keeps resized images on disk and, left alone, may take half of the free disk
+    // once per container. Past 500 MB it drops the least recently used (docs/decisions.md).
+    maximumDiskCacheSize: 500_000_000,
     localPatterns: [{ pathname: '/api/media/file/**' }],
     remotePatterns: cdn ? [new URL(`${cdn}/**`)] : [],
   },
