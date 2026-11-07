@@ -1,0 +1,352 @@
+#!/bin/bash
+# Deploys one image of one app on the shared server, as root through sudo
+# (docs/runbooks/server.md):
+#   CI:    sudo -n app-deploy <env>, the forced command of a deploy-<app> key. stdin line 1 is
+#          "v1 deploy <tag>@sha256:<digest> <extra-tag>@sha256:<digest>|-" or "v1 ping", line 2
+#          the job's registry token.
+#   Admin: sudo app-deploy <app> <env> <tag>[@sha256:<digest>] [<extra-ref>], with a registry
+#          token on stdin only if a pull needs one.
+# Callers supply only tags and digests. The registry, the repository and every path come from
+# root's /etc/apps/<app>.conf, so one app's deploy key can't reach another app or the host.
+# Exit status: 0 deployed (or pong), 1 failed (nothing switched, or rolled back), 2 refused.
+set -euo pipefail
+umask 022
+PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
+trap '' HUP PIPE                     # a dropped SSH session must not stop a switch halfway
+say() { printf '%s\n' "$*" 2>/dev/null || true; logger -t app-deploy -- "$*"; }
+die() { say "app-deploy: $*"; logger -t app-deploy "refused: $*"; exit 2; }
+
+caller=${SUDO_USER:-root}
+case "$caller:$#" in
+  deploy-*:1) mode=ci app=${caller#deploy-} env=$1 ;;
+  ops:3 | ops:4 | root:3 | root:4) mode=admin app=$1 env=$2 ;;
+  *) die "usage: app-deploy <app> <env> <tag>[@sha256:<digest>] [<extra-ref>]" ;;
+esac
+case $app in '' | *[!a-z0-9]*) die "bad app name" ;; esac
+[ -f "/etc/apps/$app.conf" ] || die "unknown app"
+# Only the conf sets these, never the caller's environment.
+PROJECT_DIR='' APP_COMPOSE_FILE='' ENV_FILES='' CI_USER='' CI_ENVS='' REPO='' REGISTRY_USER=''
+HEALTH_TIMEOUT='' EXTRA_TAG='' EXTRA_MODE='' EXTRA_KEEP='' PREDEPLOY_DB='' BACKUP_RECIPIENT=''
+SERVICE='' VAR='' TAG='' MIGRATE_SERVICE='' MIGRATE_VAR=''
+# shellcheck source=/dev/null
+. "/etc/apps/$app.conf"
+[ "$mode" = admin ] || [ "$CI_USER" = "$caller" ] || die "$caller may not deploy $app"
+[ "$mode" = admin ] || case " $CI_ENVS " in *" $env "*) ;; *) die "$env is admin-only" ;; esac
+env_config "$env" || die "unknown environment: $env"
+
+token=
+if [ "$mode" = ci ]; then
+  request=
+  IFS= read -r request || [ -n "$request" ] || die "no request"
+  IFS= read -r token || :           # keeps a token sent without a final newline
+  # Two references are about 250 characters; a refusal never echoes kilobytes back.
+  [ "${#request}" -le 512 ] || die "request too long"
+  set -f                            # split on blanks; never glob, never eval
+  # shellcheck disable=SC2086
+  set -- $request
+  set +f
+  case "$#:${1-}:${2-}" in
+    2:v1:ping) say "pong $app $env"; exit 0 ;;
+    4:v1:deploy) ref=$3 extra=$4 ;;
+    *) die "bad request" ;;
+  esac
+  digest_re='@sha256:[0-9a-f]{64}'  # CI must pin the digest
+else
+  ref=$3 extra=${4:--}
+  [ -t 0 ] || IFS= read -r token || :
+  digest_re='(@sha256:[0-9a-f]{64})?'
+fi
+check() {
+  case $1 in '' | *[!a-z0-9.:@-]*) die "bad characters: $1" ;; esac
+  printf '%s\n' "$1" | grep -Eqx "($2)$digest_re" || die "not allowed: $1"
+}
+check "$ref" "$TAG"
+[ "$extra" = - ] || { [ -n "${EXTRA_TAG-}" ] || die "no extra image for $app"; check "$extra" "$EXTRA_TAG"; }
+cd "$PROJECT_DIR"
+
+# From here on docker and compose write to the journal, never to the SSH channel: Go programs exit
+# on a write to a broken stdout or stderr even when SIGPIPE is ignored. Lines for the caller go to
+# fd 3, and nothing reads the channel any more.
+exec 3>&1 1> >(exec systemd-cat -t app-deploy >/dev/null 2>&1 3>&-) 2>&1 </dev/null
+say() { printf '%s\n' "$*" >&3 2>/dev/null || true; logger -t app-deploy -- "$*"; }
+fail() { say "app-deploy: $*"; logger -t app-deploy "failed: $*"; exit 1; }
+alert() { /usr/local/sbin/hostwatch alert "app-deploy: $*" || true; }
+# sudo's env_reset drops these; a root shell on the console may still have some.
+unset "${!COMPOSE_@}" "${!DOCKER_@}"
+
+# The same project app-compose runs: absolute paths, so the caller's directory never matters.
+# dc is for timeout, which can't run a shell function.
+read -ra env_files <<<"$ENV_FILES"
+dc=(docker compose --project-directory "$PROJECT_DIR" -f "$PROJECT_DIR/$APP_COMPOSE_FILE")
+for f in "${env_files[@]}"; do dc+=(--env-file "$PROJECT_DIR/$f"); done
+compose() { "${dc[@]}" "$@"; }
+
+# images.env has one NAME=<repo>:<tag>[@sha256:<digest>] line per image. A change replaces the
+# whole file by rename, so compose never reads half of it.
+get_var() {
+  local line
+  while IFS= read -r line || [ -n "$line" ]; do
+    case $line in "$1="*) printf '%s\n' "${line#*=}"; return 0 ;; esac
+  done <images.env
+  return 1
+}
+set_var() {
+  local line
+  tmp=$(mktemp "$PROJECT_DIR/.images.env.XXXXXX") || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    case $line in "$1="*) printf '%s=%s\n' "$1" "$2" ;; *) printf '%s\n' "$line" ;; esac
+  done <images.env >"$tmp" &&
+    chmod 0644 "$tmp" &&
+    mv -f "$tmp" images.env &&
+    tmp=
+}
+# A reference as deploys.log and the caller see it: <tag>@sha256:<digest>, or none.
+short() {
+  case $1 in
+    "$REPO:none") echo none ;;
+    "$REPO:"*) printf '%s\n' "${1#"$REPO:"}" ;;
+    *) printf '%s\n' "${1:-none}" ;;
+  esac
+}
+
+# 1. Deploys of one app run one at a time; other apps never wait for it.
+exec 9>"/run/lock/app-deploy-$app.lock"
+tries=0
+until flock -w 30 9; do
+  tries=$((tries + 1))
+  [ "$tries" -lt 10 ] || die "another deploy of $app is still running after 300 s"
+  say "waiting for another deploy of $app ($((tries * 30)) s)"
+done
+
+# 2. Refusals: a compose file app-apply didn't approve, under 5 GB free for images, staging while
+#    the server is throttled, and settings this deploy would trip over halfway.
+want=$(awk '{print $1; exit}' "/etc/apps/$app.compose.sha256") || want=
+have=$(sha256sum "$PROJECT_DIR/$APP_COMPOSE_FILE") || have=
+if [ -z "$want" ] || [ "${have%% *}" != "$want" ]; then
+  die "$APP_COMPOSE_FILE is not the file app-apply approved (sudo app-apply $app compose <file>)"
+fi
+for d in /var/lib/docker /var/lib/containerd; do
+  [ -d "$d" ] || continue
+  free=$(df -Pk -- "$d" | awk 'NR == 2 {print $4}') || free=0
+  [ "${free:-0}" -ge 5242880 ] || die "under 5 GB free on the disk holding $d"
+done
+if [ -e /run/hostwatch/throttled ]; then
+  [ "$env" != staging ] || die "the server is CPU-throttled: staging deploys wait until it recovers"
+  say "warning: the server is CPU-throttled"
+fi
+case " $ENV_FILES " in
+  *" images.env "*) ;;
+  *) die "ENV_FILES in /etc/apps/$app.conf lacks images.env" ;;
+esac
+[ -f images.env ] || die "no images.env in $PROJECT_DIR (start it from docker/images.env.example)"
+previous=$(get_var "$VAR") || die "images.env has no $VAR line"
+if [ "$env" = production ] && [ -n "$PREDEPLOY_DB" ] && [ -z "$BACKUP_RECIPIENT" ]; then
+  die "BACKUP_RECIPIENT is empty in /etc/apps/$app.conf: production needs its pre-deploy dump"
+fi
+migrate=
+if [ "$EXTRA_MODE" = migrate ] && [ "$extra" != - ]; then
+  if [ -z "$MIGRATE_SERVICE" ] || [ -z "$MIGRATE_VAR" ]; then
+    die "no migrate service for $env in /etc/apps/$app.conf"
+  fi
+  old_migrate=$(get_var "$MIGRATE_VAR") || die "images.env has no $MIGRATE_VAR line"
+  migrate=1
+fi
+
+# 3. A Docker config for this run only: root's own is never used, and no login outlives the run.
+DOCKER_CONFIG=$(mktemp -d /run/app-deploy.XXXXXX); export DOCKER_CONFIG
+tmp=
+trap 'rm -rf -- "$DOCKER_CONFIG"; [ -z "$tmp" ] || rm -f -- "$tmp"' EXIT
+registry=${REPO%%/*}
+logged_in='' hint=''
+if [ -n "$token" ]; then
+  printf '%s\n' "$token" | docker login "$registry" -u "$REGISTRY_USER" --password-stdin ||
+    fail "$registry refused the token"
+  logged_in=1
+elif [ "$mode" = admin ]; then
+  hint=" (an image that isn't on the server needs a read:packages token on stdin)"
+fi
+unset token
+
+# 4. Pull by digest, then tag it, so cleanup and rollback can see it. The admin form may name a
+#    tag alone: it is pulled by tag and its digest recorded. Images already here aren't pulled.
+fetch() {   # fetch TAG[@DIGEST]: prints TAG@DIGEST, or TAG for an image with no registry digest
+  local tag=${1%%@*} digest='' line digests='{{range .RepoDigests}}{{println .}}{{end}}'
+  [ "$tag" = "$1" ] || digest=${1#*@}
+  if [ -n "$digest" ]; then
+    docker image inspect "$REPO@$digest" >/dev/null 2>&1 ||
+      timeout 300 docker pull -q "$REPO@$digest" >&2 || return 1
+    docker tag "$REPO@$digest" "$REPO:$tag" >&2 || return 1
+  else
+    docker image inspect "$REPO:$tag" >/dev/null 2>&1 ||
+      timeout 300 docker pull -q "$REPO:$tag" >&2 || return 1
+    while IFS= read -r line; do
+      case $line in "$REPO@"*) digest=${line#"$REPO@"}; break ;; esac
+    done < <(docker image inspect --format "$digests" "$REPO:$tag")
+  fi
+  printf '%s\n' "$tag${digest:+@$digest}"
+}
+say "deploying $ref to $SERVICE ($app $env)"
+new=$(fetch "$ref") || fail "couldn't pull $ref$hint"
+case $new in *@*) ;; *) say "warning: $new has no registry digest; deploying it by tag" ;; esac
+new_extra=
+if [ "$extra" != - ]; then
+  new_extra=$(fetch "$extra") || fail "couldn't pull $extra$hint"
+fi
+[ -z "$logged_in" ] || docker logout "$registry" || true
+
+# 5. Production only: an encrypted dump of each database before anything changes, 3 kept. No
+#    dump, no deploy.
+if [ "$env" = production ] && [ -n "$PREDEPLOY_DB" ]; then
+  read -r db_service db_user db_names <<<"$PREDEPLOY_DB"
+  read -ra databases <<<"$db_names"
+  (umask 077 && mkdir -p predeploy)
+  stamp=$(date -u +%Y%m%dT%H%M%SZ)
+  for db in "${databases[@]}"; do
+    say "dumping $db"
+    tmp=predeploy/.$env-$stamp-$db.dump.age
+    if ! timeout 300 "${dc[@]}" exec -T "$db_service" pg_dump -Fc -U "$db_user" "$db" |
+      age -r "$BACKUP_RECIPIENT" >"$tmp"; then
+      fail "the dump of $db failed; nothing switched"
+    fi
+    # A custom-format dump of even an empty database is a few KB; anything tiny is broken.
+    [ "$(wc -c <"$tmp")" -gt 1024 ] || fail "the dump of $db is too small; nothing switched"
+    mv -f "$tmp" "predeploy/$env-$stamp-$db.dump.age"
+    tmp=
+    dumps=(predeploy/"$env"-*-"$db".dump.age)
+    [ "${#dumps[@]}" -le 3 ] || rm -f -- "${dumps[@]:0:${#dumps[@]}-3}"
+  done
+fi
+
+# 6. Migrations (EXTRA_MODE=migrate): a one-off of MIGRATE_SERVICE on the new migrate image, once
+#    the memory rule allows it. A failure restores the variable and switches nothing.
+mem_mib() {   # the service's mem_limit in MiB; the config holds env values, so only jq sees it
+  local bytes
+  bytes=$(compose --profile '*' config --format json --no-env-resolution |
+    jq -er --arg s "$1" '.services[$s].mem_limit // empty | tonumber') || return 1
+  echo $(((bytes + 1048575) / 1048576))
+}
+if [ -n "$migrate" ]; then
+  mib=$(mem_mib "$MIGRATE_SERVICE") || fail "no mem_limit for $MIGRATE_SERVICE; nothing switched"
+  room=$(/usr/local/sbin/app-compose headroom "$mib" 2>&1) ||
+    fail "${room:-no memory headroom}; nothing switched"
+  say "running $MIGRATE_SERVICE on ${new_extra%%@*}"
+  set_var "$MIGRATE_VAR" "$REPO:$new_extra" || fail "couldn't write images.env; nothing switched"
+  if ! timeout 600 "${dc[@]}" run --rm --no-deps -T "$MIGRATE_SERVICE"; then
+    set_var "$MIGRATE_VAR" "$old_migrate" || true
+    # A timed-out run leaves its container behind.
+    docker ps -aq --filter "label=com.docker.compose.project=$app" \
+      --filter "label=com.docker.compose.service=$MIGRATE_SERVICE" \
+      --filter label=com.docker.compose.oneoff=True | xargs -r docker rm -f || true
+    say "its logs: journalctl COM_DOCKER_COMPOSE_PROJECT=$app" \
+      "COM_DOCKER_COMPOSE_SERVICE=$MIGRATE_SERVICE"
+    fail "$MIGRATE_SERVICE failed; nothing switched"
+  fi
+fi
+
+# 7. The switch. Every step is checked here, so a failure leads to a rollback, not an exit. A hung
+#    up must not hold the lock for good; stopping the old container takes 25 s at most.
+switch_and_wait() {   # switch_and_wait REF
+  set_var "$VAR" "$1" &&
+    timeout 120 "${dc[@]}" up -d --no-deps "$SERVICE" &&
+    wait_healthy
+}
+# 8. Waits up to HEALTH_TIMEOUT for the service's healthcheck. It fails at once on unhealthy, a
+#    restart, an exit or a missing container; a service without a healthcheck passes after 15 s.
+wait_healthy() {
+  local waited=0 limit=${HEALTH_TIMEOUT:-300} cid state status restarting count health first=
+  local format='{{.State.Status}} {{.State.Restarting}} {{.RestartCount}}'
+  format+=' {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}'
+  while :; do
+    cid=$(compose ps -a -q "$SERVICE") || cid=
+    cid=${cid%%$'\n'*}
+    [ -n "$cid" ] || { say "$SERVICE has no container"; return 1; }
+    state=$(docker inspect --format "$format" "$cid") ||
+      { say "$SERVICE's container is gone"; return 1; }
+    read -r status restarting count health <<<"$state"
+    case $count in '' | *[!0-9]*) say "unexpected state of $SERVICE: $state"; return 1 ;; esac
+    first=${first:-$count}
+    if [ "$restarting" = true ] || [ "$count" -gt "$first" ]; then
+      say "$SERVICE keeps restarting"
+      return 1
+    fi
+    [ "$status" = running ] || { say "$SERVICE is $status"; return 1; }
+    case $health in
+      healthy) return 0 ;;
+      unhealthy) say "$SERVICE is unhealthy"; return 1 ;;
+      none) [ "$waited" -lt 15 ] || return 0 ;;
+    esac
+    [ "$waited" -lt "$limit" ] || { say "$SERVICE is not healthy after $limit s"; return 1; }
+    sleep 3
+    waited=$((waited + 3))
+    [ $((waited % 30)) -ne 0 ] || say "waiting for $SERVICE to turn healthy ($waited s)"
+  done
+}
+# After a deploy: removes this environment's older images, except the new one, the rollback target
+# and anything images.env names, and the extra images beyond the EXTRA_KEEP newest. Only this
+# repository is touched, and docker rmi leaves images a container still uses. Digest references go
+# too, or the containerd image store would keep their layers.
+prune() {
+  local keep=' ' ref line rows tag digest extras=0
+  local -A kept=()
+  for ref in "${previous#"$REPO:"}" "$new" "$new_extra"; do keep+="${ref%%@*} "; done
+  while IFS= read -r line || [ -n "$line" ]; do
+    case $line in *"=$REPO:"*) ref=${line#*"=$REPO:"}; keep+="${ref%%@*} " ;; esac
+  done <images.env
+  rows=$(docker images --digests --format '{{.Tag}} {{.Digest}}' "$REPO") || return 0
+  while read -r tag digest; do
+    case $keep in *" $tag "*) [ -z "$digest" ] || kept[$digest]=1 ;; esac
+  done <<<"$rows"
+  while read -r tag digest; do
+    case $tag in '' | '<none>') continue ;; esac
+    if [ -n "$EXTRA_TAG" ] && grep -Eqx "$EXTRA_TAG" <<<"$tag"; then
+      extras=$((extras + 1))
+      [ "$extras" -gt "${EXTRA_KEEP:-3}" ] || continue
+    elif ! grep -Eqx "$TAG" <<<"$tag"; then
+      continue
+    fi
+    case $keep in *" $tag "*) continue ;; esac
+    docker rmi "$REPO:$tag" || continue
+    case $digest in
+      '' | '<none>') ;;
+      *) [ -n "${kept[$digest]-}" ] || docker rmi "$REPO@$digest" || true ;;
+    esac
+  done <<<"$rows"
+}
+
+# Ctrl-C in the admin form must not stop a switch or a rollback halfway either.
+trap '' INT
+say "switching $SERVICE to $new"
+if switch_and_wait "$REPO:$new"; then
+  # 9. Success: deploys.log, the journal, cleanup, and one line for the caller.
+  printf '%s %s %s %s -> %s by %s\n' "$(date -u +%FT%TZ)" "$env" "$SERVICE" \
+    "$(short "$previous")" "$new" "$caller" >>deploys.log ||
+    say "warning: couldn't write deploys.log"
+  logger -t app-deploy "deployed: $app $env $SERVICE $(short "$previous") -> $new by $caller" ||
+    true
+  prune || true
+  say "$SERVICE is running ${new%%@*}"
+  exit 0
+fi
+
+# 10. Failure: where the logs are, then back to the previous image, or stopped if there was none.
+say "$SERVICE did not turn healthy on ${new%%@*}"
+say "its logs: journalctl COM_DOCKER_COMPOSE_PROJECT=$app COM_DOCKER_COMPOSE_SERVICE=$SERVICE"
+case $previous in
+  '' | *:none)
+    compose stop "$SERVICE" || true
+    set_var "$VAR" "${previous:-$REPO:none}" || true
+    alert "$app $env: $SERVICE failed on ${new%%@*} and is stopped; there was no earlier image"
+    say "$SERVICE is stopped: there is no earlier image to go back to"
+    exit 1
+    ;;
+esac
+say "rolling back to $(short "$previous")"
+if switch_and_wait "$previous"; then
+  logger -t app-deploy "rolled back: $app $env $SERVICE $new -> $(short "$previous")" || true
+  say "$SERVICE is back on $(short "$previous")"
+  exit 1
+fi
+alert "$app $env: $SERVICE failed on ${new%%@*}," \
+  "and the rollback to $(short "$previous") is unhealthy too"
+say "the rollback is unhealthy too; the admin has been alerted"
+exit 1

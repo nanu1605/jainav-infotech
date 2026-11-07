@@ -1,0 +1,170 @@
+#!/bin/bash
+# Compose for an installed app, as the admin runs it (docs/runbooks/server.md):
+#   sudo app-compose <app> <compose args...>       e.g. jainav ps, edge up -d
+#   sudo app-compose <app> tools <env> <tag> [<command...>]
+#       a one-off of the app's tools image with that environment's env files and networks
+#   app-compose headroom <MiB>                     does a one-off of that size fit?
+# The project, its files and env files come from /etc/apps/<app>.conf, so every command sees the
+# project app-deploy sees. The memory rule: the limits of the running containers, plus the
+# one-off, plus 1.5 GiB for the host stay below MemTotal. run and tools check it first; app-deploy
+# asks before a migration.
+set -euo pipefail
+umask 022
+PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
+
+usage() {
+  cat >&2 <<'EOF'
+usage: app-compose <app> <compose args...>
+       app-compose <app> tools <env> <tag>[@sha256:<digest>] [<command...>]
+       app-compose headroom <MiB>
+EOF
+  exit 2
+}
+die() { printf 'app-compose: %s\n' "$*" >&2; logger -t app-compose "refused: $*"; exit 2; }
+
+# headroom MiB: 0 if a one-off of MiB fits the memory rule, else 1 and why. A running container
+# without a limit counts as nothing here; hostwatch alerts on it.
+headroom() {
+  local want=$1 total limits used=0 name mem unlimited=
+  total=$(awk '$1 == "MemTotal:" {print int($2 / 1024)}' /proc/meminfo)
+  [ -n "$total" ] || { echo "app-compose: can't read MemTotal" >&2; return 1; }
+  limits=$(docker ps -q | xargs -r docker inspect --format '{{.Name}} {{.HostConfig.Memory}}') ||
+    { echo "app-compose: can't read the running containers' limits" >&2; return 1; }
+  while read -r name mem; do
+    [ -n "$name" ] || continue
+    [ "$mem" -gt 0 ] || unlimited+=" ${name#/}"
+    used=$((used + mem))
+  done <<<"$limits"
+  used=$((used / 1048576))
+  if [ $((used + want + 1536)) -lt "$total" ]; then
+    echo "fits: $used MiB of running limits + $want MiB + 1536 MiB for the host < $total MiB"
+    return 0
+  fi
+  echo "app-compose: not enough memory: $used MiB of running limits + $want MiB + 1536 MiB" \
+    "for the host is not below MemTotal ($total MiB)" >&2
+  [ -z "$unlimited" ] || echo "app-compose: running without a memory limit:$unlimited" >&2
+  return 1
+}
+
+[ $# -ge 1 ] || usage
+if [ "$1" = headroom ]; then
+  [ $# -eq 2 ] || usage
+  case $2 in '' | *[!0-9]*) usage ;; esac
+  headroom "$2"
+  exit
+fi
+
+app=$1
+shift
+case $app in '' | *[!a-z0-9]*) usage ;; esac
+[ -f "/etc/apps/$app.conf" ] || die "unknown app: $app"
+[ $# -ge 1 ] || usage
+# Only the conf sets these, never the caller's environment.
+PROJECT_DIR='' APP_COMPOSE_FILE='' ENV_FILES='' REPO='' EXTRA_TAG='' EXTRA_MODE='' SERVICE=''
+# shellcheck source=/dev/null
+. "/etc/apps/$app.conf"
+cd "$PROJECT_DIR"
+# sudo's env_reset drops these; a root shell on the console may still have some.
+unset "${!COMPOSE_@}" "${!DOCKER_@}"
+read -ra env_files <<<"$ENV_FILES"
+compose=(docker compose --project-directory "$PROJECT_DIR" -f "$PROJECT_DIR/$APP_COMPOSE_FILE")
+for f in "${env_files[@]}"; do compose+=(--env-file "$PROJECT_DIR/$f"); done
+
+# The compose config holds the env files' values, so it only ever goes to jq, never to the screen.
+config() { "${compose[@]}" --profile '*' config --format json --no-env-resolution; }
+
+if [ "$1" = tools ]; then
+  shift
+  [ $# -ge 2 ] || usage
+  env=$1 ref=$2
+  shift 2
+  if [ "$EXTRA_MODE" != pull ] || [ -z "$EXTRA_TAG" ]; then die "$app has no tools image"; fi
+  env_config "$env" || die "unknown environment: $env"
+  case $ref in '' | *[!a-z0-9.:@-]*) die "bad tag: $ref" ;; esac
+  printf '%s\n' "$ref" | grep -Eqx "($EXTRA_TAG)(@sha256:[0-9a-f]{64})?" ||
+    die "not a tools tag: $ref"
+  image=$REPO:$ref
+  docker image inspect "$image" >/dev/null 2>&1 ||
+    die "$ref is not on the server; a deploy that names it pulls it"
+  # The environment's own env files and networks, as its service has them; never an edge network.
+  spec=$(config | jq -er --arg s "$SERVICE" '
+    .name as $p | .networks as $n
+    | (.services[$s] // error("no service \($s)")) as $svc
+    | (($svc.env_file // []) | (if type == "array" then .[] else . end)
+        | (if type == "object" then .path else . end) | "env \(.)"),
+      (($svc.networks // {default: null}) | keys[] as $k | ($n[$k] // {})
+        | select((.external // false) == false) | "net \(.name // "\($p)_\($k)")")') ||
+    die "can't read $SERVICE from $APP_COMPOSE_FILE"
+  # The limits of a tools one-off on this server (memory 1 GiB, never swapped).
+  run=(docker run --rm -i --init --pull never --name "$app-tools-$env-$$"
+    --memory 1g --memory-swap 1g --cpus 1.0 --cpu-shares 256 --oom-score-adj 500
+    --pids-limit 512 --cap-drop ALL --security-opt no-new-privileges)
+  if [ -t 0 ] && [ -t 1 ]; then run+=(-t); fi
+  env_count=0
+  while read -r kind value; do
+    case $kind in
+      env)
+        case $value in /*) ;; *) value=$PROJECT_DIR/$value ;; esac
+        run+=(--env-file "$value")
+        env_count=$((env_count + 1))
+        ;;
+      net) run+=(--network "$value") ;;
+    esac
+  done <<<"$spec"
+  [ "$env_count" -gt 0 ] || die "$SERVICE has no env file, so $env has no tools runs"
+  headroom 1024 >/dev/null || exit 1
+  # The command's name only: its arguments may hold a secret.
+  logger -t app-compose "$app: tools $env $ref${1:+ $1}"
+  exec "${run[@]}" "$image" "$@"
+fi
+
+# The subcommand and, for run, the service it starts. Options that take a value are skipped with
+# it. The project and its files are app-compose's to set.
+sub='' svc='' no_deps=0
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+  a=${args[i]}
+  if [ -z "$sub" ]; then
+    case $a in
+      -f | -f?* | --file | --file=* | -p | -p?* | --project-name | --project-name=* | \
+        --project-directory | --project-directory=* | --env-file | --env-file=*)
+        die "the project and its files come from /etc/apps/$app.conf; drop $a" ;;
+      --profile | --ansi | --progress | --parallel) i=$((i + 1)) ;;
+      -*) ;;
+      *) sub=$a ;;
+    esac
+  elif [ "$sub" = run ]; then
+    case $a in
+      --no-deps) no_deps=1 ;;
+      -e | --env | --env-from-file | --entrypoint | -l | --label | --name | -p | --publish | \
+        --pull | -u | --user | -v | --volume | -w | --workdir | --cap-add | --cap-drop)
+        i=$((i + 1)) ;;
+      -*) ;;
+      *) svc=$a; break ;;
+    esac
+  else
+    break
+  fi
+done
+[ -n "$sub" ] || usage
+
+# A run starts the service plus, without --no-deps, what it depends on that isn't running yet
+# (restore-test brings restore-db): all of it must fit.
+if [ "$sub" = run ]; then
+  [ -n "$svc" ] || usage
+  running=$("${compose[@]}" ps --services --status running) ||
+    die "can't list $app's running services"
+  bytes=$(config | jq -er --arg s "$svc" --arg nodeps "$no_deps" --arg running "$running" '
+    . as $c
+    | ($running | split("\n")) as $up
+    | def deps($n): [$n] + [($c.services[$n].depends_on // {}) | keys[] | deps(.)[]];
+      (if $nodeps == "1" then [$s] else (deps($s) | unique) end)
+      | map(select(. as $n | any($up[]; . == $n) | not))
+      | map(($c.services[.] // error("no service \(.)")).mem_limit
+          // error("no mem_limit on \(.)") | tonumber)
+      | add // 0') ||
+    die "can't size the run of $svc from $APP_COMPOSE_FILE"
+  headroom $(((bytes + 1048575) / 1048576)) >/dev/null || exit 1
+fi
+logger -t app-compose "$app: $sub${svc:+ $svc}"
+exec "${compose[@]}" "$@"

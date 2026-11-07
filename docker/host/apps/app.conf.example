@@ -1,0 +1,65 @@
+# /etc/apps/<app>.conf (root:root 0644) for another app on the shared server. The admin writes it
+# from the values the app's maintainers send. <app> matches ^[a-z0-9]+$ and is also the Compose
+# project's name, /srv/<app> and the deploy user deploy-<app>. Root sources this file, so it holds
+# settings only, never commands. This example deploys staging from CI and production by the admin,
+# with migrations run as a one-off before each switch.
+
+# The project: its compose file and the files compose reads for interpolation, in order (later
+# files win). images.env belongs to app-deploy and must be one of them.
+PROJECT_DIR=/srv/example
+APP_COMPOSE_FILE=compose.yml                 # not COMPOSE_FILE, which Compose itself reads
+ENV_FILES=".env images.env"
+
+# CI deploys: the SSH user whose forced command runs app-deploy, and the environments its keys
+# may deploy. Every other environment is admin-only:
+#   sudo app-deploy example production <tag>@sha256:<digest> <migrate-tag>@sha256:<digest>
+CI_USER=deploy-example
+CI_ENVS="staging"
+
+# The one repository this app's images come from. Requests carry only tags and digests.
+REPO=ghcr.io/example-org/example-app
+REGISTRY_USER=example-org                    # the user name for docker login with a token
+
+# Per environment: the compose service, its variable in images.env, the tags allowed for it (an
+# extended regex that must match the whole tag) and, with EXTRA_MODE=migrate, the one-off service
+# that runs the migrations and its variable in images.env.
+env_config() {
+  case $1 in
+    staging)
+      SERVICE=web-staging VAR=STAGING_IMAGE TAG='staging-[0-9a-f]{40}'
+      MIGRATE_SERVICE=migrate-staging MIGRATE_VAR=MIGRATE_STAGING_IMAGE
+      ;;
+    production)
+      SERVICE=web VAR=WEB_IMAGE TAG='prod-v[0-9]+\.[0-9]+\.[0-9]+'
+      MIGRATE_SERVICE=migrate MIGRATE_VAR=MIGRATE_IMAGE
+      ;;
+    backup) SERVICE=backup VAR=BACKUP_IMAGE TAG='backup-[0-9a-f]{40}' ;;
+    *) return 1 ;;
+  esac
+}
+
+# The second image a deploy may name, and what happens to it. EXTRA_MODE=pull only fetches it (a
+# tools image for app-compose <app> tools). EXTRA_MODE=migrate sets MIGRATE_VAR to it and runs
+# MIGRATE_SERVICE before the switch; if that fails, nothing switches. EXTRA_KEEP: how many of
+# these images stay on the server.
+EXTRA_TAG='migrate-[0-9a-f]{40}' EXTRA_MODE=migrate EXTRA_KEEP=3
+
+# Seconds a switched service has to turn healthy before app-deploy rolls it back.
+HEALTH_TIMEOUT=300
+
+# Dumped before every production switch, encrypted to BACKUP_RECIPIENT, into predeploy/ (3 kept):
+# the database service, its superuser, then the databases. Empty: no dump.
+PREDEPLOY_DB="db postgres postgres"
+# This app's own age public key (age1...). Its private key stays offline with the admin.
+BACKUP_RECIPIENT=
+# Files and directories under PROJECT_DIR that app-config-archive encrypts nightly into
+# backup-out/, for the app's backup job to upload.
+CONFIG_ARCHIVE_FILES=".env images.env env deploys.log"
+
+# The edge (app-apply <app> site): the zone the site file may serve (it and one label under it),
+# the upstreams its reverse_proxy lines may name (aliases on its edge networks, all starting with
+# <app>-), the prefix of its {$...} placeholders in edge.env, and its edge networks.
+ZONE=example.com
+UPSTREAMS="example-web:3000 example-gw:8000 example-web-staging:3000"
+ENV_PREFIX=EXAMPLE_
+EDGE_NETWORKS="edge-example edge-example-staging"

@@ -1,0 +1,6 @@
+# /etc/sudoers.d/app-deploy (root:root 0440), installed by install.sh after visudo -cf.
+# A deploy user may run app-deploy with one argument only, the environment its key's forced
+# command names, so it never reaches the admin form. !use_pty keeps stdin a plain pipe for the
+# request and the registry token.
+Defaults!/usr/local/sbin/app-deploy !use_pty
+%deployers ALL=(root) NOPASSWD: /usr/local/sbin/app-deploy staging, /usr/local/sbin/app-deploy production
