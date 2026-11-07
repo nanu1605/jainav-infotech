@@ -1,0 +1,4 @@
+#!/bin/bash
+# Stand-in for age: records the recipient and passes the data through.
+printf 'age %s\n' "$*" >>"$STUB_STATE/calls"
+cat

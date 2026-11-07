@@ -79,3 +79,27 @@ jobs:
           push: false
           cache-from: type=gha,scope=ci-image
           cache-to: type=gha,mode=max,scope=ci-image
+
+  # The server's root scripts (docker/host) and the backup scripts: shellcheck, which the runner
+  # image ships, then app-deploy against stubs of docker and the host tools. The list is explicit,
+  # so each new script joins it on purpose.
+  host-scripts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Shellcheck
+        run: >-
+          shellcheck --version &&
+          shellcheck
+          docker/host/app-deploy docker/host/app-compose docker/host/app-apply
+          docker/host/app-config-archive docker/host/cf-ranges docker/host/hostwatch
+          docker/host/install.sh
+          docker/backup/backup.sh docker/backup/prune-umami.sh docker/backup/restore-test.sh
+          tests/host/app-deploy.sh
+      - name: app-deploy refuses bad requests and rolls back
+        run: bash tests/host/app-deploy.sh

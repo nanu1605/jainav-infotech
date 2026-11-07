@@ -1,0 +1,8 @@
+#!/bin/bash
+# Stand-in for /usr/local/sbin/app-compose: records the call; "headroom" fails while
+# $STUB_STATE/no-headroom exists.
+printf 'app-compose %s\n' "$*" >>"$STUB_STATE/calls"
+if [ "${1-}" = headroom ] && [ -e "$STUB_STATE/no-headroom" ]; then
+  echo "app-compose: not enough memory for $2 MiB" >&2
+  exit 1
+fi

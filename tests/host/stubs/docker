@@ -1,0 +1,152 @@
+#!/bin/bash
+# Stand-in for docker in tests/host/app-deploy.sh. Every call is a line in $STUB_STATE/calls. A
+# small image store ($STUB_STATE/images: "<repo> <tag or -> <digest>"), the image each service runs
+# (running-<service>) and flag files under $STUB_STATE decide the answers.
+set -euo pipefail
+s=$STUB_STATE
+printf 'docker %s\n' "$*" >>"$s/calls"
+touch "$s/images"
+
+flag() { [ -e "$s/$1" ]; }
+# Whether REF contains one of the strings listed in the file NAME.
+listed() { [ -s "$s/$2" ] && grep -qF -f "$s/$2" <<<"$1"; }
+repo_of() {
+  local n=${1%%@*}
+  case ${n##*/} in *:*) n=${n%:*} ;; esac
+  printf '%s\n' "$n"
+}
+tag_of() {
+  local n=${1%%@*}
+  case ${n##*/} in *:*) printf '%s\n' "${n##*:}" ;; *) echo - ;; esac
+}
+# The digest REF resolves to: by digest when it names one, else by tag.
+digest_of() {
+  local repo tag
+  repo=$(repo_of "$1")
+  case $1 in
+    *@*) awk -v r="$repo" -v d="${1#*@}" '$1 == r && $3 == d {f = 1} END {if (f) print d; else exit 1}' "$s/images" ;;
+    *) tag=$(tag_of "$1"); awk -v r="$repo" -v t="$tag" '$1 == r && $2 == t {d = $3} END {if (d) print d; else exit 1}' "$s/images" ;;
+  esac
+}
+add() {   # add REPO TAG DIGEST: replaces what TAG pointed to
+  awk -v r="$1" -v t="$2" -v d="$3" '!($1 == r && $2 == t && (t != "-" || $3 == d))' "$s/images" >"$s/images.new"
+  printf '%s %s %s\n' "$1" "$2" "$3" >>"$s/images.new"
+  mv "$s/images.new" "$s/images"
+}
+# The value a service's image variable has in the env files (later files win).
+image_of() {
+  local svc=$1 var='' pair line value=''
+  shift
+  for pair in $STUB_SERVICE_VARS; do [ "${pair%%=*}" = "$svc" ] && var=${pair#*=}; done
+  for f in "$@"; do
+    while IFS= read -r line || [ -n "$line" ]; do
+      case $line in "$var="*) value=${line#*=} ;; esac
+    done <"$f"
+  done
+  printf '%s\n' "$value"
+}
+
+compose() {
+  local files=() sub
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --project-directory | -f | --profile) shift 2 ;;
+      --env-file) files+=("$2"); shift 2 ;;
+      *) break ;;
+    esac
+  done
+  sub=$1
+  shift
+  case $sub in
+    up)
+      flag up-fails && exit 1
+      image_of "${*: -1}" "${files[@]}" >"$s/running-${*: -1}"
+      printf 'up %s %s\n' "${*: -1}" "$(cat "$s/running-${*: -1}")" >>"$s/calls"
+      ;;
+    ps) [ ! -e "$s/running-${*: -1}" ] || echo "cid-${*: -1}" ;;
+    stop) rm -f "$s/running-${*: -1}" ;;
+    exec)
+      flag dump-fails && exit 1
+      head -c 2048 /dev/zero | tr '\0' x
+      ;;
+    run)
+      printf 'ran %s %s\n' "${*: -1}" "$(image_of "${*: -1}" "${files[@]}")" >>"$s/calls"
+      flag run-fails && exit 1
+      ;;
+    config) if [ -e "$s/config.json" ]; then cat "$s/config.json"; else echo '{}'; fi ;;
+  esac
+  exit 0
+}
+
+case $1 in
+  compose) shift; compose "$@" ;;
+  login)
+    cat >"$s/login-token"
+    flag login-fails && exit 1
+    echo "Login Succeeded"
+    ;;
+  logout) ;;
+  pull)
+    flag pull-fails && { echo "pull failed" >&2; exit 1; }
+    ref=${*: -1}
+    case $ref in
+      *@*) add "$(repo_of "$ref")" - "${ref#*@}" ;;
+      *)
+        d=sha256:$(printf '%s' "$ref" | sha256sum | cut -c 1-64)
+        add "$(repo_of "$ref")" "$(tag_of "$ref")" "$d"
+        add "$(repo_of "$ref")" - "$d"
+        ;;
+    esac
+    echo "$ref"
+    ;;
+  tag)
+    d=$(digest_of "$2") || { echo "No such image: $2" >&2; exit 1; }
+    add "$(repo_of "$3")" "$(tag_of "$3")" "$d"
+    ;;
+  image)
+    # image inspect [--format F] REF
+    shift 2
+    format=
+    if [ "$1" = --format ]; then format=$2; shift 2; fi
+    d=$(digest_of "$1") || { echo "Error: No such image: $1" >&2; exit 1; }
+    case $format in
+      *RepoDigests*) printf '%s@%s\n' "$(repo_of "$1")" "$d" ;;
+      '') echo '[{}]' ;;
+    esac
+    ;;
+  images)
+    # images [--digests] --format F REPO: tags newest first
+    repo=${*: -1}
+    awk -v r="$repo" '$1 == r && $2 != "-" {print $2, $3}' "$s/images" | tac
+    ;;
+  rmi)
+    shift
+    for ref in "$@"; do
+      case $ref in
+        *@*) awk -v r="$(repo_of "$ref")" -v d="${ref#*@}" '!($1 == r && $2 == "-" && $3 == d)' "$s/images" >"$s/images.new" ;;
+        *) awk -v r="$(repo_of "$ref")" -v t="$(tag_of "$ref")" '!($1 == r && $2 == t)' "$s/images" >"$s/images.new" ;;
+      esac
+      mv "$s/images.new" "$s/images"
+    done
+    ;;
+  inspect)
+    # inspect --format F cid-<service>: status restarting restart-count health
+    cid=${*: -1}
+    svc=${cid#cid-}
+    [ -e "$s/running-$svc" ] || { echo "No such container: $cid" >&2; exit 1; }
+    ref=$(cat "$s/running-$svc")
+    if listed "$ref" crash; then
+      echo "restarting true 2 starting"
+    elif [ -s "$s/nohealth" ] && grep -qx "$svc" "$s/nohealth"; then
+      echo "running false 0 none"
+    elif listed "$ref" bad; then
+      echo "running false 0 unhealthy"
+    elif listed "$ref" starting; then
+      echo "running false 0 starting"
+    else
+      echo "running false 0 healthy"
+    fi
+    ;;
+  ps | rm) ;;
+  *) echo "stub docker: unexpected call: $*" >&2; exit 1 ;;
+esac
