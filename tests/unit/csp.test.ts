@@ -1,6 +1,7 @@
+import { withPayload } from '@payloadcms/next/withPayload'
 import { describe, expect, it } from 'vitest'
 
-import { contentSecurityPolicy, securityHeaders } from '@/lib/csp'
+import { adminOnlyClientHints, contentSecurityPolicy, securityHeaders } from '@/lib/csp'
 
 const directives = (csp: string) =>
   Object.fromEntries(
@@ -85,5 +86,15 @@ describe('content security policy', () => {
         'Permissions-Policy',
       ]),
     )
+  })
+
+  it('keeps Payload’s colour-scheme client hints to the admin', async () => {
+    const rules = adminOnlyClientHints((await withPayload({}).headers?.()) ?? [])
+    const hinted = rules.filter((rule) =>
+      rule.headers.some((h) => ['Accept-CH', 'Critical-CH'].includes(h.key)),
+    )
+    // If this finds nothing, withPayload stopped sending the hints: drop adminOnlyClientHints.
+    expect(hinted.length).toBeGreaterThan(0)
+    for (const rule of hinted) expect(rule.source).toBe('/admin/:path*')
   })
 })

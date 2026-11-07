@@ -6,6 +6,7 @@ import { Fragment, useEffect, useId, useRef, useState, type CSSProperties } from
 
 import { revealPieces } from '@/components/motion/TextReveal'
 import { IconButton } from '@/components/ui/IconButton'
+import { useHydrated } from '@/lib/useHydrated'
 
 import { buildTimeline, restFrame, type OrbState } from './baby/script'
 
@@ -109,6 +110,10 @@ export function BabyOrb({ speaking = false }: Props) {
   const [tick, setTick] = useState(() => restFrame(timeline))
   const [live, setLive] = useState(false)
   const [paused, setPaused] = useState(false)
+  // The Hindi exchange is hidden in the still frame, yet laying it out fetched Mukta ahead of the
+  // hero (spec §15 LCP). It takes the device's font until the orb hydrates, which is after the
+  // first paint; the box is size-contained, so the swap moves nothing and is never seen.
+  const hydrated = useHydrated()
 
   // Live while on screen in a visible tab; never with reduced motion (the still frame stays).
   useEffect(() => {
@@ -219,7 +224,11 @@ export function BabyOrb({ speaking = false }: Props) {
               // Other exchanges keep every word on, so one fading out stays whole.
               const shown = (n: number) => (active ? n : Infinity)
               return (
-                <div key={key} className="bo-ex" data-on={active ? '' : undefined}>
+                <div
+                  key={key}
+                  className={lang === 'hi' && !hydrated ? 'bo-ex font-system' : 'bo-ex'}
+                  data-on={active ? '' : undefined}
+                >
                   <span className="inline-flex rounded-full border border-border px-[0.65em] text-[max(0.75em,0.6875rem)] text-fg-muted">
                     {t(`languages.${key}`)}
                   </span>

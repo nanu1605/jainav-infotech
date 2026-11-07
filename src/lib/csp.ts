@@ -59,6 +59,21 @@ export function contentSecurityPolicy(
   ].join('; ')
 }
 
+type HeaderRule = { source: string; headers: { key: string; value: string }[] }
+
+/**
+ * withPayload asks every response for the Sec-CH-Prefers-Color-Scheme hint (Accept-CH, Vary and
+ * Critical-CH), so that the admin renders in the visitor's theme. Public pages theme on the client,
+ * and on them Critical-CH makes Chrome send each first visit twice: it restarts the navigation to
+ * add the hint (Lighthouse's "Avoid multiple page redirects", about 600 ms on mobile). This keeps
+ * that rule to the admin.
+ */
+export function adminOnlyClientHints<T extends HeaderRule>(rules: T[]): T[] {
+  return rules.map((rule) =>
+    rule.headers.some((h) => h.key === 'Critical-CH') ? { ...rule, source: '/admin/:path*' } : rule,
+  )
+}
+
 /** Response headers for every route in production builds (spec §16). */
 export function securityHeaders(env: CspEnv) {
   return [
