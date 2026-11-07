@@ -1,4 +1,6 @@
 #!/bin/sh
+# shellcheck disable=SC3040
+# (busybox ash, this image's sh, has pipefail)
 # Deletes Umami's visitor data older than UMAMI_RETENTION_DAYS (empty = keep it). Umami has no
 # retention setting of its own. Tables as of Umami 3.4: a new one holding visitor data needs a line
 # here, and a dropped one fails this script, which Telegram is told about.
@@ -8,12 +10,18 @@ days=${UMAMI_RETENTION_DAYS:-}
 [ -n "$days" ] || exit 0
 
 alert() {
-  echo "$1" >&2
-  [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ] &&
+  msg="[jainav] $1"
+  echo "$msg" >&2
+  if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
     curl -fsS -o /dev/null "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-      --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=$1" || true
+      --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=$msg" || true
+  fi
 }
-trap 'status=$?; [ "$status" -ne 0 ] && alert "Umami retention failed (exit $status)"' EXIT
+finish() {
+  status=$?
+  if [ "$status" -ne 0 ]; then alert "Umami retention failed (exit $status)"; fi
+}
+trap finish EXIT
 
 case "$days" in
   *[!0-9]*) echo "UMAMI_RETENTION_DAYS must be a whole number of days" >&2; exit 1 ;;

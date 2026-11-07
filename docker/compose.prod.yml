@@ -179,6 +179,12 @@ services:
       RCLONE_CONFIG_BACKUPS_NO_CHECK_BUCKET: 'true'
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      # Pinged after every full success; the monitor alerts when 26 hours pass without one.
+      HEARTBEAT_URL: ${BACKUP_HEARTBEAT_URL:-}
+    # The host's timer writes the encrypted settings archives here (docs/runbooks/backups.md). This
+    # container sees ciphertext only, read-only: the settings files never enter it.
+    volumes:
+      - ./backup-out:/config-out:ro
     mem_limit: 384m
     memswap_limit: 384m
     cpus: 0.5
