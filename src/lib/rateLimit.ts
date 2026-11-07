@@ -54,8 +54,10 @@ const RULES = {
 export type Rule = keyof typeof RULES
 
 /**
- * The visitor's IP. Production sits behind Cloudflare and its origin only accepts Cloudflare's
- * ranges, so CF-Connecting-IP is trustworthy there; the fallbacks are for local runs.
+ * The visitor's IP. Production sits behind Cloudflare and its origin only accepts requests that
+ * come through Cloudflare, so CF-Connecting-IP is trustworthy there; the fallbacks are for local
+ * runs. On Vercel that takes a firewall rule refusing direct requests, before any deployment there
+ * is public.
  */
 export const clientIp = (headers: Headers) =>
   headers.get('cf-connecting-ip') ||
