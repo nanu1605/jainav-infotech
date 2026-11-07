@@ -5,4 +5,5 @@ src/payload-types.ts
 src/app/(payload)/
 src/styles/tokens.css
 src/styles/tokens.generated.ts
+src/components/layout/logo-mark.generated.ts
 tests/fixtures/

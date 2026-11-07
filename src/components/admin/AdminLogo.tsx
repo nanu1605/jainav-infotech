@@ -1,6 +1,6 @@
-import { tokens } from '@/styles/tokens.generated'
+import { LogoMark } from '@/components/layout/LogoMark'
 
-/** Placeholder admin branding until the brand kit arrives (spec §10, Appendix B). */
+/** Login-page branding (spec §10, Appendix B): the mark beside the company name. */
 export function AdminLogo() {
   return (
     <span
@@ -12,31 +12,8 @@ export function AdminLogo() {
         fontWeight: 700,
       }}
     >
-      <Monogram size={40} />
+      <LogoMark height={40} />
       Jainav Infotech
-    </span>
-  )
-}
-
-export function Monogram({ size = 24 }: { size?: number }) {
-  return (
-    <span
-      aria-hidden
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: size,
-        height: size,
-        borderRadius: size / 4,
-        background: tokens.light.primary,
-        color: tokens.light['primary-fg'],
-        fontWeight: 700,
-        fontSize: size * 0.55,
-        lineHeight: 1,
-      }}
-    >
-      J
     </span>
   )
 }

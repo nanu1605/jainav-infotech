@@ -19,6 +19,7 @@
     "test:e2e": "playwright test",
     "test:smoke": "playwright test --config playwright.smoke.config.ts",
     "tokens:build": "tsx scripts/tokens-build.ts",
+    "brand:assets": "tsx scripts/brand-assets.ts",
     "check:tokens": "tsx scripts/check-tokens.ts",
     "check:i18n": "tsx scripts/check-i18n.ts",
     "check:migrations": "cross-env NODE_OPTIONS=--no-deprecation PAYLOAD_MIGRATING=true payload run scripts/check-migrations.ts",

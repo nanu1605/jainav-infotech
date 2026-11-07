@@ -74,7 +74,7 @@ export function MobileMenuDialog({
                   <Link
                     href={item.href}
                     aria-current={currentAttr(pathname, item.href)}
-                    className="flex min-h-12 items-center rounded-md px-2 font-display text-2xl font-semibold transition-colors duration-(--duration-fast) hover:bg-hover aria-[current]:text-primary"
+                    className="flex min-h-12 items-center rounded-md px-2 font-display text-2xl font-semibold transition-colors duration-(--duration-fast) decoration-ring decoration-2 underline-offset-8 hover:bg-hover aria-[current]:underline"
                   >
                     {item.label}
                   </Link>

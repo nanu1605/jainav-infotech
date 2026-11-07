@@ -52,7 +52,7 @@ export async function PricingTable({ tiers, level = 3 }: { tiers: Tier[]; level?
         >
           <div className="flex items-center justify-between gap-3">
             <Heading className="font-display text-xl font-semibold text-fg">{tier.name}</Heading>
-            {tier.highlight && <Badge tone="primary">{t('recommended')}</Badge>}
+            {tier.highlight && <Badge tone="accent">{t('recommended')}</Badge>}
           </div>
           {tier.description && <p className="mt-2 text-sm text-fg-muted">{tier.description}</p>}
           <p className="mt-6 flex items-baseline gap-1.5">

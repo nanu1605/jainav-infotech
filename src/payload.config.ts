@@ -153,6 +153,11 @@ export default buildConfig({
     meta: {
       titleSuffix: '- Jainav Admin',
       defaultOGImageType: 'off',
+      // The site's own icons (pnpm brand:assets); Payload's favicon shows otherwise.
+      icons: [
+        { rel: 'icon', type: 'image/png', sizes: '512x512', url: '/icon.png' },
+        { rel: 'apple-touch-icon', type: 'image/png', sizes: '180x180', url: '/apple-icon.png' },
+      ],
     },
     livePreview: {
       url: livePreviewURL,
