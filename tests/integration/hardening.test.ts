@@ -370,46 +370,49 @@ describe('legal pages with blanks', () => {
     expect(page._status).toBe('published')
   })
 
-  // Payload accepts locale=all, though its generated type lists only real locales. On an update it
-  // ignores the text sent and keeps what is stored, so the stored text is what counts.
+  // Payload accepts locale=all, though its generated type lists only real locales. Since 3.92 an
+  // update writes each language sent and keeps the stored text of the rest, as a create does.
   const allLocales = 'all' as never
-  it('checks what is stored when a save names every language', async () => {
-    const clean = { en: body('Full text'), hi: body('पूरा पाठ') }
+  it('checks each language a save for every language sends, and the stored text of the rest', async () => {
     const blank = await draftPage('Full text', 'समय: {{BUSINESS_DAYS}}')
     await refused(
       payload.update({
         collection: 'legal-pages',
         id: blank,
         locale: allLocales,
-        data: { body: clean, _status: 'published' } as never,
+        data: { body: { en: body('Full text') }, _status: 'published' } as never,
         ...as('owner'),
       }),
       'Hindi: {{BUSINESS_DAYS}}',
     )
     expect(await live(blank)).toBeUndefined()
-
-    const id = await draftPage('Full text', 'पूरा पाठ')
     await payload.update({
       collection: 'legal-pages',
-      id,
+      id: blank,
       locale: allLocales,
       data: {
-        body: { en: body('{{NEVER_WRITTEN}}'), hi: body('{{NEVER_WRITTEN}}') },
+        body: { en: body('Full text'), hi: body('पूरा पाठ') },
         _status: 'published',
       } as never,
       ...as('owner'),
     })
-    expect(
-      JSON.stringify(
-        await payload.findByID({
-          collection: 'legal-pages',
-          id,
-          locale: allLocales,
-          depth: 0,
-          overrideAccess: true,
-        }),
-      ),
-    ).not.toContain('{{')
+    expect(JSON.stringify(await live(blank, 'hi'))).toContain('पूरा पाठ')
+
+    const id = await draftPage('Full text', 'पूरा पाठ')
+    await refused(
+      payload.update({
+        collection: 'legal-pages',
+        id,
+        locale: allLocales,
+        data: {
+          body: { en: body('{{NEVER_WRITTEN}}'), hi: body('{{NEVER_WRITTEN}}') },
+          _status: 'published',
+        } as never,
+        ...as('owner'),
+      }),
+      'English: {{NEVER_WRITTEN}}. Hindi: {{NEVER_WRITTEN}}.',
+    )
+    expect(await live(id)).toBeUndefined()
   })
 
   it('refuses a copy published with a blank in the language it was not made from', async () => {

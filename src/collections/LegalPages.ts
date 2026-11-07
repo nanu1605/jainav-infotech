@@ -63,9 +63,13 @@ const refuseBlanks: FieldHook = ({
   const stored = (siblingDocWithLocales ?? {}) as Record<string, Record<string, unknown>>
   const blanks = Object.entries(LANGUAGES).flatMap(([locale, language]) => {
     const text = LOCALIZED_TEXT.map((field) => {
-      const written = locale === req.locale ? siblingData[field] : stored[field]?.[locale]
-      // A create with locale=all keeps what it was sent; an update ignores it.
-      return written ?? (req.locale === 'all' ? siblingData[field]?.[locale] : undefined)
+      const sent = siblingData[field]
+      // locale=all sends each language keyed by locale. Payload writes the ones sent and keeps the
+      // stored text of the rest, on an update too since 3.92 (payloadcms/payload#18500).
+      if (req.locale === 'all' && sent && typeof sent === 'object' && !Array.isArray(sent)) {
+        return locale in sent ? sent[locale] : stored[field]?.[locale]
+      }
+      return locale === req.locale ? sent : stored[field]?.[locale]
     })
     const found = placeholdersIn([...text, siblingData.version, siblingData.slug])
     // Spaces, not commas: the admin's toast splits its message at every comma.
