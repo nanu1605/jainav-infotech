@@ -1,12 +1,13 @@
 /**
- * pnpm brand:assets — favicons and app icons from the logo files in public/brand/ (spec
- * Appendix B). The tile takes the light theme's primary color and the mark its primary-fg, so
- * run `pnpm tokens:build` first whenever the palette changes, then commit what this writes.
+ * pnpm brand:assets — everything drawn from the logo master, public/brand/logo-mark.svg (spec
+ * Appendix B): the paths <LogoMark /> draws inline, black and white copies of the SVG, a PNG for
+ * structured data, the favicon and the app icons. Icon tiles take the light theme's primary and
+ * the mark its primary-fg, so run `pnpm tokens:build` first whenever the palette changes, then
+ * commit what this writes.
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parse, wcagLuminance } from 'culori'
 import sharp from 'sharp'
 
 import { tokens } from '../src/styles/tokens.generated'
@@ -14,34 +15,67 @@ import { tokens } from '../src/styles/tokens.generated'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const brand = (file: string) => path.join(root, 'public/brand', file)
 
-const tileColor = tokens.light.primary
-const mark = readFileSync(
-  brand(
-    wcagLuminance(parse(tokens.light['primary-fg'])!) > 0.5
-      ? 'logo-mark-dark.png'
-      : 'logo-mark-light.png',
+// The master holds only paths, in currentColor: no groups, transforms or styles, so the same
+// paths can be drawn inline, recoloured and rasterised. Clean a designer's export to that shape
+// (one <path d> per shape) before replacing it.
+const master = readFileSync(brand('logo-mark.svg'), 'utf8')
+const svg = /^<svg((?:\s+[\w:-]+="[^"]*")*)\s*>([\s\S]*)<\/svg>\s*$/.exec(master)
+const attributes = new Map(
+  [...(svg?.[1] ?? '').matchAll(/([\w:-]+)="([^"]*)"/g)].map(
+    ([, name, value]) => [name!, value!] as const,
   ),
 )
+const viewBox = /^0 0 ([\d.]+) ([\d.]+)$/.exec(attributes.get('viewBox') ?? '')
+const paths = [...(svg?.[2] ?? '').matchAll(/<path d="([^"]+)"\/>/g)].map(([, d]) => d!)
+const rest = (svg?.[2] ?? '').replace(/<path d="[^"]+"\/>/g, '').trim()
+// Nothing rebuilds the root's other attributes, so a transform or style there would be lost.
+const unknown = [...attributes.keys()].filter(
+  (name) => !['xmlns', 'width', 'height', 'viewBox', 'fill'].includes(name),
+)
+if (
+  !svg ||
+  !viewBox ||
+  attributes.get('fill') !== 'currentColor' ||
+  unknown.length ||
+  !paths.length ||
+  rest
+) {
+  throw new Error(
+    'public/brand/logo-mark.svg must be one <svg viewBox="0 0 w h" fill="currentColor"> (xmlns, width and height allowed) holding only <path d="…"/> elements.',
+  )
+}
+const width = Number(viewBox[1])
+const height = Number(viewBox[2])
+
+/** The mark as a standalone SVG in one colour. */
+const markSvg = (fill: string) =>
+  [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" fill="${fill}">`,
+    ...paths.map((d) => `  <path d="${d}"/>`),
+    '</svg>',
+    '',
+  ].join('\n')
+
+// As supplied: pure black for light surfaces, pure white for dark ones.
+const light = markSvg('#000000')
+const dark = markSvg('#ffffff')
 
 /**
  * The mark centred on a square tile. `scale` is the mark's width as a share of the tile;
- * `radius` rounds the corners (0 for icons the platform masks itself).
+ * `radius` rounds the corners (0 for icons the platform masks itself). The mark's box snaps to
+ * whole pixels, and librsvg draws the tile straight at its final size.
  */
 async function tile(size: number, scale: number, radius: number) {
-  const width = Math.round(size * scale)
-  const resized = await sharp(mark).resize({ width, kernel: 'lanczos3' }).toBuffer()
-  const { height = width } = await sharp(resized).metadata()
-  const background = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${Math.round(size * radius)}" fill="${tileColor}"/></svg>`
-  return sharp(Buffer.from(background))
-    .composite([
-      {
-        input: resized,
-        left: Math.round((size - width) / 2),
-        top: Math.round((size - height) / 2),
-      },
-    ])
-    .png({ compressionLevel: 9 })
-    .toBuffer()
+  const w = Math.round(size * scale)
+  const h = Math.round((w * height) / width)
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">`,
+    `<rect width="${size}" height="${size}" rx="${Math.round(size * radius)}" fill="${tokens.light.primary}"/>`,
+    `<svg x="${Math.round((size - w) / 2)}" y="${Math.round((size - h) / 2)}" width="${w}" height="${h}" viewBox="0 0 ${width} ${height}" fill="${tokens.light['primary-fg']}">`,
+    ...paths.map((d) => `<path d="${d}"/>`),
+    '</svg></svg>',
+  ].join('')
+  return sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toBuffer()
 }
 
 /** An ICO file holding PNG images, which every current browser reads. */
@@ -74,7 +108,24 @@ const favicon = await Promise.all(
   ).map(async ([size, scale]) => ({ size, png: await tile(size, scale, 0.22) })),
 )
 
-const outputs: Array<[string, Buffer]> = [
+const generated = [
+  '// Generated by `pnpm brand:assets` from public/brand/logo-mark.svg. Do not edit.',
+  '',
+  `export const logoMark = ${JSON.stringify({ width, height, paths }, null, 2)} as const`,
+  '',
+].join('\n')
+
+const outputs: Array<[string, string | Buffer]> = [
+  ['src/components/layout/logo-mark.generated.ts', generated],
+  ['public/brand/logo-mark-light.svg', light],
+  ['public/brand/logo-mark-dark.svg', dark],
+  // The organization logo in the home page's structured data, as a PNG: not every consumer reads SVG.
+  [
+    'public/brand/logo-mark-light.png',
+    await sharp(Buffer.from(light), { density: (72 * 1024) / width })
+      .png({ palette: true, compressionLevel: 9 })
+      .toBuffer(),
+  ],
   ['src/app/favicon.ico', ico(favicon)],
   ['src/app/icon.png', await tile(512, 0.62, 0.22)],
   // iOS rounds the corners itself and shows transparency as black.
