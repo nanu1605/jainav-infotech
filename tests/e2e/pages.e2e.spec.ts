@@ -5,6 +5,8 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 
+import { settle } from './helpers/settle'
+
 const ROUTES = [
   '/',
   '/products',
@@ -195,6 +197,7 @@ for (const url of [
   for (const path of [url, hi(url)]) {
     test(`axe: ${path}`, async ({ page }) => {
       await page.goto(path)
+      await settle(page)
       const axe = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
         // Radix NavigationMenu's empty focus proxy: aria-hidden on purpose, it only forwards focus.

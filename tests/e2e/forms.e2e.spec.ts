@@ -9,6 +9,8 @@ import path from 'node:path'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
+import { settle } from './helpers/settle'
+
 const OUTBOX = path.resolve('.outbox')
 const run = Date.now()
 const address = (name: string) => `${name}.${run}@example.test`
@@ -191,6 +193,7 @@ test('newsletter: sign up in the footer, confirm by email, unsubscribe', async (
 test('form pages pass axe', async ({ page }) => {
   for (const url of ['/contact', '/hi/contact', '/careers', '/services', '/products/baby']) {
     await page.goto(url)
+    await settle(page)
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
       // Cloudflare's challenge frame is third-party markup.
