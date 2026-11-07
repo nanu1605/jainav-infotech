@@ -89,13 +89,14 @@ export async function releaseStuckJobs(payload: Payload) {
 
 /**
  * Background work (spec §2, §11.3). Handlers import their code on first use, so the Payload
- * config stays light. autoRun ticks every minute once crons start (instrumentation.ts), or
- * /api/v1/cron does the same on Vercel; route handlers also run the queue right after a payment
- * so emails don't wait for the tick.
+ * config stays light. autoRun ticks every minute once crons start (instrumentation.ts); route
+ * handlers also run the queue right after a payment so emails don't wait for the tick.
+ * Vercel has no autoRun, because Payload's own routes would start it in instances that sleep
+ * between requests; /api/v1/cron does the tick there.
  */
 export const jobs: JobsConfig = {
   access: { run: ({ req }) => hasRole(req.user, 'owner') },
-  autoRun: [{ cron: '* * * * *', queue: 'default' }],
+  ...(process.env.VERCEL ? {} : { autoRun: [{ cron: '* * * * *', queue: 'default' }] }),
   shouldAutoRun: async (payload) => {
     await releaseStuckJobs(payload)
     return true

@@ -39,6 +39,10 @@ describe('GET /api/v1/cron', () => {
   })
 
   it('releases a stuck job, runs it and queues what is scheduled', async () => {
+    // A schedule counts from the last run in the stats global, so an earlier run's leftovers would
+    // make reconcileOrders due at once (run and deleted) or already queued.
+    await db().execute(sql`DELETE FROM payload_jobs_stats`)
+    await db().execute(sql`DELETE FROM payload_jobs WHERE task_slug = 'reconcileOrders'`)
     const job = await payload.jobs.queue({ task: 'cleanup', input: {} })
     await db().execute(
       sql`UPDATE payload_jobs SET processing = true, updated_at = now() - interval '31 minutes' WHERE id = ${job.id}`,
@@ -55,12 +59,14 @@ describe('GET /api/v1/cron', () => {
       overrideAccess: true,
     })
     expect(left.docs).toHaveLength(0)
-    const { totalDocs: scheduled } = await payload.count({
+    const { docs: scheduled } = await payload.find({
       collection: 'payload-jobs',
       where: { taskSlug: { equals: 'reconcileOrders' } },
+      depth: 0,
       overrideAccess: true,
     })
-    expect(scheduled).toBeGreaterThan(0)
+    expect(scheduled).toHaveLength(1)
+    expect(Date.parse(scheduled[0]?.waitUntil ?? '')).toBeGreaterThan(Date.now())
   })
 })
 
@@ -71,5 +77,15 @@ describe('the rate limiter', () => {
     expect(query).toHaveBeenCalled()
     expect(query.mock.calls.every(([statement]) => typeof statement === 'string')).toBe(true)
     query.mockRestore()
+  })
+})
+
+describe('the jobs config', () => {
+  // Payload's own routes start autoRun whatever getClient passes, so only its absence keeps it off.
+  it('has no autoRun on Vercel', async () => {
+    vi.stubEnv('VERCEL', '1')
+    vi.resetModules()
+    const { jobs } = await import('@/jobs')
+    expect(jobs.autoRun).toBeUndefined()
   })
 })

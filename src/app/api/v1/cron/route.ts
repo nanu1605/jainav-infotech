@@ -16,9 +16,10 @@ const authorized = (header: string | null) => {
 
 /**
  * GET /api/v1/cron: one tick of the jobs queue, for Vercel Cron (vercel.json), which sends
- * CRON_SECRET as a bearer token. A long-running server does this with autoRun instead. Delivery is
- * best effort and can overlap: a later tick picks up what a missed one left, and every job handler
- * is idempotent.
+ * CRON_SECRET as a bearer token. Vercel Cron calls only the production deployment, so a preview is
+ * ticked by hand. A long-running server does this with autoRun instead. Delivery is best effort
+ * and can repeat or overlap: a later tick picks up what a missed one left, and the job handlers
+ * are idempotent, except remindDataRequests, which can then remind staff twice.
  */
 export async function GET(request: Request) {
   if (!authorized(request.headers.get('authorization'))) return new Response(null, { status: 401 })
