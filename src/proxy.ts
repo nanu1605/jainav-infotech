@@ -29,6 +29,6 @@ export const config = {
   // the root metadata files. Not every dotted path: a blog tag like "node.js" is a page. Files
   // added to public/ later must be listed here.
   matcher: [
-    '/((?!(?:admin|api|brand|go|feeds|og|_next|_vercel)(?:/|$)|(?:robots\\.txt|sitemap\\.xml|favicon\\.ico)$).*)',
+    '/((?!(?:admin|api|brand|go|feeds|og|_next|_vercel)(?:/|$)|(?:robots\\.txt|sitemap\\.xml|favicon\\.ico|(?:apple-)?icon(?:\\.png)?|manifest\\.webmanifest)$).*)',
   ],
 }
