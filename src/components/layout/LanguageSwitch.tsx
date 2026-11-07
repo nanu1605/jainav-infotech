@@ -44,7 +44,9 @@ export function LanguageSwitch({ className }: { className?: string }) {
             </span>
           )}
           {/* next/link on purpose: given `locale`, next-intl's Link forces /en/… for English,
-              which only 307-redirects here (docs/decisions.md). */}
+              which only 307-redirects here (docs/decisions.md). On English pages "हिंदी" is
+              set in the device's font: Mukta for five letters would be a 63 KB download ahead
+              of the hero (spec §15 LCP). */}
           <NextLink
             href={getPathname({ href: pathname, locale }) + search}
             lang={locale}
@@ -54,7 +56,10 @@ export function LanguageSwitch({ className }: { className?: string }) {
               rememberLocale(locale)
               if (locale !== current) track('language_switch', { to: locale })
             }}
-            className="inline-flex h-10 min-w-10 items-center justify-center rounded-md px-2 text-fg-muted transition-colors duration-(--duration-fast) hover:text-fg aria-[current=true]:font-semibold aria-[current=true]:text-fg"
+            className={cn(
+              'inline-flex h-10 min-w-10 items-center justify-center rounded-md px-2 text-fg-muted transition-colors duration-(--duration-fast) hover:text-fg aria-[current=true]:font-semibold aria-[current=true]:text-fg',
+              locale === 'hi' && current !== 'hi' && 'font-system',
+            )}
           >
             {t(locale)}
           </NextLink>

@@ -83,6 +83,9 @@
   /* Latin font first, Devanagari second: mixed text uses each script's font. */
   --font-sans: var(--font-jakarta), var(--font-mukta), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-jakarta), var(--font-mukta), ui-sans-serif, system-ui, sans-serif;
+  /* The device's own font, for a word in a script the page doesn't otherwise show (the language
+     switch's Hindi on English pages), so it doesn't download that script's web font. */
+  --font-system: ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Continuous marquee (spec §14): transform only; the global reduced-motion rule stops it. */
