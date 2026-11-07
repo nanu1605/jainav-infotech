@@ -9,8 +9,10 @@ import { Toaster } from '@/components/feedback/Toast'
 import { ClientMessages } from '@/i18n/clientMessages'
 import { routing } from '@/i18n/routing'
 import { SITE_URL } from '@/lib/seo'
-import { fontVariables } from '@/styles/fonts'
+// The main stylesheet first, so it takes the page's open connection even when next/font's rules
+// land in a file of their own (Turbopack splits CSS past a size limit; docs/decisions.md).
 import '@/styles/globals.css'
+import { fontVariables } from '@/styles/fonts'
 
 // Umami (spec §17): self-hosted and cookie-free. Public pages only; off until both are set.
 const UMAMI_URL = process.env.NEXT_PUBLIC_UMAMI_URL?.replace(/\/$/, '')
