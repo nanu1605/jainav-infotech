@@ -28,6 +28,7 @@ export default defineConfig([
     'src/migrations/',
     'src/app/(payload)/',
     'src/styles/tokens.generated.ts',
+    'src/components/layout/logo-mark.generated.ts',
     'tests/fixtures/',
     'playwright-report/',
     'test-results/',

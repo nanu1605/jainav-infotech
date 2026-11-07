@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og'
 
+import { LogoMark } from '@/components/layout/LogoMark'
 import { tokens } from '@/styles/tokens.generated'
 
 export const OG_SIZE = { width: 1200, height: 630 }
@@ -52,21 +53,7 @@ export function ogImage({
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 20, fontSize: 32 }}>
-        <div
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 14,
-            background: t.primary,
-            color: t['primary-fg'],
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 700,
-          }}
-        >
-          J
-        </div>
+        <LogoMark height={56} fill={t.fg} />
         <div style={{ display: 'flex', fontWeight: 600 }}>Jainav Infotech</div>
       </div>
     </div>,

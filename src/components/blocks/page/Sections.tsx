@@ -318,7 +318,7 @@ function FounderFeature({
         </div>
         {m.quote && (
           <figure className="relative mx-4 -mt-20 rounded-lg border border-border bg-surface p-6 shadow-lg sm:mx-8">
-            <QuoteMark aria-hidden className="size-7 text-primary" />
+            <QuoteMark aria-hidden className="size-7 text-brand-accent" />
             <blockquote className="mt-3 font-display text-lg leading-relaxed text-pretty text-fg">
               {m.quote}
             </blockquote>

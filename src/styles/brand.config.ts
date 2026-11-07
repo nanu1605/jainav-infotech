@@ -51,51 +51,55 @@ type ThemeMapping = {
 
 export const brandConfig = {
   seeds: {
-    // Placeholder seeds until the logo arrives (spec §5.2).
-    brand: 'oklch(0.55 0.22 275)', // electric indigo
-    brandAccent: 'oklch(0.78 0.14 195)', // cyan
-    neutral: 'oklch(0.55 0.015 265)', // cool neutral tint (hue + chroma are used)
-    success: 'oklch(0.6 0.16 150)',
-    warning: 'oklch(0.75 0.16 75)',
-    danger: 'oklch(0.58 0.21 27)',
-    info: 'oklch(0.6 0.15 245)',
+    // From the logo, a black and white mark: ink actions on warm paper, one champagne accent.
+    // Ink fills come from the neutral steps, so the button matches the text and the mark.
+    brand: 'oklch(0.2 0.006 80)', // ink
+    brandAccent: 'oklch(0.75 0.09 80)', // champagne: focus ring, glow, accent badges, dark hover
+    neutral: 'oklch(0.55 0.006 80)', // warm paper tint (hue + chroma are used)
+    success: 'oklch(0.6 0.14 155)',
+    warning: 'oklch(0.75 0.17 62)', // marigold, kept apart from the champagne
+    danger: 'oklch(0.58 0.2 25)',
+    info: 'oklch(0.6 0.13 250)',
   } satisfies Record<ScaleName, string>,
 
   light: {
     colors: {
       bg: 'neutral.0',
-      'bg-subtle': 'neutral.50',
+      'bg-subtle': 'neutral.100',
       surface: 'neutral.0',
       'surface-raised': 'neutral.0',
       overlay: { ref: 'neutral.1000', alpha: 0.5 },
-      hover: 'neutral.100',
+      hover: 'neutral.150',
       fg: 'neutral.950',
       'fg-muted': 'neutral.600',
       'fg-subtle': 'neutral.500',
       'fg-inverse': 'neutral.0',
       border: 'neutral.200',
       'border-strong': 'neutral.500',
-      ring: 'brand.500',
-      primary: 'brand.600',
-      'primary-hover': 'brand.700',
+      ring: 'brandAccent.600',
+      primary: 'neutral.950',
+      'primary-hover': 'neutral.800',
       'primary-fg': 'neutral.0',
       'brand-accent': 'brandAccent.500',
       'brand-accent-fg': 'neutral.1000',
-      success: 'success.600',
-      'success-fg': 'neutral.0',
+      // Status fills step in lightness (info, danger, success, warning) so they stay apart
+      // for colour-blind readers, not by hue alone.
+      success: 'success.500',
+      'success-fg': 'neutral.1000',
       warning: 'warning.400',
       'warning-fg': 'neutral.1000',
       danger: 'danger.600',
       'danger-fg': 'neutral.0',
-      info: 'info.600',
+      info: 'info.700',
       'info-fg': 'neutral.0',
-      glow: { ref: 'brand.500', alpha: 0.35 },
+      glow: { ref: 'brandAccent.200', alpha: 0.55 },
     },
     shadowColor: 'neutral.1000',
     gradients: [
-      'linear-gradient(135deg, var(--brand-500), var(--brand-accent-400))',
-      'radial-gradient(circle at 30% 20%, var(--brand-200), transparent 60%)',
-      'linear-gradient(180deg, var(--neutral-0), var(--neutral-50))',
+      'linear-gradient(135deg, var(--brand-accent-100), var(--brand-accent-300))',
+      'radial-gradient(circle at 30% 20%, var(--brand-accent-100), transparent 60%)',
+      // Ends on the page color, so the hero has no edge.
+      'linear-gradient(180deg, var(--neutral-0), var(--neutral-50) 40%, var(--neutral-0))',
     ],
   },
 
@@ -107,19 +111,19 @@ export const brandConfig = {
       'surface-raised': 'neutral.900',
       overlay: { ref: 'neutral.1000', alpha: 0.7 },
       hover: 'neutral.800',
-      fg: 'neutral.50',
+      fg: 'neutral.100',
       'fg-muted': 'neutral.300',
       'fg-subtle': 'neutral.400',
       'fg-inverse': 'neutral.1000',
       border: 'neutral.800',
       'border-strong': 'neutral.500',
-      ring: 'brand.400',
-      primary: 'brand.400',
-      'primary-hover': 'brand.300',
+      ring: 'brandAccent.300',
+      primary: 'neutral.100',
+      'primary-hover': 'brandAccent.200',
       'primary-fg': 'neutral.1000',
-      'brand-accent': 'brandAccent.400',
+      'brand-accent': 'brandAccent.300',
       'brand-accent-fg': 'neutral.1000',
-      success: 'success.400',
+      success: 'success.300',
       'success-fg': 'neutral.1000',
       warning: 'warning.400',
       'warning-fg': 'neutral.1000',
@@ -127,13 +131,14 @@ export const brandConfig = {
       'danger-fg': 'neutral.1000',
       info: 'info.400',
       'info-fg': 'neutral.1000',
-      glow: { ref: 'brand.400', alpha: 0.45 },
+      glow: { ref: 'brandAccent.300', alpha: 0.3 },
     },
     shadowColor: 'neutral.1000',
     gradients: [
-      'linear-gradient(135deg, var(--brand-400), var(--brand-accent-300))',
-      'radial-gradient(circle at 30% 20%, var(--brand-900), transparent 60%)',
-      'linear-gradient(180deg, var(--neutral-1000), var(--neutral-950))',
+      'linear-gradient(135deg, var(--brand-accent-200), transparent)',
+      'radial-gradient(circle at 30% 20%, var(--brand-accent-900), transparent 60%)',
+      // A graphite spotlight behind the headline that ends on the page color.
+      'radial-gradient(80% 62% at 35% 50%, var(--neutral-900), var(--neutral-1000) 80%)',
     ],
   },
 

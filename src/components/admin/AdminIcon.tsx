@@ -1,5 +1,5 @@
-import { Monogram } from './AdminLogo'
+import { LogoMark } from '@/components/layout/LogoMark'
 
 export function AdminIcon() {
-  return <Monogram size={24} />
+  return <LogoMark height={24} />
 }
