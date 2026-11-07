@@ -1,4 +1,6 @@
-@import 'tailwindcss';
+/* Classes come from src/ only: Tailwind otherwise reads every file in the repository, so a test
+   or a doc naming a class (`dark:hidden` in docs/decisions.md) added CSS to every page. */
+@import 'tailwindcss' source('..');
 @import './tokens.css';
 
 /* Light islands inside a dark page (nested data-theme wrappers) stay light. */
@@ -83,6 +85,9 @@
   /* Latin font first, Devanagari second: mixed text uses each script's font. */
   --font-sans: var(--font-jakarta), var(--font-mukta), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-jakarta), var(--font-mukta), ui-sans-serif, system-ui, sans-serif;
+  /* The device's own font, for a word in a script the page doesn't otherwise show (the language
+     switch's Hindi on English pages), so it doesn't download that script's web font. */
+  --font-system: ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Continuous marquee (spec §14): transform only; the global reduced-motion rule stops it. */
