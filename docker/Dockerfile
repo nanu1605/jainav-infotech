@@ -49,7 +49,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 USER nextjs
 EXPOSE 3000
-# /api/v1/health also initializes Payload, which applies pending migrations on start.
-HEALTHCHECK --interval=15s --timeout=5s --start-period=90s --retries=5 \
+# /api/v1/health also initializes Payload, which applies pending migrations on start. During the
+# start period it is probed every 3 s, so a deploy sees the app healthy right after its migrations.
+HEALTHCHECK --interval=15s --timeout=5s --start-period=90s --start-interval=3s --retries=5 \
   CMD wget -qO /dev/null http://127.0.0.1:3000/api/v1/health || exit 1
 CMD ["node", "server.js"]
