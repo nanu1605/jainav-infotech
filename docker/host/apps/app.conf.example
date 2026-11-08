@@ -21,8 +21,10 @@ REPO=ghcr.io/example-org/example-app
 REGISTRY_USER=example-org                    # the user name for docker login with a token
 
 # Per environment: the compose service, its variable in images.env, the tags allowed for it (an
-# extended regex that must match the whole tag) and, with EXTRA_MODE=migrate, the one-off service
-# that runs the migrations and its variable in images.env.
+# extended regex that app-deploy anchors itself: write it without ^ and $) and, with
+# EXTRA_MODE=migrate, the one-off service that runs the migrations and its variable in images.env.
+# With EXTRA_MODE=pull, EXTRA_VAR is the images.env line that records the extra image each
+# environment's last deploy named (an environment without one takes no extra image).
 env_config() {
   case $1 in
     staging)
@@ -38,14 +40,22 @@ env_config() {
   esac
 }
 
-# The second image a deploy may name, and what happens to it. EXTRA_MODE=pull only fetches it (a
-# tools image for app-compose <app> tools). EXTRA_MODE=migrate sets MIGRATE_VAR to it and runs
-# MIGRATE_SERVICE before the switch; if that fails, nothing switches. EXTRA_KEEP: how many of
-# these images stay on the server.
+# The second image a deploy may name, and what happens to it. EXTRA_MODE=pull fetches it and, once
+# the switch succeeds, records it in EXTRA_VAR (a tools image: app-compose <app> tools <env> -
+# runs it by digest). EXTRA_MODE=migrate sets MIGRATE_VAR to it and runs MIGRATE_SERVICE before
+# the switch; if that fails, nothing switches, and the migrations a later failure leaves applied
+# are reported. EXTRA_KEEP: how many of these images stay on the server besides the ones
+# images.env names.
 EXTRA_TAG='migrate-[0-9a-f]{40}' EXTRA_MODE=migrate EXTRA_KEEP=3
 
 # Seconds a switched service has to turn healthy before app-deploy rolls it back.
 HEALTH_TIMEOUT=300
+
+# Journal lines a day this app's containers may write before hostwatch alerts (default 30000).
+LOG_LINE_BUDGET=30000
+# 1 when the app's site file needs a URI redaction file on the server: hostwatch's daily run
+# alerts while /srv/edge/config/log-redact.d/<app>.caddy is missing (docs/runbooks/edge.md §7).
+LOG_REDACT=0
 
 # Dumped before every production switch, encrypted to BACKUP_RECIPIENT, into predeploy/ (3 kept):
 # the database service, its superuser, then the databases. Empty: no dump.
@@ -53,12 +63,15 @@ PREDEPLOY_DB="db postgres postgres"
 # This app's own age public key (age1...). Its private key stays offline with the admin.
 BACKUP_RECIPIENT=
 # Files and directories under PROJECT_DIR that app-config-archive encrypts nightly into
-# backup-out/, for the app's backup job to upload.
+# backup-out/, for the app's backup job to upload. backup-out is 0755 and each archive 0644 (it is
+# ciphertext), so the job may run as any uid; it should fail when the newest archive is missing or
+# more than 2 hours old. app-apply <app> compose creates backup-out.
 CONFIG_ARCHIVE_FILES=".env images.env env deploys.log"
 
 # The edge (app-apply <app> site): the zone the site file may serve (it and one label under it),
 # the upstreams its reverse_proxy lines may name (aliases on its edge networks, all starting with
-# <app>-), the prefix of its {$...} placeholders in edge.env, and its edge networks.
+# <app>-), the prefix of its {$...} placeholders in edge.env (exactly <APP>_, the app name in
+# upper case), and its edge networks.
 ZONE=example.com
 UPSTREAMS="example-web:3000 example-gw:8000 example-web-staging:3000"
 ENV_PREFIX=EXAMPLE_

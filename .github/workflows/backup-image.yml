@@ -51,6 +51,8 @@ jobs:
           context: docker/backup
           push: true
           tags: ${{ steps.names.outputs.image }}
+          # The server refuses a digest whose label isn't the tag it is deployed under.
+          labels: org.opencontainers.image.version=${{ steps.names.outputs.tag }}
           cache-from: type=gha,scope=backup
           cache-to: type=gha,mode=max,scope=backup
 

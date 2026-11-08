@@ -1,7 +1,8 @@
 #!/bin/bash
 # Stand-in for docker in tests/host/app-deploy.sh. Every call is a line in $STUB_STATE/calls. A
-# small image store ($STUB_STATE/images: "<repo> <tag or -> <digest>"), the image each service runs
-# (running-<service>) and flag files under $STUB_STATE decide the answers.
+# small image store ($STUB_STATE/images: "<repo> <tag or -> <digest>"), the label each digest
+# carries (labels: "<digest> <tag>", what CI would stamp; labels-override wins), the image each
+# service runs (running-<service>) and flag files under $STUB_STATE decide the answers.
 set -euo pipefail
 s=$STUB_STATE
 printf 'docker %s\n' "$*" >>"$s/calls"
@@ -33,6 +34,17 @@ add() {   # add REPO TAG DIGEST: replaces what TAG pointed to
   printf '%s %s %s\n' "$1" "$2" "$3" >>"$s/images.new"
   mv "$s/images.new" "$s/images"
 }
+# The label of the image with digest $1: a test's override, else what CI would have set.
+label_of() {
+  local v='' f
+  for f in "$s/labels-override" "$s/labels"; do
+    [ -s "$f" ] || continue
+    v=$(awk -v d="$1" '$1 == d {l = $2; found = 1} END {if (found) print l}' "$f")
+    [ -z "$v" ] || break
+  done
+  [ "$v" != - ] || v=   # "-" stands for no label at all
+  printf '%s\n' "$v"
+}
 # The value a service's image variable has in the env files (later files win).
 image_of() {
   local svc=$1 var='' pair line value=''
@@ -50,7 +62,7 @@ compose() {
   local files=() sub
   while [ $# -gt 0 ]; do
     case $1 in
-      --project-directory | -f | --profile) shift 2 ;;
+      -p | --project-directory | -f | --profile) shift 2 ;;
       --env-file) files+=("$2"); shift 2 ;;
       *) break ;;
     esac
@@ -67,7 +79,7 @@ compose() {
     stop) rm -f "$s/running-${*: -1}" ;;
     exec)
       flag dump-fails && exit 1
-      head -c 2048 /dev/zero | tr '\0' x
+      if flag dump-small; then echo tiny; else head -c 2048 /dev/zero | tr '\0' x; fi
       ;;
     run)
       printf 'ran %s %s\n' "${*: -1}" "$(image_of "${*: -1}" "${files[@]}")" >>"$s/calls"
@@ -89,12 +101,15 @@ case $1 in
   pull)
     flag pull-fails && { echo "pull failed" >&2; exit 1; }
     ref=${*: -1}
+    ! listed "$ref" pull-fails-on || { echo "pull failed" >&2; exit 1; }
+    ! flag interrupt-on-pull || kill -INT "$(cat "$s/pid")"
     case $ref in
       *@*) add "$(repo_of "$ref")" - "${ref#*@}" ;;
       *)
         d=sha256:$(printf '%s' "$ref" | sha256sum | cut -c 1-64)
         add "$(repo_of "$ref")" "$(tag_of "$ref")" "$d"
         add "$(repo_of "$ref")" - "$d"
+        printf '%s %s\n' "$d" "$(tag_of "$ref")" >>"$s/labels"
         ;;
     esac
     echo "$ref"
@@ -111,6 +126,7 @@ case $1 in
     d=$(digest_of "$1") || { echo "Error: No such image: $1" >&2; exit 1; }
     case $format in
       *RepoDigests*) printf '%s@%s\n' "$(repo_of "$1")" "$d" ;;
+      *Labels*) label_of "$d" ;;
       '') echo '[{}]' ;;
     esac
     ;;
@@ -147,6 +163,18 @@ case $1 in
       echo "running false 0 healthy"
     fi
     ;;
-  ps | rm) ;;
+  ps)
+    # ps -a -q --filter label=...service=S --filter label=...oneoff=V: the service's container,
+    # unless the filter asks for one-offs
+    svc='' oneoff=''
+    for a in "$@"; do
+      case $a in
+        label=com.docker.compose.service=*) svc=${a##*=} ;;
+        label=com.docker.compose.oneoff=*) oneoff=${a##*=} ;;
+      esac
+    done
+    [ "$oneoff" != False ] || [ -z "$svc" ] || [ ! -e "$s/running-$svc" ] || echo "cid-$svc"
+    ;;
+  rm) ;;
   *) echo "stub docker: unexpected call: $*" >&2; exit 1 ;;
 esac
