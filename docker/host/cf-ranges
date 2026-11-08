@@ -2,7 +2,11 @@
 # Cloudflare-only inbound filters, in iptables and ip6tables (docs/runbooks/server.md, edge.md).
 #   cf-ranges firewall   load the filters, drop first (boot; again after editing bootstrap-ssh)
 #   cf-ranges apply      rebuild CF-INBOUND from the lists and refresh Caddy's trusted proxies
-#   cf-ranges verify     exit 1 unless every filter is in place (Docker's ExecStartPre, hostwatch)
+#                        (the ranges file goes in through app-apply edge ranges)
+#   cf-ranges verify     exit 1 unless every filter is in place, in its place and on a live
+#                        interface (hostwatch, every 5 minutes)
+#   cf-ranges verify --gate   the same without the extra strictness: only that every required rule
+#                        is present (Docker's ExecStartPre, so a stricter check never keeps Docker down)
 #   cf-ranges check      alert when Cloudflare's published ranges differ from the lists
 # Reads /etc/cf-ranges: ips-v4.txt, ips-v6.txt, iface (the default-route interface) and, while it
 # exists, bootstrap-ssh (one IPv4 address that may open SSH on the public interface).
@@ -13,67 +17,79 @@ PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
 
 CF_DIR=/etc/cf-ranges
 EDGE_CONFIG=/srv/edge/config
-CADDY=edge-caddy-1
 APP_APPLY=/usr/local/sbin/app-apply
 HOSTWATCH=/usr/local/sbin/hostwatch
+LOCK_DIR=/run/app-locks
 
 say() { printf '%s\n' "$*"; }
 note() { say "$*"; logger -t cf-ranges -- "$*" || true; }
 die() { say "cf-ranges: $*" >&2; logger -t cf-ranges -- "refused: $*" || true; exit 1; }
-usage() { say 'usage: cf-ranges firewall | apply | verify | check' >&2; exit 2; }
+usage() { say 'usage: cf-ranges firewall | apply | verify [--gate] | check' >&2; exit 2; }
 alert() { "$HOSTWATCH" alert "$*" || true; }
 
+# Root's lock files live in a directory only root can enter: /run/lock is writable by every user,
+# who could then hold the lock Docker's start waits for.
+lock_dir() {
+  local uid mode
+  [ -d "$LOCK_DIR" ] && [ ! -L "$LOCK_DIR" ] || install -d -m 0700 -o root -g root -- "$LOCK_DIR"
+  read -r uid mode < <(stat -c '%u %a' -- "$LOCK_DIR") || die "cannot read $LOCK_DIR"
+  if [ "$uid" != 0 ] || [ $((8#$mode & 8#022)) != 0 ] || [ -L "$LOCK_DIR" ]; then
+    die "$LOCK_DIR must be a directory of root's that nobody else can write to"
+  fi
+}
+
 oct='(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])'
-v4_re="^($oct\\.){3}$oct/(3[0-2]|[12]?[0-9])\$"
-host_re="^($oct\\.){3}$oct(/(3[0-2]|[12]?[0-9]))?\$"
+# Cloudflare's widest ranges are a /13 and a /29: nothing shorter than /11 or /20 is a Cloudflare range.
+v4_re="^($oct\\.){3}$oct/(1[1-9]|2[0-9]|3[0-2])\$"
+ip_re="^($oct\\.){3}$oct\$"
 # Loose on purpose: iptables is not given the IPv6 list, and Caddy's validate rejects a bad one.
-v6_re='^([0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}/([0-9]|[1-9][0-9]|1[01][0-9]|12[0-8])$'
+v6_re='^([0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}/(2[0-9]|[3-9][0-9]|1[01][0-9]|12[0-8])$'
 
 # Call iface, ranges and load_ranges as plain statements, never after || or inside if: bash turns
 # set -e off in there, and a failure would be ignored.
 iface() {
-	local name=
-	if [ -r "$CF_DIR/iface" ]; then read -r name <"$CF_DIR/iface" || true; fi
-	[[ $name =~ ^[A-Za-z0-9._-]{1,15}$ ]] || die "$CF_DIR/iface must name the default-route interface (for example eth0)"
-	printf '%s\n' "$name"
+  local name=
+  if [ -r "$CF_DIR/iface" ]; then read -r name <"$CF_DIR/iface" || true; fi
+  [[ $name =~ ^[A-Za-z0-9._-]{1,15}$ ]] || die "$CF_DIR/iface must name the default-route interface (for example eth0)"
+  printf '%s\n' "$name"
 }
 
 # The ranges of one list, in file order. Blank and # lines are skipped; Cloudflare's own lists
 # have neither.
 ranges() {
-	local file=$CF_DIR/ips-v$1.txt re=$v4_re line n=0
-	[ "$1" = 4 ] || re=$v6_re
-	[ -r "$file" ] || die "missing $file"
-	while IFS= read -r line || [ -n "$line" ]; do
-		line=${line//[[:space:]]/}
-		case $line in '' | '#'*) continue ;; esac
-		[[ $line =~ $re ]] || die "not a range in $file: $line"
-		printf '%s\n' "$line"
-		n=$((n + 1))
-	done <"$file"
-	[ "$n" -gt 0 ] || die "$file has no ranges"
+  local file=$CF_DIR/ips-v$1.txt re=$v4_re line n=0
+  [ "$1" = 4 ] || re=$v6_re
+  [ -r "$file" ] || die "missing $file"
+  while IFS= read -r line || [ -n "$line" ]; do
+    line=${line//[[:space:]]/}
+    case $line in '' | '#'*) continue ;; esac
+    [[ $line =~ $re ]] || die "not a range in $file: $line"
+    printf '%s\n' "$line"
+    n=$((n + 1))
+  done <"$file"
+  [ "$n" -gt 0 ] || die "$file has no ranges"
 }
 
 load_ranges() { # fills V4 and V6
-	local out
-	out=$(ranges 4)
-	mapfile -t V4 <<<"$out"
-	out=$(ranges 6)
-	mapfile -t V6 <<<"$out"
+  local out
+  out=$(ranges 4)
+  mapfile -t V4 <<<"$out"
+  out=$(ranges 6)
+  mapfile -t V6 <<<"$out"
 }
 
 # The one address that may open SSH on the public interface until install.sh --harden removes the
 # file. A bad file is ignored (SSH stays closed) instead of failing the whole firewall.
 bootstrap_ip() {
-	local ip=
-	[ -r "$CF_DIR/bootstrap-ssh" ] || return 0
-	read -r ip <"$CF_DIR/bootstrap-ssh" || true
-	[ -n "$ip" ] || return 0
-	if [[ $ip =~ $host_re ]]; then
-		printf '%s\n' "$ip"
-	else
-		say "cf-ranges: ignoring $CF_DIR/bootstrap-ssh: not an IPv4 address" >&2
-	fi
+  local ip=
+  [ -r "$CF_DIR/bootstrap-ssh" ] || return 0
+  read -r ip <"$CF_DIR/bootstrap-ssh" || true
+  [ -n "$ip" ] || return 0
+  if [[ $ip =~ $ip_re ]]; then
+    printf '%s\n' "$ip"
+  else
+    say "cf-ranges: ignoring $CF_DIR/bootstrap-ssh: not an IPv4 address" >&2
+  fi
 }
 
 # Part 1 holds no list, so a bad list can only leave the host shut, never open: nothing new gets in
@@ -81,9 +97,9 @@ bootstrap_ip() {
 # with userland-proxy off Docker turns route_localnet on, and a neighbour on the same network could
 # otherwise reach ports published on loopback.
 rules_v4_closed() {
-	local bs
-	bs=$(bootstrap_ip)
-	cat <<EOF
+  local bs
+  bs=$(bootstrap_ip)
+  cat <<EOF
 *filter
 :INPUT DROP [0:0]
 :DOCKER-USER - [0:0]
@@ -95,8 +111,8 @@ rules_v4_closed() {
 -A INPUT -p icmp -j ACCEPT
 -A INPUT -p udp --sport 67 --dport 68 -j ACCEPT
 EOF
-	[ -z "$bs" ] || say "-A INPUT -p tcp -s $bs --dport 22 -m conntrack --ctstate NEW -j ACCEPT"
-	cat <<EOF
+  [ -z "$bs" ] || say "-A INPUT -p tcp -s $bs --dport 22 -m conntrack --ctstate NEW -j ACCEPT"
+  cat <<EOF
 -A DOCKER-USER -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN
 -A DOCKER-USER -i $IFACE -m conntrack --ctstate NEW -j DROP
 -A DOCKER-USER -j RETURN
@@ -107,18 +123,18 @@ EOF
 # Part 2, also what apply loads: published ports reach DOCKER-USER after DNAT, so the original
 # destination port says what the visitor asked for. Only Cloudflare's ranges get through to 443.
 rules_v4_cloudflare() {
-	local r
-	cat <<EOF
+  local r
+  cat <<EOF
 *filter
 :CF-INBOUND - [0:0]
 :DOCKER-USER - [0:0]
 -F CF-INBOUND
 -F DOCKER-USER
 EOF
-	for r in "${V4[@]}"; do
-		say "-A CF-INBOUND -p tcp -m conntrack --ctstate DNAT --ctorigdstport 443 -s $r -j RETURN"
-	done
-	cat <<EOF
+  for r in "${V4[@]}"; do
+    say "-A CF-INBOUND -p tcp -m conntrack --ctstate DNAT --ctorigdstport 443 -s $r -j RETURN"
+  done
+  cat <<EOF
 -A CF-INBOUND -j DROP
 -A DOCKER-USER -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN
 -A DOCKER-USER -i $IFACE -m conntrack --ctstate NEW -j CF-INBOUND
@@ -129,7 +145,7 @@ EOF
 
 # Nothing is served on IPv6 (no AAAA records, an IPv4-only edge network): shut, one part.
 rules_v6() {
-	cat <<EOF
+  cat <<EOF
 *filter
 :INPUT DROP [0:0]
 :DOCKER-USER - [0:0]
@@ -148,86 +164,61 @@ EOF
 
 # All or nothing. Docker edits the same tables, so a busy table gets a few tries.
 load() { # <4|6> <rules>
-	local tool=iptables-restore
-	if [ "$1" = 6 ]; then tool=ip6tables-restore; fi
-	for _ in 1 2 3; do
-		if printf '%s\n' "$2" | "$tool" -w 5 --noflush; then return 0; fi
-		sleep 1
-	done
-	return 1
+  local tool=iptables-restore
+  if [ "$1" = 6 ]; then tool=ip6tables-restore; fi
+  for _ in 1 2 3; do
+    if printf '%s\n' "$2" | "$tool" -w 5 --noflush; then return 0; fi
+    sleep 1
+  done
+  return 1
 }
 
 cmd_firewall() {
-	IFACE=$(iface)
-	load 4 "$(rules_v4_closed)" || die "could not load the IPv4 filters"
-	load 6 "$(rules_v6)" || die "could not load the IPv6 filters"
-	note "firewall: nothing new gets in on $IFACE"
-	load_ranges
-	load 4 "$(rules_v4_cloudflare)" || die "could not load the Cloudflare ranges; inbound stays closed"
-	note "firewall: 443 open to ${#V4[@]} Cloudflare IPv4 ranges on $IFACE"
+  IFACE=$(iface)
+  load 4 "$(rules_v4_closed)" || die "could not load the IPv4 filters"
+  load 6 "$(rules_v6)" || die "could not load the IPv6 filters"
+  note "firewall: nothing new gets in on $IFACE"
+  load_ranges
+  load 4 "$(rules_v4_cloudflare)" || die "could not load the Cloudflare ranges; inbound stays closed"
+  note "firewall: 443 open to ${#V4[@]} Cloudflare IPv4 ranges on $IFACE"
 }
 
 # What the Caddyfile imports inside "servers { }" (docker/edge/config/cloudflare-ranges.caddy).
 caddy_file() {
-	local r line=
-	for r in "${V4[@]}" "${V6[@]}"; do line+=" $r"; done
-	printf '%s\n' '# Generated by cf-ranges from ips-v4.txt and ips-v6.txt. Do not edit.'
-	printf 'trusted_proxies static%s\n' "$line"
+  local r line=
+  for r in "${V4[@]}" "${V6[@]}"; do line+=" $r"; done
+  printf '%s\n' '# Generated by cf-ranges from ips-v4.txt and ips-v6.txt. Do not edit.'
+  printf 'trusted_proxies static%s\n' "$line"
 }
 
-# Not running yet (the first apply, before the edge is up): it reads the file when it starts.
-reload_caddy() {
-	if [ "$(docker inspect -f '{{.State.Running}}' "$CADDY" 2>/dev/null || true)" != true ]; then
-		say "cf-ranges: $CADDY is not running; it reads the new file when it starts"
-		return 0
-	fi
-	docker exec "$CADDY" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 |
-		systemd-cat -t cf-ranges
-}
-
-# The filters and Caddy's trusted proxies must name the same ranges. The file goes first and is put
-# back if anything fails, so a failure leaves the old pair, not a mix.
+# The filters and Caddy's trusted proxies must name the same ranges. app-apply edge ranges stages
+# the new file in a copy of the tree, validates it there under its own lock, keeps the old file in
+# /var/lib/app-apply and reloads Caddy, putting the old file back if the reload fails. If the
+# filters then do not load, the old file goes back the same way. A Caddy that is not running reads
+# the file when it starts, so the first apply works before the edge is up.
 cmd_apply() {
-	local dst=$EDGE_CONFIG/cloudflare-ranges.caddy
-	# Not local: the EXIT trap reads these after the function has returned.
-	new=$EDGE_CONFIG/.cloudflare-ranges.caddy.new
-	IFACE=$(iface)
-	load_ranges
-	[ -d "$EDGE_CONFIG" ] || die "$EDGE_CONFIG is missing: lay out /srv/edge first"
-	# app-apply copies this directory when it swaps a change in: not while we write to it.
-	flock -n /run/lock/app-apply.lock true || die "app-apply is running: try again in a minute"
-	printf '%s\n' "$(rules_v4_cloudflare)" | iptables-restore -w 5 --noflush --test ||
-		die "iptables refused the lists; nothing changed"
-	tmp=$(mktemp -d /run/cf-ranges.XXXXXX)
-	trap 'rm -rf "$tmp" "$new"' EXIT
-	if [ -e "$dst" ]; then cp -p "$dst" "$tmp/previous"; fi
-	caddy_file >"$new"
-	chmod 0644 "$new"
-	mv -f "$new" "$dst"
-	if ! "$APP_APPLY" edge validate; then
-		undo_file "$tmp" "$dst" "$new"
-		alert "cf-ranges apply: Caddy refused the new ranges; the previous file is back, the filters are unchanged"
-		die "app-apply edge validate failed; the previous ranges file is back"
-	fi
-	if ! load 4 "$(rules_v4_cloudflare)"; then
-		undo_file "$tmp" "$dst" "$new"
-		alert "cf-ranges apply: could not load the new filters; the previous file is back"
-		die "could not load the new filters; the previous ranges file is back"
-	fi
-	note "apply: ${#V4[@]} IPv4 and ${#V6[@]} IPv6 ranges"
-	if ! reload_caddy; then
-		alert "cf-ranges apply: the filters and the file are new, but Caddy did not reload"
-		die "Caddy did not reload (journalctl -t cf-ranges); it keeps its old ranges until it does"
-	fi
-}
-
-undo_file() { # <tmp> <dst> <staging>
-	if [ -e "$1/previous" ]; then
-		cp -p "$1/previous" "$3"
-		mv -f "$3" "$2"
-	else
-		rm -f "$2"
-	fi
+  local dst=$EDGE_CONFIG/cloudflare-ranges.caddy back
+  trap '' HUP PIPE # the filters must still load once app-apply has swapped the file in
+  IFACE=$(iface)
+  load_ranges
+  [ -d "$EDGE_CONFIG" ] || die "$EDGE_CONFIG is missing: lay out /srv/edge first"
+  printf '%s\n' "$(rules_v4_cloudflare)" | iptables-restore -w 5 --noflush --test ||
+    die "iptables refused the lists; nothing changed"
+  tmp=$(mktemp -d /run/cf-ranges.XXXXXX)
+  trap 'rm -rf "$tmp"' EXIT
+  if [ -e "$dst" ]; then cp -p "$dst" "$tmp/previous"; fi
+  caddy_file >"$tmp/cloudflare-ranges.caddy"
+  if ! "$APP_APPLY" edge ranges "$tmp/cloudflare-ranges.caddy"; then
+    alert "cf-ranges apply: app-apply edge ranges failed; the ranges file and the filters are unchanged"
+    die "app-apply edge ranges failed (above); nothing changed"
+  fi
+  if ! load 4 "$(rules_v4_cloudflare)"; then
+    back="Caddy keeps the new ranges file"
+    if [ -e "$tmp/previous" ] && "$APP_APPLY" edge ranges "$tmp/previous"; then back="the previous ranges file is back"; fi
+    alert "cf-ranges apply: could not load the new filters; $back"
+    die "could not load the new filters; $back"
+  fi
+  note "apply: ${#V4[@]} IPv4 and ${#V6[@]} IPv6 ranges"
 }
 
 BAD=0
@@ -237,138 +228,153 @@ dump() { "$1" -w -S "$2" 2>/dev/null; }
 rules_in() { awk -v chain="$1" 'index($0, "-A " chain " ") == 1 { n++ } END { print n + 0 }'; }
 
 # Every filter, for both families: the policy, the chains, the rules and their order where it
-# matters. A flushed chain or a malformed list therefore keeps Docker from starting.
+# matters. A flushed chain or a malformed list therefore keeps Docker from starting. Without --gate
+# it also checks what only the periodic run needs to alert on: the saved interface exists, and
+# FORWARD's first rule is the jump to DOCKER-USER, so nothing ahead of it skips the filters. The
+# gate leaves those out: a stricter check must never be what keeps Docker from starting.
 cmd_verify() {
-	local fam tool out bs now r
-	local guard_re='^-A INPUT ! -s 127\.0\.0\.0/8 -d 127\.0\.0\.0/8 .* -j DROP$'
-	IFACE=$(iface)
-	load_ranges
-	bs=$(bootstrap_ip)
-	for fam in 4 6; do
-		tool=iptables
-		[ "$fam" = 4 ] || tool=ip6tables
-		if out=$(dump "$tool" INPUT); then
-			[ "$(printf '%s\n' "$out" | sed -n 1p)" = '-P INPUT DROP' ] || fail "v$fam INPUT policy is not DROP"
-			if [ "$fam" = 4 ]; then
-				[[ $(printf '%s\n' "$out" | sed -n 2p) =~ $guard_re ]] || fail "v4 INPUT: the 127.0.0.0/8 guard is not the first rule"
-			fi
-		else
-			fail "v$fam INPUT chain unreadable"
-		fi
-		has "$tool" INPUT -i lo -j ACCEPT || fail "v$fam INPUT: loopback is not accepted"
-		has "$tool" INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT || fail "v$fam INPUT: replies are not accepted"
-		if [ "$fam" = 4 ]; then
-			has "$tool" INPUT ! -s 127.0.0.0/8 -d 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP ||
-				fail "v4 INPUT: the 127.0.0.0/8 guard is missing"
-			has "$tool" INPUT -p icmp -j ACCEPT || fail "v4 INPUT: ICMP is not accepted"
-			has "$tool" INPUT -p udp --sport 67 --dport 68 -j ACCEPT || fail "v4 INPUT: DHCP replies are not accepted"
-			if [ -n "$bs" ]; then
-				has "$tool" INPUT -p tcp -s "$bs" --dport 22 -m conntrack --ctstate NEW -j ACCEPT ||
-					fail "v4 INPUT does not admit SSH from $bs (bootstrap-ssh)"
-			elif grep -q -- '--dport 22 ' <<<"$out"; then
-				fail "v4 INPUT admits SSH, but there is no valid bootstrap-ssh file"
-			fi
-		else
-			has "$tool" INPUT -p ipv6-icmp -j ACCEPT || fail "v6 INPUT: ICMPv6 is not accepted"
-			has "$tool" INPUT -p udp --sport 547 --dport 546 -j ACCEPT || fail "v6 INPUT: DHCPv6 replies are not accepted"
-		fi
-		if out=$(dump "$tool" DOCKER-USER); then
-			[ "$(printf '%s\n' "$out" | tail -n 1)" = '-A DOCKER-USER -j RETURN' ] || fail "v$fam DOCKER-USER does not end in RETURN"
-			[ "$(printf '%s\n' "$out" | rules_in DOCKER-USER)" = 3 ] || fail "v$fam DOCKER-USER does not hold exactly its three rules"
-		else
-			fail "v$fam DOCKER-USER does not exist"
-		fi
-		has "$tool" DOCKER-USER -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN || fail "v$fam DOCKER-USER: replies are not returned"
-		if [ "$fam" = 4 ]; then
-			has "$tool" DOCKER-USER -i "$IFACE" -m conntrack --ctstate NEW -j CF-INBOUND ||
-				fail "v4 DOCKER-USER does not send new $IFACE traffic to CF-INBOUND"
-		else
-			has "$tool" DOCKER-USER -i "$IFACE" -m conntrack --ctstate NEW -j DROP ||
-				fail "v6 DOCKER-USER does not drop new $IFACE traffic"
-		fi
-		# Docker adds this jump when it starts; without it DOCKER-USER filters nothing. IPv4 only:
-		# Docker may leave ip6tables alone, and it forwards no IPv6.
-		if [ "$fam" = 4 ] && systemctl is-active --quiet docker && ! has "$tool" FORWARD -j DOCKER-USER; then
-			fail "v4 FORWARD does not jump to DOCKER-USER"
-		fi
-	done
-	if out=$(dump iptables CF-INBOUND); then
-		[ "$(printf '%s\n' "$out" | rules_in CF-INBOUND)" = "$((${#V4[@]} + 1))" ] ||
-			fail "CF-INBOUND does not hold exactly the ${#V4[@]} ranges of ips-v4.txt and a final DROP"
-		[ "$(printf '%s\n' "$out" | tail -n 1)" = '-A CF-INBOUND -j DROP' ] || fail "CF-INBOUND does not end in DROP"
-		for r in "${V4[@]}"; do
-			has iptables CF-INBOUND -p tcp -m conntrack --ctstate DNAT --ctorigdstport 443 -s "$r" -j RETURN ||
-				fail "CF-INBOUND lacks $r"
-		done
-	else
-		fail "CF-INBOUND does not exist"
-	fi
-	# Rules naming another interface than the one the server really uses would filter nothing.
-	now=$(ip -o -4 route show default 2>/dev/null |
-		awk '{ for (i = 1; i < NF; i++) if ($i == "dev" && !seen) { print $(i + 1); seen = 1 } }') || now=
-	if [ -n "$now" ] && [ "$now" != "$IFACE" ]; then
-		fail "the default route uses $now, but $CF_DIR/iface says $IFACE"
-	fi
-	if [ "$BAD" -gt 0 ]; then
-		logger -t cf-ranges -- "verify failed: $BAD problem(s)" || true
-		exit 1
-	fi
-	say "cf-ranges verify: ok"
+  local fam tool out bs now r strict=1
+  if [ "${1-}" = --gate ]; then strict=0; fi
+  local guard_re='^-A INPUT ! -s 127\.0\.0\.0/8 -d 127\.0\.0\.0/8 .* -j DROP$'
+  IFACE=$(iface)
+  load_ranges
+  bs=$(bootstrap_ip)
+  if [ "$strict" = 1 ] && [ ! -e "/sys/class/net/$IFACE" ]; then fail "the interface $IFACE in $CF_DIR/iface does not exist"; fi
+  for fam in 4 6; do
+    tool=iptables
+    [ "$fam" = 4 ] || tool=ip6tables
+    if out=$(dump "$tool" INPUT); then
+      [ "$(printf '%s\n' "$out" | sed -n 1p)" = '-P INPUT DROP' ] || fail "v$fam INPUT policy is not DROP"
+      if [ "$fam" = 4 ]; then
+        [[ $(printf '%s\n' "$out" | sed -n 2p) =~ $guard_re ]] || fail "v4 INPUT: the 127.0.0.0/8 guard is not the first rule"
+      fi
+    else
+      fail "v$fam INPUT chain unreadable"
+    fi
+    has "$tool" INPUT -i lo -j ACCEPT || fail "v$fam INPUT: loopback is not accepted"
+    has "$tool" INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT || fail "v$fam INPUT: replies are not accepted"
+    if [ "$fam" = 4 ]; then
+      has "$tool" INPUT ! -s 127.0.0.0/8 -d 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP ||
+        fail "v4 INPUT: the 127.0.0.0/8 guard is missing"
+      has "$tool" INPUT -p icmp -j ACCEPT || fail "v4 INPUT: ICMP is not accepted"
+      has "$tool" INPUT -p udp --sport 67 --dport 68 -j ACCEPT || fail "v4 INPUT: DHCP replies are not accepted"
+      if [ -n "$bs" ]; then
+        has "$tool" INPUT -p tcp -s "$bs" --dport 22 -m conntrack --ctstate NEW -j ACCEPT ||
+          fail "v4 INPUT does not admit SSH from $bs (bootstrap-ssh)"
+      elif grep -q -- '--dport 22 ' <<<"$out"; then
+        fail "v4 INPUT admits SSH, but there is no valid bootstrap-ssh file"
+      fi
+    else
+      has "$tool" INPUT -p ipv6-icmp -j ACCEPT || fail "v6 INPUT: ICMPv6 is not accepted"
+      has "$tool" INPUT -p udp --sport 547 --dport 546 -j ACCEPT || fail "v6 INPUT: DHCPv6 replies are not accepted"
+    fi
+    if out=$(dump "$tool" DOCKER-USER); then
+      [ "$(printf '%s\n' "$out" | tail -n 1)" = '-A DOCKER-USER -j RETURN' ] || fail "v$fam DOCKER-USER does not end in RETURN"
+      [ "$(printf '%s\n' "$out" | rules_in DOCKER-USER)" = 3 ] || fail "v$fam DOCKER-USER does not hold exactly its three rules"
+    else
+      fail "v$fam DOCKER-USER does not exist"
+    fi
+    has "$tool" DOCKER-USER -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN || fail "v$fam DOCKER-USER: replies are not returned"
+    if [ "$fam" = 4 ]; then
+      has "$tool" DOCKER-USER -i "$IFACE" -m conntrack --ctstate NEW -j CF-INBOUND ||
+        fail "v4 DOCKER-USER does not send new $IFACE traffic to CF-INBOUND"
+    else
+      has "$tool" DOCKER-USER -i "$IFACE" -m conntrack --ctstate NEW -j DROP ||
+        fail "v6 DOCKER-USER does not drop new $IFACE traffic"
+    fi
+    # Docker adds this jump when it starts; without it DOCKER-USER filters nothing. IPv4 only:
+    # Docker may leave ip6tables alone, and it forwards no IPv6.
+    if [ "$fam" = 4 ] && systemctl is-active --quiet docker; then
+      if ! has "$tool" FORWARD -j DOCKER-USER; then
+        fail "v4 FORWARD does not jump to DOCKER-USER"
+      elif [ "$strict" = 1 ] && [ "$(dump "$tool" FORWARD | sed -n 2p)" != '-A FORWARD -j DOCKER-USER' ]; then
+        fail "v4 FORWARD: the jump to DOCKER-USER is not its first rule"
+      fi
+    fi
+  done
+  if out=$(dump iptables CF-INBOUND); then
+    [ "$(printf '%s\n' "$out" | rules_in CF-INBOUND)" = "$((${#V4[@]} + 1))" ] ||
+      fail "CF-INBOUND does not hold exactly the ${#V4[@]} ranges of ips-v4.txt and a final DROP"
+    [ "$(printf '%s\n' "$out" | tail -n 1)" = '-A CF-INBOUND -j DROP' ] || fail "CF-INBOUND does not end in DROP"
+    for r in "${V4[@]}"; do
+      has iptables CF-INBOUND -p tcp -m conntrack --ctstate DNAT --ctorigdstport 443 -s "$r" -j RETURN ||
+        fail "CF-INBOUND lacks $r"
+    done
+  else
+    fail "CF-INBOUND does not exist"
+  fi
+  # Rules naming another interface than the one the server really uses would filter nothing.
+  now=$(ip -o -4 route show default 2>/dev/null |
+    awk '{ for (i = 1; i < NF; i++) if ($i == "dev" && !seen) { print $(i + 1); seen = 1 } }') || now=
+  if [ -n "$now" ] && [ "$now" != "$IFACE" ]; then
+    fail "the default route uses $now, but $CF_DIR/iface says $IFACE"
+  fi
+  if [ "$BAD" -gt 0 ]; then
+    logger -t cf-ranges -- "verify failed: $BAD problem(s)" || true
+    exit 1
+  fi
+  say "cf-ranges verify: ok"
 }
 
 normalize() { tr -d '[:blank:]\r' | { grep -v -e '^$' -e '^#' || true; } | LC_ALL=C sort -u; }
 
 # Only reports. The hPanel rules need the same change by hand, so nothing is applied here.
 cmd_check() {
-	local fam url re text='' bad=0 added removed line
-	tmp=$(mktemp -d /run/cf-ranges.XXXXXX)
-	trap 'rm -rf "$tmp"' EXIT
-	for fam in 4 6; do
-		url=https://www.cloudflare.com/ips-v$fam
-		re=$v4_re
-		[ "$fam" = 4 ] || re=$v6_re
-		if ! curl -fsS --max-time 30 --retry 2 --proto '=https' "$url" | normalize >"$tmp/new$fam"; then
-			text+=" The v$fam list could not be fetched."
-			bad=1
-			continue
-		fi
-		# An error page or an empty answer is not a list.
-		if [ ! -s "$tmp/new$fam" ]; then
-			text+=" The v$fam list came back empty."
-			bad=1
-			continue
-		fi
-		while IFS= read -r line; do
-			[[ $line =~ $re ]] || { text+=" The v$fam list holds something that is not a range."; bad=1; continue 2; }
-		done <"$tmp/new$fam"
-		[ -r "$CF_DIR/ips-v$fam.txt" ] || die "missing $CF_DIR/ips-v$fam.txt"
-		normalize <"$CF_DIR/ips-v$fam.txt" >"$tmp/old$fam"
-		# sed, not head: head would end the pipe early, and pipefail would turn that into a failure.
-		added=$(comm -13 "$tmp/old$fam" "$tmp/new$fam" | sed -n 1,8p | tr '\n' ' ')
-		removed=$(comm -23 "$tmp/old$fam" "$tmp/new$fam" | sed -n 1,8p | tr '\n' ' ')
-		if [ -n "$added$removed" ]; then
-			text+=" v$fam added [${added:-none}] removed [${removed:-none}]."
-			bad=1
-		fi
-	done
-	if [ "$bad" = 0 ]; then
-		say "cf-ranges: Cloudflare's ranges match the lists"
-		return 0
-	fi
-	note "check:$text"
-	alert "Cloudflare's IP ranges:$text Update docker/edge/cloudflare-ips-v*.txt and the hPanel rules, then run cf-ranges apply."
-	exit 1
+  local fam url re text='' bad=0 added removed line
+  tmp=$(mktemp -d /run/cf-ranges.XXXXXX)
+  trap 'rm -rf "$tmp"' EXIT
+  for fam in 4 6; do
+    url=https://www.cloudflare.com/ips-v$fam
+    re=$v4_re
+    [ "$fam" = 4 ] || re=$v6_re
+    if ! curl -fsS --max-time 30 --retry 2 --proto '=https' "$url" | normalize >"$tmp/new$fam"; then
+      text+=" The v$fam list could not be fetched."
+      bad=1
+      continue
+    fi
+    # An error page or an empty answer is not a list.
+    if [ ! -s "$tmp/new$fam" ]; then
+      text+=" The v$fam list came back empty."
+      bad=1
+      continue
+    fi
+    while IFS= read -r line; do
+      [[ $line =~ $re ]] || { text+=" The v$fam list holds something that is not a range."; bad=1; continue 2; }
+    done <"$tmp/new$fam"
+    [ -r "$CF_DIR/ips-v$fam.txt" ] || die "missing $CF_DIR/ips-v$fam.txt"
+    normalize <"$CF_DIR/ips-v$fam.txt" >"$tmp/old$fam"
+    # sed, not head: head would end the pipe early, and pipefail would turn that into a failure.
+    added=$(comm -13 "$tmp/old$fam" "$tmp/new$fam" | sed -n 1,8p | tr '\n' ' ')
+    removed=$(comm -23 "$tmp/old$fam" "$tmp/new$fam" | sed -n 1,8p | tr '\n' ' ')
+    if [ -n "$added$removed" ]; then
+      text+=" v$fam added [${added:-none}] removed [${removed:-none}]."
+      bad=1
+    fi
+  done
+  if [ "$bad" = 0 ]; then
+    say "cf-ranges: Cloudflare's ranges match the lists"
+    return 0
+  fi
+  note "check:$text"
+  alert "Cloudflare's IP ranges:$text Update docker/edge/cloudflare-ips-v*.txt and the hPanel rules, rerun install.sh from the kit (it copies the lists to /etc/cf-ranges), then run cf-ranges apply."
+  exit 1
 }
 
-[ $# -eq 1 ] || usage
-case $1 in firewall | apply | verify | check) ;; *) usage ;; esac
-# At boot this can run before systemd-tmpfiles has made /run/lock.
-mkdir -p /run/lock
-exec 9>/run/lock/cf-ranges.lock
-flock -w 60 9 || die "another cf-ranges run holds the lock"
+case ${1-}:$# in
+  firewall:1 | apply:1 | verify:1 | verify:2 | check:1) ;;
+  *) usage ;;
+esac
+if [ "$1" = verify ] && [ $# -eq 2 ] && [ "$2" != --gate ]; then usage; fi
+# check only reads the lists and the network, and can take minutes when Cloudflare is slow: it must
+# not hold the lock that verify (Docker's start, hostwatch) waits for.
+if [ "$1" != check ]; then
+  lock_dir
+  exec 9>"$LOCK_DIR/cf-ranges.lock"
+  flock -w 60 9 || die "another cf-ranges run holds the lock"
+fi
 case $1 in
-	firewall) cmd_firewall ;;
-	apply) cmd_apply ;;
-	verify) cmd_verify ;;
-	check) cmd_check ;;
+  firewall) cmd_firewall ;;
+  apply) cmd_apply ;;
+  verify) cmd_verify "${2-}" ;;
+  check) cmd_check ;;
 esac

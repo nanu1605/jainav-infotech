@@ -2,17 +2,21 @@
 # Encrypts one app's settings into <PROJECT_DIR>/backup-out/config-<UTC stamp>.tar.age and keeps
 # the newest 3: app-config-archive <app>. A root timer (app-config-archive@<app>.timer) runs it
 # shortly before the app's backup, which mounts backup-out read-only and uploads the newest archive.
-# So the backup container only ever sees ciphertext, and the secrets never enter it.
-# The files are CONFIG_ARCHIVE_FILES in /etc/apps/<app>.conf, paths below PROJECT_DIR (a directory
-# takes everything in it), as they are at that moment; the key is BACKUP_RECIPIENT, an age public
-# key. A failure is alerted through hostwatch. Nothing from the files is printed or logged.
+# So the backup container only ever sees ciphertext, and the secrets never enter it. Because it is
+# ciphertext, backup-out is 0755 and each archive 0644: the job may run as any uid. It should fail
+# on a missing archive, or one more than 2 hours old, as docker/backup/backup.sh does.
+# The files are CONFIG_ARCHIVE_FILES in /etc/apps/<app>.conf, paths below PROJECT_DIR (a file, or a
+# directory, which takes everything in it), as they are at that moment. Entries that would nest
+# archives are refused: ., .., absolute paths, anything with .. in it, and backup-out itself. The
+# key is BACKUP_RECIPIENT, an age public key. A failure is alerted through hostwatch. Nothing from
+# the files is printed or logged.
 set -euo pipefail
 umask 022
 PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
 LC_ALL=C; export LC_ALL
 
 APPS_DIR=/etc/apps
-LOCK_DIR=/run/lock
+LOCK_DIR=/run/app-locks
 HOSTWATCH=/usr/local/sbin/hostwatch
 KEEP=3
 
@@ -30,6 +34,16 @@ fail() {
   exit 1
 }
 
+# Root's lock files live in a directory only root can enter: /run/lock is writable by every user.
+lock_dir() {
+  local uid mode
+  [ -d "$LOCK_DIR" ] && [ ! -L "$LOCK_DIR" ] || install -d -m 0700 -o root -g root -- "$LOCK_DIR"
+  read -r uid mode < <(stat -c '%u %a' -- "$LOCK_DIR") || fail "cannot read $LOCK_DIR"
+  if [ "$uid" != 0 ] || [ $((8#$mode & 8#022)) != 0 ] || [ -L "$LOCK_DIR" ]; then
+    fail "$LOCK_DIR must be a directory of root's that nobody else can write to"
+  fi
+}
+
 [ $# -eq 1 ] || usage
 app=$1
 case $app in '' | *[!a-z0-9]*) usage ;; esac
@@ -37,6 +51,7 @@ case $app in '' | *[!a-z0-9]*) usage ;; esac
 # shellcheck source=/dev/null
 . "$APPS_DIR/$app.conf"
 
+lock_dir
 exec 9>"$LOCK_DIR/app-config-archive-$app.lock"
 flock -n 9 || { say "$app: an archive run is already in progress"; exit 0; }
 
@@ -51,9 +66,13 @@ read -ra entries <<<"${CONFIG_ARCHIVE_FILES-}"
 present=()
 missing=()
 for f in "${entries[@]}"; do
-  # Plain paths below PROJECT_DIR only: a typo in the list must not archive another tree.
-  if ! [[ $f =~ ^[A-Za-z0-9._][A-Za-z0-9._/-]*$ ]] || [[ $f == *..* ]]; then
+  # Plain paths below PROJECT_DIR only: a typo in the list must not archive another tree, and no
+  # entry may hold backup-out, where the archives are written.
+  if ! [[ $f =~ ^[A-Za-z0-9._][A-Za-z0-9._/-]*$ ]] || [[ $f == *..* ]] || [[ /$f/ == *//* || /$f/ == */./* ]]; then
     fail "CONFIG_ARCHIVE_FILES has '$f', which is not a plain path below PROJECT_DIR"
+  fi
+  if [ "${f%%/*}" = backup-out ]; then
+    fail "CONFIG_ARCHIVE_FILES has '$f': an archive does not hold the archives"
   fi
   if [ -e "$project/$f" ]; then present+=("$f"); else missing+=("$f"); fi
 done
@@ -70,7 +89,7 @@ if [[ " ${present[*]} " == *" images.env "* ]]; then
 fi
 
 out_dir=$project/backup-out
-install -d -m 0700 "$out_dir"
+install -d -m 0755 "$out_dir"
 rm -f -- "$out_dir"/.config-*.partial   # a run killed by its timeout leaves one; the lock says it is stale
 stamp=$(date -u +%Y-%m-%dT%H%MZ)
 final=$out_dir/config-$stamp.tar.age
@@ -93,6 +112,7 @@ esac
 size=$(stat -c %s "$partial")
 # tar pads even one small file to 10 KiB: anything under 1 KiB is broken.
 [ "$size" -gt 1024 ] || fail "the archive is only $size bytes"
+chmod 0644 -- "$partial"
 mv -f -- "$partial" "$final"
 
 old=()

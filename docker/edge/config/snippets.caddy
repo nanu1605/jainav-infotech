@@ -6,12 +6,17 @@
 # visitor's address Caddy resolved from them (client_ip), response headers (Location holds 5-minute
 # signed file URLs), staging's login name, the whole query string (newsletter tokens, order numbers,
 # form prefills) and the token in Payload's password reset path. A path can still identify a record.
-# Another app's token-bearing paths are added as more alternatives in the uri pattern.
+# Another app's token-bearing paths are redacted by its own file on the server,
+# /srv/edge/config/log-redact.d/<app>.caddy (root's, 0644, never in git; installed with app-apply
+# edge redact, docs/runbooks/edge.md §7): one `request>uri regexp <pattern> <replacement>` line,
+# applied after the public one below, so the import must stay after it. A glob that matches no file
+# only warns.
 (log_fields) {
 	wrap json
 	request>headers delete
 	request>client_ip delete
 	request>uri regexp (/admin/reset)/[^?]*|\?.* ${1}
+	import /etc/caddy/log-redact.d/*.caddy
 	resp_headers delete
 	headers delete
 	user_id delete
@@ -29,14 +34,17 @@
 # Inside every reverse_proxy. An app gets one client address, the one Cloudflare sent in
 # CF-Connecting-IP (trusted only from Cloudflare's ranges), and nothing a client sent in its place.
 # Caddy keeps incoming X-Forwarded-* values from a trusted peer, hence the explicit overrides (it
-# still logs "Unnecessary header_up X-Forwarded-Host" on every load: that line is needed). The
-# retries hide an app that is restarting for a deploy.
+# still logs "Unnecessary header_up X-Forwarded-Host" on every load: that line is needed). The edge
+# serves TLS only on 443 and the zones keep Always Use HTTPS on, so the protocol and port are
+# fixed. The retries hide an app that is restarting for a deploy.
 (upstream) {
 	header_up X-Real-IP {client_ip}
 	header_up X-Forwarded-For {client_ip}
 	header_up CF-Connecting-IP {client_ip}
 	header_up Sb-Forwarded-For {client_ip}
 	header_up X-Forwarded-Host {host}
+	header_up X-Forwarded-Proto https
+	header_up X-Forwarded-Port 443
 	header_up -True-Client-IP
 	header_up -X-Client-IP
 	header_up -Forwarded

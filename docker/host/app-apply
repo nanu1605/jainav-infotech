@@ -2,11 +2,12 @@
 # shellcheck disable=SC2016
 # (SC2016: the jq and awk programs below use $ inside single quotes on purpose)
 # Installs the files that root runs, after checking them (docs/runbooks/edge.md, server.md):
-#   app-apply <app> compose <file>    the app's compose file (design §8.6)
-#   app-apply <app> site <file>       the app's Caddy site file (§5.6)
+#   app-apply <app> compose <file>    the app's compose file
+#   app-apply <app> site <file>       the app's Caddy site file
 #   app-apply edge config <file>      Caddyfile, snippets.caddy or cloudflare-ranges.caddy
 #   app-apply edge ranges <file>      cloudflare-ranges.caddy under any name (cf-ranges apply)
 #   app-apply edge env <file>         edge.env; Caddy reads it only when it is recreated
+#   app-apply edge redact <app> <file>  the app's log-redact.d file (docs/runbooks/edge.md §7)
 #   app-apply edge cert <app> <origin.pem> <origin-key.pem> [<aop-ca.pem>]
 #   app-apply edge compose <file>     the edge project; also needs a recreate
 #   app-apply edge validate           checks the live edge tree (hostwatch runs it daily)
@@ -24,7 +25,8 @@ trap '' HUP PIPE
 EDGE_DIR=/srv/edge
 KEEP_DIR=/var/lib/app-apply
 CADDY_CONTAINER=edge-caddy-1
-HOST_RESERVE_MIB=1536 # §6: the host's share, outside every container limit
+LOCK_DIR=/run/app-locks
+HOST_RESERVE_MIB=1536 # the host's share, outside every container limit
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 work=
 tmpfiles=()
@@ -33,181 +35,234 @@ allowed_edge=
 other_apps=
 extra_keys=
 CADDY_IMAGE=
+edge_all=()
+edge_present=()
 
 say() { printf '%s\n' "$*" || true; logger -t app-apply -- "$*" || true; }
 die() { printf 'app-apply: %s\n' "$*" >&2 || true; logger -t app-apply -- "failed: $*" || true; exit 1; }
 usage() {
-	cat >&2 <<'EOF' || true
+  cat >&2 <<'EOF' || true
 usage: app-apply <app> compose <file>
        app-apply <app> site <file>
        app-apply edge config <file>     (Caddyfile, snippets.caddy or cloudflare-ranges.caddy)
        app-apply edge ranges <file>
        app-apply edge env <file>
+       app-apply edge redact <app> <file>
        app-apply edge cert <app> <origin.pem> <origin-key.pem> [<aop-ca.pem>]
        app-apply edge compose <file>
        app-apply edge validate
        app-apply edge reload
 EOF
-	exit 2
+  exit 2
 }
 bad_arg() { printf 'app-apply: %s\n' "$*" >&2 || true; usage; }
 
 # Every check adds what it refuses to one list, so the admin sees all the problems in one run.
 problem() { printf '%s\n' "$*" >>"$work/problems"; }
 finish() { # finish <what was checked>: stops here if anything was refused
-	[ -s "$work/problems" ] || return 0
-	{ printf 'app-apply: refused %s:\n' "$1"; sed 's/^/  - /' "$work/problems"; } >&2 || true
-	sed "s|^|refused $1: |" "$work/problems" | logger -t app-apply || true
-	exit 1
+  [ -s "$work/problems" ] || return 0
+  { printf 'app-apply: refused %s:\n' "$1"; sed 's/^/  - /' "$work/problems"; } >&2 || true
+  sed "s|^|refused $1: |" "$work/problems" | logger -t app-apply || true
+  exit 1
 }
 journal() { systemd-cat -t app-apply || true; }
+
+# Root's lock files live in a directory only root can enter: /run/lock is writable by every user,
+# who could then hold a lock root waits for.
+lock_dir() {
+  local uid mode
+  [ -d "$LOCK_DIR" ] && [ ! -L "$LOCK_DIR" ] || install -d -m 0700 -o root -g root -- "$LOCK_DIR"
+  read -r uid mode < <(stat -c '%u %a' -- "$LOCK_DIR") || die "cannot read $LOCK_DIR"
+  if [ "$uid" != 0 ] || [ $((8#$mode & 8#022)) != 0 ] || [ -L "$LOCK_DIR" ]; then
+    die "$LOCK_DIR must be a directory of root's that nobody else can write to"
+  fi
+}
 
 # Prints stdin with every value of the given env files replaced by <NAME>. Caddy and Compose can
 # quote a value in an error, and no value may reach the terminal or the journal.
 redact() { # redact <env file>... <text
-	awk -v files="$*" -v sq="'" '
-		BEGIN {
-			nf = split(files, list, " ")
-			for (i = 1; i <= nf; i++) {
-				while ((getline line < list[i]) > 0) {
-					sub(/^export[ \t]+/, "", line)
-					eq = index(line, "=")
-					if (eq < 2 || line ~ /^[ \t]*#/) continue
-					v = substr(line, eq + 1)
-					c = substr(v, 1, 1)
-					if (length(v) >= 2 && (c == sq || c == "\"") && substr(v, length(v), 1) == c)
-						v = substr(v, 2, length(v) - 2)
-					if (length(v) >= 8) { n++; key[n] = substr(line, 1, eq - 1); val[n] = v }
-				}
-				close(list[i])
-			}
-		}
-		{
-			s = $0
-			for (i = 1; i <= n; i++) {
-				out = ""
-				while ((p = index(s, val[i])) > 0) {
-					out = out substr(s, 1, p - 1) "<" key[i] ">"
-					s = substr(s, p + length(val[i]))
-				}
-				s = out s
-			}
-			print s
-		}'
+  awk -v files="$*" -v sq="'" '
+    BEGIN {
+      nf = split(files, list, " ")
+      for (i = 1; i <= nf; i++) {
+        while ((getline line < list[i]) > 0) {
+          sub(/^export[ \t]+/, "", line)
+          eq = index(line, "=")
+          if (eq < 2 || line ~ /^[ \t]*#/) continue
+          v = substr(line, eq + 1)
+          c = substr(v, 1, 1)
+          if (length(v) >= 2 && (c == sq || c == "\"") && substr(v, length(v), 1) == c)
+            v = substr(v, 2, length(v) - 2)
+          if (length(v) >= 8) { n++; key[n] = substr(line, 1, eq - 1); val[n] = v }
+        }
+        close(list[i])
+      }
+    }
+    {
+      s = $0
+      for (i = 1; i <= n; i++) {
+        out = ""
+        while ((p = index(s, val[i])) > 0) {
+          out = out substr(s, 1, p - 1) "<" key[i] ">"
+          s = substr(s, p + length(val[i]))
+        }
+        s = out s
+      }
+      print s
+    }'
 }
 
 # Docker gets a clean environment: Compose interpolates from the env files alone, as it does under
 # sudo, and no DOCKER_HOST or COMPOSE_* variable of the caller applies.
 clean() { env -i PATH="$PATH" HOME=/root LC_ALL=C "$@"; }
 
-# Every directory from the path up to / is root's and writable by root alone (design §2.2).
+# Every directory from the path up to / is root's and writable by root alone
+# (docs/runbooks/server.md §2).
 root_path() { # root_path <path>
-	local p=$1 uid mode
-	while :; do
-		read -r uid mode < <(stat -c '%u %a' -- "$p" 2>/dev/null) || return 1
-		if [ "$uid" != 0 ] || [ $((8#$mode & 8#022)) != 0 ]; then return 1; fi
-		if [ "$p" = / ]; then return 0; fi
-		p=$(dirname -- "$p")
-	done
+  local p=$1 uid mode
+  while :; do
+    read -r uid mode < <(stat -c '%u %a' -- "$p" 2>/dev/null) || return 1
+    if [ "$uid" != 0 ] || [ $((8#$mode & 8#022)) != 0 ]; then return 1; fi
+    if [ "$p" = / ]; then return 0; fi
+    p=$(dirname -- "$p")
+  done
 }
 
 # Copies the admin's file into the work directory. The checks and the install use that copy, and
 # the admin's own file stays where it is (~ops/incoming/ or any path).
 take_in() { # take_in <file> <copy>
-	[ -f "$1" ] || bad_arg "not a file: $1"
-	[ "$(stat -L -c %s -- "$1")" -le 1048576 ] || die "$1 is larger than 1 MiB"
-	cat -- "$1" >"$2"
-	if grep -q $'\r' "$2"; then die "$1 has CRLF line endings: convert it to LF first"; fi
+  [ -f "$1" ] || bad_arg "not a file: $1"
+  [ "$(stat -L -c %s -- "$1")" -le 1048576 ] || die "$1 is larger than 1 MiB"
+  cat -- "$1" >"$2"
+  if grep -q $'\r' "$2"; then die "$1 has CRLF line endings: convert it to LF first"; fi
 }
 
 # Writes next to the destination, then renames: readers see the old file or the new one, never
 # part of one. The temporary name doesn't end in .caddy, so Caddy's import glob never sees it.
 put() { # put <source> <destination> <mode>
-	local tmp
-	tmp=$(mktemp "$(dirname -- "$2")/.app-apply.XXXXXX")
-	tmpfiles+=("$tmp")
-	cat -- "$1" >"$tmp"
-	chmod "$3" -- "$tmp"
-	mv -f -- "$tmp" "$2"
+  local tmp
+  tmp=$(mktemp "$(dirname -- "$2")/.app-apply.XXXXXX")
+  tmpfiles+=("$tmp")
+  cat -- "$1" >"$tmp"
+  chmod "$3" -- "$tmp"
+  mv -f -- "$tmp" "$2"
 }
 
 # Keeps the file about to be replaced as /var/lib/app-apply/<its path>.<time>, five per file, for
 # the restore after a failed reload and for a rollback by hand. Prints the copy's path.
 keep_previous() { # keep_previous <live file>
-	local dir base copies
-	[ -e "$1" ] || return 0
-	dir=$KEEP_DIR$(dirname -- "$1")
-	base=$(basename -- "$1")
-	install -d -m 0700 -- "$KEEP_DIR"
-	mkdir -p -- "$dir"
-	cp -p -- "$1" "$dir/$base.$stamp"
-	copies=("$dir/$base".*)
-	if [ "${#copies[@]}" -gt 5 ]; then rm -f -- "${copies[@]:0:${#copies[@]}-5}"; fi
-	printf '%s\n' "$dir/$base.$stamp"
+  local dir base copies
+  [ -e "$1" ] || return 0
+  dir=$KEEP_DIR$(dirname -- "$1")
+  base=$(basename -- "$1")
+  install -d -m 0700 -- "$KEEP_DIR"
+  mkdir -p -- "$dir"
+  cp -p -- "$1" "$dir/$base.$stamp"
+  copies=("$dir/$base".*)
+  if [ "${#copies[@]}" -gt 5 ]; then rm -f -- "${copies[@]:0:${#copies[@]}-5}"; fi
+  printf '%s\n' "$dir/$base.$stamp"
 }
 
-# Sources /etc/apps/<name>.conf (root's own, design §8.3) and checks the values app-apply uses.
+# Sources /etc/apps/<name>.conf (root's own) and checks the values app-apply uses.
 load_conf() { # load_conf <app|edge>
-	local conf=/etc/apps/$1.conf f files=() list=()
-	[ -f "$conf" ] || die "there is no $conf"
-	root_path "$conf" || die "$conf must be root's and writable by root alone"
-	PROJECT_DIR= APP_COMPOSE_FILE= ENV_FILES= UPSTREAMS= ZONE= ENV_PREFIX= EDGE_NETWORKS=
-	# An app's conf leaves CADDY_IMAGE alone: site checks load an app on top of the edge's.
-	if [ "$1" = edge ]; then CADDY_IMAGE=; fi
-	# shellcheck source=/dev/null
-	. "$conf"
-	[ "$PROJECT_DIR" = "/srv/$1" ] || die "PROJECT_DIR in $conf must be /srv/$1"
-	[[ $APP_COMPOSE_FILE =~ ^[A-Za-z0-9_-][A-Za-z0-9._-]*$ ]] || die "APP_COMPOSE_FILE in $conf must be a file name"
-	read -ra files <<<"$ENV_FILES"
-	for f in "${files[@]}"; do
-		[[ $f =~ ^[A-Za-z0-9._][A-Za-z0-9._/-]*$ && $f != *..* ]] ||
-			die "ENV_FILES in $conf: $f must be a path inside $PROJECT_DIR"
-	done
-	if [ "$1" = edge ]; then
-		[[ $CADDY_IMAGE =~ ^[a-z0-9][a-z0-9./:@_-]*$ ]] || die "CADDY_IMAGE in $conf must name the pinned caddy image"
-		return 0
-	fi
-	[[ $ZONE =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || die "ZONE in $conf must be the app's domain, in lower case"
-	[[ $ENV_PREFIX =~ ^[A-Z][A-Z0-9]*_$ ]] || die "ENV_PREFIX in $conf must look like ${1^^}_"
-	read -ra list <<<"$UPSTREAMS"
-	for f in "${list[@]}"; do
-		[[ $f =~ ^$1-[a-z0-9-]+:[0-9]+$ ]] || die "UPSTREAMS in $conf: $f must be $1-<name>:<port>"
-	done
-	read -ra list <<<"$EDGE_NETWORKS"
-	for f in "${list[@]}"; do
-		[ "$f" = "edge-$1" ] || [ "$f" = "edge-$1-staging" ] ||
-			die "EDGE_NETWORKS in $conf: $f must be edge-$1 or edge-$1-staging"
-	done
+  local conf=/etc/apps/$1.conf f files=() list=()
+  [ -f "$conf" ] || die "there is no $conf"
+  root_path "$conf" || die "$conf must be root's and writable by root alone"
+  PROJECT_DIR= APP_COMPOSE_FILE= ENV_FILES= UPSTREAMS= ZONE= ENV_PREFIX= EDGE_NETWORKS= CONFIG_ARCHIVE_FILES=
+  # An app's conf leaves CADDY_IMAGE alone: site checks load an app on top of the edge's.
+  if [ "$1" = edge ]; then CADDY_IMAGE=; fi
+  # shellcheck source=/dev/null
+  . "$conf"
+  [ "$PROJECT_DIR" = "/srv/$1" ] || die "PROJECT_DIR in $conf must be /srv/$1"
+  [[ $APP_COMPOSE_FILE =~ ^[A-Za-z0-9_-][A-Za-z0-9._-]*$ ]] || die "APP_COMPOSE_FILE in $conf must be a file name"
+  read -ra files <<<"$ENV_FILES"
+  for f in "${files[@]}"; do
+    [[ $f =~ ^[A-Za-z0-9._][A-Za-z0-9._/-]*$ && $f != *..* ]] ||
+      die "ENV_FILES in $conf: $f must be a path inside $PROJECT_DIR"
+  done
+  if [ "$1" = edge ]; then
+    [[ $CADDY_IMAGE =~ ^[a-z0-9][a-z0-9./:@_-]*$ ]] || die "CADDY_IMAGE in $conf must name the pinned caddy image"
+    read -ra list <<<"$EDGE_NETWORKS"
+    for f in "${list[@]}"; do
+      [[ $f =~ ^edge-[a-z0-9]+(-staging)?$ ]] || die "EDGE_NETWORKS in $conf: $f must be edge-<app> or edge-<app>-staging"
+    done
+    return 0
+  fi
+  [[ $ZONE =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || die "ZONE in $conf must be the app's domain, in lower case"
+  [ "$ENV_PREFIX" = "${1^^}_" ] || die "ENV_PREFIX in $conf must be ${1^^}_"
+  read -ra list <<<"$UPSTREAMS"
+  for f in "${list[@]}"; do
+    [[ $f =~ ^$1-[a-z0-9-]+:[0-9]+$ ]] || die "UPSTREAMS in $conf: $f must be $1-<name>:<port>"
+  done
+  read -ra list <<<"$EDGE_NETWORKS"
+  for f in "${list[@]}"; do
+    [ "$f" = "edge-$1" ] || [ "$f" = "edge-$1-staging" ] ||
+      die "EDGE_NETWORKS in $conf: $f must be edge-$1 or edge-$1-staging"
+  done
 }
 
 # CADDY_IMAGE from /etc/apps/edge.conf, read in a subshell so the app's own settings stay loaded.
 edge_image() {
-	CADDY_IMAGE=$(load_conf edge && printf '%s' "$CADDY_IMAGE") || exit 1
+  CADDY_IMAGE=$(load_conf edge && printf '%s' "$CADDY_IMAGE") || exit 1
 }
 
 # Every app that has a conf, edge excluded.
 configured_apps() {
-	local conf name
-	for conf in /etc/apps/*.conf; do
-		name=${conf##*/}
-		name=${name%.conf}
-		if [ -f "$conf" ] && [[ $name =~ ^[a-z0-9]+$ ]] && [ "$name" != edge ]; then printf '%s\n' "$name"; fi
-	done
+  local conf name
+  for conf in /etc/apps/*.conf; do
+    name=${conf##*/}
+    name=${name%.conf}
+    if [ -f "$conf" ] && [[ $name =~ ^[a-z0-9]+$ ]] && [ "$name" != edge ]; then printf '%s\n' "$name"; fi
+  done
 }
 
-# §4: an app's compose file may join its own edge networks; the edge project joins every app's.
-edge_networks_of() { # edge_networks_of <app|edge>
-	local name
-	if [ "$1" != edge ]; then
-		printf '%s' "$EDGE_NETWORKS"
-		return 0
-	fi
-	while IFS= read -r name; do
-		(load_conf "$name" && printf '%s ' "$EDGE_NETWORKS") || true
-	done < <(configured_apps)
+# An app's compose file may join its own edge networks; the edge project joins the ones listed in
+# edge.conf, which holds every app's, so Caddy can join a new app's networks before that app's conf
+# exists.
+edge_networks_of() { # edge_networks_of <app|edge>: the project's conf is the one loaded
+  if [ "$1" != edge ]; then
+    printf '%s' "$EDGE_NETWORKS"
+    return 0
+  fi
+  (load_conf edge && printf '%s' "$EDGE_NETWORKS")
 }
 
-# --- compose files (§8.6) ---
+# Every edge network named in edge.conf and in the apps' confs, one a line.
+all_edge_networks() {
+  local name
+  {
+    (load_conf edge && printf '%s\n' "$EDGE_NETWORKS") || exit 1
+    while IFS= read -r name; do
+      (load_conf "$name" && printf '%s\n' "$EDGE_NETWORKS") || true
+    done < <(configured_apps)
+  } | tr -s ' ' '\n' | grep -v '^$' | sort -u
+}
+
+# An edge network carries Caddy and one app's services and nothing else, so it is internal: no route
+# out, and no published port can reach it. Refuses one that exists without being internal; the ones
+# that are missing are created once the checks pass (create_edge_networks).
+check_edge_networks() {
+  local n internal
+  mapfile -t edge_all < <(all_edge_networks)
+  edge_present=()
+  for n in "${edge_all[@]}"; do
+    if internal=$(clean docker network inspect -f '{{.Internal}}' "$n" 2>/dev/null); then
+      [ "$internal" = true ] || problem "the Docker network $n exists but is not internal: remove it, and app-apply creates it again"
+      edge_present+=("$n")
+    fi
+  done
+}
+create_edge_networks() {
+  local n
+  for n in "${edge_all[@]}"; do
+    if [[ " ${edge_present[*]} " != *" $n "* ]]; then
+      clean docker network create --internal -- "$n" >/dev/null
+      say "created the internal Docker network $n"
+    fi
+  done
+}
+
+# --- compose files ---
 
 # jq helpers for the compose checks. Compose prints normalized JSON (long-syntax mounts, sizes as
 # byte counts); the short forms are read too, in case a Compose version prints them.
@@ -239,477 +294,578 @@ def external: (.external // false) != false;
 JQ
 )
 STEADY_JQ='[services | select(((.value.profiles // []) | length) == 0) | (.value.mem_limit | tobytes) // 0]
-	| add // 0 | . / 1048576 | floor'
+  | add // 0 | . / 1048576 | floor'
 
 # Runs a jq program over the compose config. jq's own errors are dropped: they can quote a value.
 jqc() { # jqc <program> [<json file>]
-	jq -r --arg app "$project" --arg ups "$UPSTREAMS" --arg edge "$allowed_edge" --arg others "$other_apps" \
-		--arg extra "$extra_keys" --arg caddy "$CADDY_IMAGE" "$JQ_LIB $1" "${2:-$work/config.json}" 2>/dev/null
+  jq -r --arg app "$project" --arg ups "$UPSTREAMS" --arg edge "$allowed_edge" --arg others "$other_apps" \
+    --arg extra "$extra_keys" --arg caddy "$CADDY_IMAGE" "$JQ_LIB $1" "${2:-$work/config.json}" 2>/dev/null
 }
-rule() { # rule <program>: every line it prints is one problem
-	jqc "$1" >>"$work/problems" || problem "a check could not read the compose config"
-}
-
-# Compose's own view of the project, every profile included, as app-compose runs it. The JSON
-# holds interpolated secrets: it stays in the work directory and is never printed.
-compose_json() { # compose_json <compose file> <output json>
-	local f files=() args=() envs=()
-	read -ra files <<<"$ENV_FILES"
-	for f in "${files[@]}"; do
-		args+=(--env-file "$PROJECT_DIR/$f")
-		envs+=("$PROJECT_DIR/$f")
-	done
-	if ! clean docker compose --project-directory "$PROJECT_DIR" -f "$1" "${args[@]}" --profile '*' \
-		config --format json --no-env-resolution >"$2" 2>"$2.err"; then
-		redact "${envs[@]}" <"$2.err" >&2 || true
-		return 1
-	fi
-	redact "${envs[@]}" <"$2.err" | journal
+rule() { # rule <program> [<json file>]: every line it prints is one problem
+  jqc "$1" "${2-}" >>"$work/problems" || problem "a check could not read the compose config"
 }
 
-# §8.6 top level, on the text itself: Compose merges include and extends before it prints the
-# config, so neither would show in the JSON, and the files they pull in would not be pinned.
+# Compose's own view of the project, every profile included, as app-compose runs it: named with -p,
+# which beats a COMPOSE_PROJECT_NAME line and any name: in the file. With "raw" the values are not
+# interpolated, so the JSON shows where the env files could change the file (check_interpolation).
+# The other JSON holds interpolated secrets: it stays in the work directory and is never printed.
+compose_json() { # compose_json <compose file> <output json> [raw]
+  local f files=() args=() envs=() mode=(--no-env-resolution)
+  read -ra files <<<"$ENV_FILES"
+  for f in "${files[@]}"; do
+    args+=(--env-file "$PROJECT_DIR/$f")
+    envs+=("$PROJECT_DIR/$f")
+    # COMPOSE_* lines would rename the project or change its profiles, whatever the file says.
+    if grep -Eq '^[[:space:]]*(export[[:space:]]+)?COMPOSE_' "$PROJECT_DIR/$f" 2>/dev/null; then
+      printf 'app-apply: %s sets a COMPOSE_ variable: remove it\n' "$PROJECT_DIR/$f" >&2
+      return 1
+    fi
+  done
+  if [ "${3-}" = raw ]; then mode=(--no-interpolate --no-env-resolution); fi
+  if ! clean docker compose -p "${PROJECT_DIR##*/}" --project-directory "$PROJECT_DIR" -f "$1" "${args[@]}" \
+    --profile '*' config --format json "${mode[@]}" >"$2" 2>"$2.err"; then
+    redact "${envs[@]}" <"$2.err" >&2 || true
+    return 1
+  fi
+  redact "${envs[@]}" <"$2.err" | journal
+}
+
+# Top level, on the text itself: Compose merges include and extends before it prints the config, so
+# neither would show in the JSON, and the files they pull in would not be pinned. The project name
+# is checked here too, because Compose runs with -p and prints that name whatever the file says.
+# The alias and complex-key tests read a copy of the line without quoted text and comments, so a
+# ternary in a JavaScript healthcheck is not taken for a key.
 check_compose_text() { # check_compose_text <file>
-	awk -v problems="$work/problems" -v sq="'" '
-		function bad(m) { print "line " NR ": " m >> problems }
-		BEGIN { inex = "(^|[^A-Za-z0-9_.-])[\"" sq "]?(include|extends)[\"" sq "]?[ \t]*:([ \t]|$)" }
-		/^[ \t]*#/ || /^[ \t]*$/ { next }
-		/^[^ \t]/ && !/^(name|services|networks|volumes|x-[A-Za-z0-9_.-]*)[ \t]*:([ \t]|$)/ {
-			bad("top-level keys are name, services, networks, volumes and x-*, written plainly"); next
-		}
-		$0 ~ inex { bad("include and extends are not allowed") }
-		/"[^"]*\\[^"]*"[ \t]*:([ \t]|$)/ { bad("quoted keys with escapes are not allowed") }
-		/\*[^] \t,}]+[ \t]+:([ \t]|$)/ { bad("an alias can not be a key") }
-		/(^|[ \t,{[])\?([ \t]|$)/ { bad("complex keys (?) are not allowed") }
-	' "$1"
+  awk -v problems="$work/problems" -v sq="'" -v app="$project" '
+    function bad(m) { print "line " NR ": " m >> problems }
+    BEGIN { inex = "(^|[^A-Za-z0-9_.-])[\"" sq "]?(include|extends)[\"" sq "]?[ \t]*:([ \t]|$)" }
+    /^[ \t]*#/ || /^[ \t]*$/ { next }
+    /^[^ \t]/ && !/^(name|services|networks|volumes|x-[A-Za-z0-9_.-]*)[ \t]*:([ \t]|$)/ {
+      bad("top-level keys are name, services, networks, volumes and x-*, written plainly"); next
+    }
+    /^name[ \t]*:/ {
+      v = $0
+      sub(/^name[ \t]*:[ \t]*/, "", v)
+      sub(/[ \t]+#.*$/, "", v)
+      if (v ~ /^".*"$/ || v ~ ("^" sq ".*" sq "$")) v = substr(v, 2, length(v) - 2)
+      if (v != app) bad("the project name must be " app ", written plainly")
+    }
+    {
+      s = $0
+      gsub(/"([^"\\]|\\.)*"/, "\"\"", s)
+      gsub(sq "[^" sq "]*" sq, "", s)
+      sub(/(^|[ \t])#.*$/, "", s)
+    }
+    $0 ~ inex { bad("include and extends are not allowed") }
+    /"[^"]*\\[^"]*"[ \t]*:([ \t]|$)/ { bad("quoted keys with escapes are not allowed") }
+    s ~ /\*[^] \t,}]+[ \t]+:([ \t]|$)/ { bad("an alias can not be a key") }
+    s ~ /^[ \t]*(-[ \t]+)*[?]([ \t]|$)/ || s ~ /[{[,][ \t]*[?][ \t]/ { bad("complex keys (?) are not allowed") }
+  ' "$1"
 }
 
-# §8.6 top level: the project is named after the app and has only services, networks and volumes
-# (x- extensions configure nothing).
+# The env files may fill in only what acts inside a container: image, environment, command,
+# entrypoint and healthcheck. Anywhere else a later edit of .env could turn an approved file into
+# privileged: true, a host network or a bind of /, and the pin covers the file's text, not the
+# values that fill it. Runs on the JSON Compose prints without interpolating.
+check_interpolation() { # check_interpolation <raw json>
+  rule 'def interp: type == "string" and test("(^|[^$])([$][$])*[$]([{]|[A-Za-z_])");
+    def inert: (.key | IN("image", "environment", "command", "entrypoint", "healthcheck")) or (.key | startswith("x-"));
+    (services | .key as $s | .value | to_entries[] | select(inert | not)
+      | select([.value | .. | select(interp)] | length > 0)
+      | "service \($s): \(.key) takes a value from the env files; only image, environment, command, entrypoint and healthcheck may"),
+    ((.networks // {}), (.volumes // {}) | to_entries[] | select([.value | .. | select(interp)] | length > 0)
+      | "\(.key) takes a value from the env files")' "$1"
+}
+
+# The project has only services, networks and volumes (x- extensions configure nothing). Its name
+# is pinned by -p and checked in check_compose_text.
 check_top_level() {
-	rule '(if .name != $app then "the project name is \(.name // "unset"), not \($app)" else empty end),
-		(keys[] | select((IN("name", "services", "networks", "volumes") or startswith("x-")) | not)
-			| "top-level \(.) is not allowed")'
+  rule '(if .name != $app then "the project name is \(.name // "unset"), not \($app)" else empty end),
+    (keys[] | select((IN("name", "services", "networks", "volumes") or startswith("x-")) | not)
+      | "top-level \(.) is not allowed")'
 }
 
-# §8.6 volumes: local, without driver_opts, not external, and named <app>_<key> as Compose names
+# Volumes: local, without driver_opts, not external, and named <app>_<key> as Compose names
 # them, so a custom name can't reuse another project's volume.
 check_volumes() {
-	rule '(.volumes // {}) | to_entries[] | .key as $k | (.value // {}) |
-		(if external then "volume \($k) is external" else empty end),
-		(if (.driver // "local") != "local" then "volume \($k) uses driver \(.driver)" else empty end),
-		(if ((.driver_opts // {}) | blank) then empty else "volume \($k) sets driver_opts" end),
-		(if (.name // "\($app)_\($k)") != "\($app)_\($k)" then "volume \($k) is named \(.name), not \($app)_\($k)" else empty end),
-		(keys - ["name", "driver", "driver_opts", "external", "labels"] | .[] | "volume \($k) sets \(.)")'
+  rule '(.volumes // {}) | to_entries[] | .key as $k | (.value // {}) |
+    (if external then "volume \($k) is external" else empty end),
+    (if (.driver // "local") != "local" then "volume \($k) uses driver \(.driver)" else empty end),
+    (if ((.driver_opts // {}) | blank) then empty else "volume \($k) sets driver_opts" end),
+    (if (.name // "\($app)_\($k)") != "\($app)_\($k)" then "volume \($k) is named \(.name), not \($app)_\($k)" else empty end),
+    (keys - ["name", "driver", "driver_opts", "external", "labels"] | .[] | "volume \($k) sets \(.)")'
 }
 
-# §8.6 networks and §4: compose-defined networks are plain bridges named <app>_<key>; external ones
+# Networks: compose-defined networks are plain bridges named <app>_<key>; external ones
 # are only the app's own edge networks (for the edge project, the apps' edge networks).
 check_networks() {
-	rule '(.networks // {}) | to_entries[] | .key as $k | (.value // {}) |
-		if external then
-			((if (.external | type) == "object" then .external.name else null end) // .name // $k) as $n
-			| (if ($n | IN($edge | words | .[])) then empty else "external network \($n) is not one of: \($edge)" end),
-			  (keys - ["name", "external"] | .[] | "external network \($k) sets \(.)")
-		else
-			(if (.name // "\($app)_\($k)") != "\($app)_\($k)" then "network \($k) is named \(.name), not \($app)_\($k)" else empty end),
-			(if (.driver // "bridge") != "bridge" then "network \($k) uses driver \(.driver)" else empty end),
-			(if ((.driver_opts // {}) | blank) then empty else "network \($k) sets driver_opts" end),
-			(if (.enable_ipv6 // false) != false then "network \($k) enables IPv6" else empty end),
-			(if (.attachable // false) != false then "network \($k) is attachable" else empty end),
-			(if (((.ipam // {}) | keys - ["driver"] | length) > 0) or ((.ipam.driver // "default") != "default")
-			 then "network \($k) sets ipam" else empty end),
-			(keys - ["name", "driver", "driver_opts", "internal", "ipam", "labels", "external", "enable_ipv6", "attachable"]
-			 | .[] | "network \($k) sets \(.)")
-		end'
+  rule '(.networks // {}) | to_entries[] | .key as $k | (.value // {}) |
+    if external then
+      ((if (.external | type) == "object" then .external.name else null end) // .name // $k) as $n
+      | (if ($n | IN($edge | words | .[])) then empty else "external network \($n) is not one of: \($edge)" end),
+        (to_entries[] | select((.key | IN("name", "external")) | not) | select(.value | blank | not)
+          | "external network \($k) sets \(.key)")
+    else
+      (if (.name // "\($app)_\($k)") != "\($app)_\($k)" then "network \($k) is named \(.name), not \($app)_\($k)" else empty end),
+      (if (.driver // "bridge") != "bridge" then "network \($k) uses driver \(.driver)" else empty end),
+      (if ((.driver_opts // {}) | blank) then empty else "network \($k) sets driver_opts" end),
+      (if (.enable_ipv6 // false) != false then "network \($k) enables IPv6" else empty end),
+      (if (.attachable // false) != false then "network \($k) is attachable" else empty end),
+      (if (((.ipam // {}) | keys - ["driver"] | length) > 0) or ((.ipam.driver // "default") != "default")
+       then "network \($k) sets ipam" else empty end),
+      (keys - ["name", "driver", "driver_opts", "internal", "ipam", "labels", "external", "enable_ipv6", "attachable"]
+       | .[] | "network \($k) sets \(.)")
+    end'
 }
 
-# §4 name rules for an app: only services that serve an UPSTREAMS alias join its edge networks
+# Name rules for an app: only services that serve an UPSTREAMS alias join its edge networks
 # (so no database does), every alias there starts with <app>-, and no service name there starts
 # with edge- or with the name of another app.
 check_edge_members() {
-	rule '. as $root
-		| [($root.networks // {}) | to_entries[] | select((.value // {}) | external) | .key] as $edgekeys
-		| ($ups | words | map(sub(":[0-9]+$"; ""))) as $hosts
-		| ($others | words) as $other
-		| services | .key as $s | (.value | nets) | to_entries[] | select(.key | IN($edgekeys[]))
-		| .key as $n | (.value // {}) as $c
-		| (if ($s | startswith("edge-")) or any($other[]; . as $o | $s | startswith($o + "-"))
-			then "service \($s) is on \($n), so its name may not start with edge- or the name of another app" else empty end),
-		  (if (($c.aliases // []) | length) == 0 then "service \($s) is on \($n) without an alias from UPSTREAMS" else empty end),
-		  (($c.aliases // [])[] | select(startswith($app + "-") | not) | "service \($s): alias \(.) on \($n) must start with \($app)-"),
-		  (($c.aliases // [])[] | select(IN($hosts[]) | not) | "service \($s): alias \(.) on \($n) is not in UPSTREAMS"),
-		  ($c | keys - ["aliases", "priority", "gw_priority"] | .[] | "service \($s) sets \(.) on \($n)")'
+  rule '. as $root
+    | [($root.networks // {}) | to_entries[] | select((.value // {}) | external) | .key] as $edgekeys
+    | ($ups | words | map(sub(":[0-9]+$"; ""))) as $hosts
+    | ($others | words) as $other
+    | services | .key as $s | (.value | nets) | to_entries[] | select(.key | IN($edgekeys[]))
+    | .key as $n | (.value // {}) as $c
+    | (if ($s | startswith("edge-")) or any($other[]; . as $o | $s | startswith($o + "-"))
+      then "service \($s) is on \($n), so its name may not start with edge- or the name of another app" else empty end),
+      (if (($c.aliases // []) | length) == 0 then "service \($s) is on \($n) without an alias from UPSTREAMS" else empty end),
+      (($c.aliases // [])[] | select(startswith($app + "-") | not) | "service \($s): alias \(.) on \($n) must start with \($app)-"),
+      (($c.aliases // [])[] | select(IN($hosts[]) | not) | "service \($s): alias \(.) on \($n) is not in UPSTREAMS"),
+      ($c | keys - ["aliases", "priority", "gw_priority"] | .[] | "service \($s) sets \(.) on \($n)")'
 }
 
-# §4 for the edge project: Caddy takes no alias on an edge network, so no upstream name of an app
+# For the edge project: Caddy takes no alias on an edge network, so no upstream name of an app
 # can ever lead to it.
 check_edge_aliases() {
-	rule '. as $root
-		| [($root.networks // {}) | to_entries[] | select((.value // {}) | external) | .key] as $ext
-		| services | .key as $s | (.value | nets) | to_entries[] | select(.key | IN($ext[])) | .key as $n
-		| ((.value // {}).aliases // [])[] | "service \($s) has alias \(.) on \($n): the edge takes none there"'
+  rule '. as $root
+    | [($root.networks // {}) | to_entries[] | select((.value // {}) | external) | .key] as $ext
+    | services | .key as $s | (.value | nets) | to_entries[] | select(.key | IN($ext[])) | .key as $n
+    | ((.value // {}).aliases // [])[] | "service \($s) has alias \(.) on \($n): the edge takes none there"'
 }
 
-# §8.6 service keys: the allow-list. A key outside it is refused unless its value is empty (null,
-# false, 0, "", [] or {}), which sets nothing. pull_policy, logging and labels are narrowed further.
+# Service keys: the allow-list. A key outside it is refused unless its value is empty (null,
+# false, 0, "", [] or {}), which sets nothing. pull_policy, logging, labels and ulimits are narrowed
+# further.
 check_service_keys() {
-	rule 'def allowed: "image", "command", "entrypoint", "environment", "env_file", "healthcheck", "restart",
-			"depends_on", "networks", "volumes", "tmpfs", "read_only", "user", "working_dir", "mem_limit",
-			"memswap_limit", "mem_reservation", "cpus", "cpu_shares", "pids_limit", "oom_score_adj", "cap_drop",
-			"cap_add", "security_opt", "stop_grace_period", "stop_signal", "profiles", "labels", "init", "ulimits",
-			"shm_size", "expose", "pull_policy", "logging", ($extra | words | .[]);
-		services | .key as $s | .value |
-		(to_entries[] | select(((.key | IN(allowed)) or (.key | startswith("x-")) or (.value | blank)) | not)
-			| "service \($s): \(.key) is not allowed"),
-		(if (.pull_policy // null) == null or (.pull_policy | IN("missing", "never")) then empty
-		 else "service \($s): pull_policy \(.pull_policy) is not allowed (missing or never)" end),
-		(if (.logging // null) == null then empty
-		 elif ((.logging.driver // "") == "journald") and ((.logging.options // {}) | blank)
-			and ((.logging | keys - ["driver", "options"]) == []) then empty
-		 else "service \($s): logging must be journald with no options" end),
-		((.labels // {}) | (if type == "array" then map(split("=")[0]) else keys end) | .[]
-			| select(startswith("com.docker.")) | "service \($s): label \(.) belongs to Docker")'
+  rule 'def allowed: "image", "command", "entrypoint", "environment", "env_file", "healthcheck", "restart",
+      "depends_on", "networks", "volumes", "tmpfs", "read_only", "user", "working_dir", "mem_limit",
+      "memswap_limit", "mem_reservation", "cpus", "cpu_shares", "pids_limit", "oom_score_adj", "cap_drop",
+      "cap_add", "security_opt", "stop_grace_period", "stop_signal", "profiles", "labels", "init", "ulimits",
+      "shm_size", "expose", "pull_policy", "logging", ($extra | words | .[]);
+    services | .key as $s | .value |
+    (to_entries[] | select(((.key | IN(allowed)) or (.key | startswith("x-")) or (.value | blank)) | not)
+      | "service \($s): \(.key) is not allowed"),
+    ((.ulimits // {}) | keys - ["nofile", "nproc"] | .[] | "service \($s): ulimit \(.) is not allowed (nofile and nproc only)"),
+    (if (.pull_policy // null) == null or (.pull_policy | IN("missing", "never")) then empty
+     else "service \($s): pull_policy \(.pull_policy) is not allowed (missing or never)" end),
+    (if (.logging // null) == null then empty
+     elif ((.logging.driver // "") == "journald") and ((.logging.options // {}) | blank)
+      and ((.logging | keys - ["driver", "options"]) == []) then empty
+     else "service \($s): logging must be journald with no options" end),
+    ((.labels // {}) | (if type == "array" then map(split("=")[0]) else keys end) | .[]
+      | select(startswith("com.docker.")) | "service \($s): label \(.) belongs to Docker")'
 }
 
-# §8.6 mounts: binds are read-only absolute paths without .. (check_host_paths does the rest),
+# Mounts: binds are read-only absolute paths without .. (check_host_paths does the rest),
 # named volumes are declared in this file, tmpfs mounts have a size, and never the Docker socket.
 check_mounts() {
-	rule '. as $root | (($root.volumes // {}) | keys) as $declared |
-		services | .key as $s | .value |
-		(mounts[] |
-			if .type == "bind" then
-				(if .read_only == true then empty else "service \($s): bind \(.source) must be read-only" end),
-				(if ((.source // "") | test("(^|/)\\.\\.(/|$)")) then "service \($s): bind \(.source) contains .." else empty end),
-				(if ((.source // "") | startswith("/")) then empty else "service \($s): bind \(.source) is not an absolute path" end),
-				(if (((.source // "") + " " + (.target // "")) | test("docker\\.sock")) then "service \($s): the Docker socket is never mounted" else empty end),
-				((.bind // {}) | keys - ["create_host_path", "propagation", "recursive", "selinux"] | .[]
-					| "service \($s): bind option \(.) is not allowed"),
-				(if ((.bind.propagation // "rprivate") | IN("private", "rprivate")) then empty
-				 else "service \($s): bind propagation \(.bind.propagation) is not allowed" end),
-				(if ((.bind.recursive // "enabled") | IN("enabled", "readonly")) then empty
-				 else "service \($s): bind recursive \(.bind.recursive) is not allowed" end),
-				(keys - ["type", "source", "target", "read_only", "bind", "consistency"] | .[] | "service \($s): a bind sets \(.)")
-			elif .type == "volume" then
-				(if .source == null or (.source | IN($declared[])) then empty else "service \($s): volume \(.source) is not declared in this file" end),
-				((.volume // {}) | keys - ["nocopy", "subpath"] | .[] | "service \($s): volume option \(.) is not allowed"),
-				(keys - ["type", "source", "target", "read_only", "volume", "consistency"] | .[] | "service \($s): a volume mount sets \(.)")
-			elif .type == "tmpfs" then
-				(if (((.tmpfs.size // null) | tobytes) // 0) > 0 then empty else "service \($s): tmpfs \(.target) has no size" end),
-				((.tmpfs // {}) | keys - ["size", "mode"] | .[] | "service \($s): tmpfs option \(.) is not allowed"),
-				(keys - ["type", "target", "read_only", "tmpfs", "consistency"] | .[] | "service \($s): a tmpfs mount sets \(.)")
-			else "service \($s): \(.type // "untyped") mounts are not allowed" end),
-		((.tmpfs // []) | (if type == "string" then [.] else . end) | .[] | select(test("(^|[:,])size=[1-9]") | not)
-			| "service \($s): tmpfs \(.) has no size")'
+  rule '. as $root | (($root.volumes // {}) | keys) as $declared |
+    services | .key as $s | .value |
+    (mounts[] |
+      if .type == "bind" then
+        (if .read_only == true then empty else "service \($s): bind \(.source) must be read-only" end),
+        (if ((.source // "") | test("(^|/)\\.\\.(/|$)")) then "service \($s): bind \(.source) contains .." else empty end),
+        (if ((.source // "") | startswith("/")) then empty else "service \($s): bind \(.source) is not an absolute path" end),
+        (if (((.source // "") + " " + (.target // "")) | test("docker\\.sock")) then "service \($s): the Docker socket is never mounted" else empty end),
+        ((.bind // {}) | keys - ["create_host_path", "propagation", "recursive", "selinux"] | .[]
+          | "service \($s): bind option \(.) is not allowed"),
+        (if ((.bind.propagation // "rprivate") | IN("private", "rprivate")) then empty
+         else "service \($s): bind propagation \(.bind.propagation) is not allowed" end),
+        (if ((.bind.recursive // "enabled") | IN("enabled", "readonly")) then empty
+         else "service \($s): bind recursive \(.bind.recursive) is not allowed" end),
+        (keys - ["type", "source", "target", "read_only", "bind", "consistency"] | .[] | "service \($s): a bind sets \(.)")
+      elif .type == "volume" then
+        (if .source == null or (.source | IN($declared[])) then empty else "service \($s): volume \(.source) is not declared in this file" end),
+        ((.volume // {}) | keys - ["nocopy", "subpath"] | .[] | "service \($s): volume option \(.) is not allowed"),
+        (keys - ["type", "source", "target", "read_only", "volume", "consistency"] | .[] | "service \($s): a volume mount sets \(.)")
+      elif .type == "tmpfs" then
+        (if (((.tmpfs.size // null) | tobytes) // 0) > 0 then empty else "service \($s): tmpfs \(.target) has no size" end),
+        ((.tmpfs // {}) | keys - ["size", "mode"] | .[] | "service \($s): tmpfs option \(.) is not allowed"),
+        (keys - ["type", "target", "read_only", "tmpfs", "consistency"] | .[] | "service \($s): a tmpfs mount sets \(.)")
+      else "service \($s): \(.type // "untyped") mounts are not allowed" end),
+    ((.tmpfs // []) | (if type == "string" then [.] else . end) | .[] | select(test("(^|[:,])size=[1-9]") | not)
+      | "service \($s): tmpfs \(.) has no size")'
 }
 
-# §8.6 mounts and env files on the host: each path is exactly what it says (realpath, so no symlink
+# Mounts and env files on the host: each path is exactly what it says (realpath, so no symlink
 # anywhere), lies under /srv/<project>/ and is root's all the way up. A container then gets only
 # files of its own app that root put there.
 check_host_paths() {
-	local svc kind path real
-	jqc 'services | .key as $s | .value |
-		(mounts[] | select(.type == "bind") | [$s, "bind", (.source // "")] | @tsv),
-		((.env_file // []) | (if type == "string" then [.] else . end) | .[]
-			| [$s, "env_file", (if type == "string" then . else (.path // "") end)] | @tsv)' >"$work/paths" ||
-		problem "a check could not read the compose config"
-	while IFS=$'\t' read -r svc kind path; do
-		if ! real=$(realpath -e -- "$path" 2>/dev/null); then
-			problem "service $svc: $kind $path does not exist"
-		elif [ "$real" != "$path" ]; then
-			problem "service $svc: $kind $path is not its real path ($real)"
-		elif [[ $path != "/srv/$project/"?* ]]; then
-			problem "service $svc: $kind $path is outside /srv/$project/"
-		elif [ "$kind" = env_file ] && [ ! -f "$path" ]; then
-			problem "service $svc: env_file $path is not a file"
-		elif [ ! -f "$path" ] && [ ! -d "$path" ]; then
-			problem "service $svc: bind $path is not a file or a directory"
-		elif ! root_path "$path"; then
-			problem "service $svc: $kind $path is not root's alone (owner and mode, up to /)"
-		fi
-	done <"$work/paths"
-	# --no-env-resolution keeps the env_file paths in the JSON. If a Compose version ever drops
-	# them, the file's env_file lines would go unchecked, so that is refused too.
-	if grep -Eq '(^|[^A-Za-z0-9_.-])env_file[ \t]*:' "$work/compose.yml" && ! grep -q $'\tenv_file\t' "$work/paths"; then
-		problem "the file sets env_file, but docker compose config did not list the paths"
-	fi
+  local svc kind path real
+  jqc 'services | .key as $s | .value |
+    (mounts[] | select(.type == "bind") | [$s, "bind", (.source // "")] | @tsv),
+    ((.env_file // []) | (if type == "string" then [.] else . end) | .[]
+      | [$s, "env_file", (if type == "string" then . else (.path // "") end)] | @tsv)' >"$work/paths" ||
+    problem "a check could not read the compose config"
+  while IFS=$'\t' read -r svc kind path; do
+    if ! real=$(realpath -e -- "$path" 2>/dev/null); then
+      problem "service $svc: $kind $path does not exist"
+    elif [ "$real" != "$path" ]; then
+      problem "service $svc: $kind $path is not its real path ($real)"
+    elif [[ $path != "/srv/$project/"?* ]]; then
+      problem "service $svc: $kind $path is outside /srv/$project/"
+    elif [ "$kind" = env_file ] && [ ! -f "$path" ]; then
+      problem "service $svc: env_file $path is not a file"
+    elif [ ! -f "$path" ] && [ ! -d "$path" ]; then
+      problem "service $svc: bind $path is not a file or a directory"
+    elif ! root_path "$path"; then
+      problem "service $svc: $kind $path is not root's alone (owner and mode, up to /)"
+    fi
+  done <"$work/paths"
+  # --no-env-resolution keeps the env_file paths in the JSON. If a Compose version ever drops
+  # them, the file's env_file lines would go unchecked, so that is refused too.
+  if grep -Eq '(^|[^A-Za-z0-9_.-])env_file[ \t]*:' "$work/compose.yml" && ! grep -q $'\tenv_file\t' "$work/paths"; then
+    problem "the file sets env_file, but docker compose config did not list the paths"
+  fi
 }
 
-# §8.6 capabilities: cap_drop has ALL, and cap_add stays within what Postgres, crond and Caddy need.
+# Capabilities: cap_drop has ALL, and cap_add stays within what Postgres, crond and Caddy need.
 check_caps() {
-	rule 'services | .key as $s | .value |
-		(if any((.cap_drop // [])[]; capname == "ALL") then empty else "service \($s): cap_drop must contain ALL" end),
-		((.cap_add // [])[]
-			| select(capname | IN("CHOWN", "DAC_OVERRIDE", "FOWNER", "SETUID", "SETGID", "KILL", "NET_BIND_SERVICE") | not)
-			| "service \($s): cap_add \(.) is not allowed")'
+  rule 'services | .key as $s | .value |
+    (if any((.cap_drop // [])[]; capname == "ALL") then empty else "service \($s): cap_drop must contain ALL" end),
+    ((.cap_add // [])[]
+      | select(capname | IN("CHOWN", "DAC_OVERRIDE", "FOWNER", "SETUID", "SETGID", "KILL", "NET_BIND_SERVICE") | not)
+      | "service \($s): cap_add \(.) is not allowed")'
 }
 
-# §8.6 security options: no-new-privileges at most. Seccomp, AppArmor and the masked /proc paths
+# Security options: no-new-privileges at most. Seccomp, AppArmor and the masked /proc paths
 # stay as Docker sets them.
 check_security_opt() {
-	rule 'services | .key as $s | (.value.security_opt // [])[]
-		| select(IN("no-new-privileges:true", "no-new-privileges=true", "no-new-privileges") | not)
-		| "service \($s): security_opt \(.) is not allowed"'
+  rule 'services | .key as $s | (.value.security_opt // [])[]
+    | select(IN("no-new-privileges:true", "no-new-privileges=true", "no-new-privileges") | not)
+    | "service \($s): security_opt \(.) is not allowed"'
 }
 
-# §8.6 limits on every service, one-offs included: mem_limit, cpus up to 1.5, pids_limit,
-# oom_score_adj from -900 to 1000, and memswap_limit from mem_limit to mem_limit + 256m.
+# Limits on every service, one-offs included: mem_limit, cpus up to 1.5, pids_limit up to 2048,
+# cpu_shares up to 1024, oom_score_adj from -900 to 1000 (Compose leaves 0 out of its JSON, so
+# unset is 0), and memswap_limit from mem_limit to mem_limit + 256m.
 check_limits() {
-	rule 'services | .key as $s | .value |
-		(.mem_limit | tobytes) as $mem | (.memswap_limit | tobytes) as $swap | (.cpus | tonum) as $cpus |
-		(.pids_limit | tonum) as $pids | (.oom_score_adj | tonum) as $oom |
-		(if $mem == null or $mem <= 0 then "service \($s): mem_limit is not set" else empty end),
-		(if $cpus == null or $cpus <= 0 or $cpus > 1.5 then "service \($s): cpus must be set, at most 1.5" else empty end),
-		(if $pids == null or $pids <= 0 then "service \($s): pids_limit is not set" else empty end),
-		(if $oom == null or $oom < -900 or $oom > 1000 then "service \($s): oom_score_adj must be set, from -900 to 1000" else empty end),
-		(if $mem == null or $mem <= 0 then empty
-		 elif $swap == null then "service \($s): memswap_limit is not set"
-		 elif $swap < $mem or $swap > $mem + 268435456 then "service \($s): memswap_limit must be from mem_limit to mem_limit + 256m"
-		 else empty end)'
+  rule 'services | .key as $s | .value |
+    (.mem_limit | tobytes) as $mem | (.memswap_limit | tobytes) as $swap | (.cpus | tonum) as $cpus |
+    (.pids_limit | tonum) as $pids | ((.oom_score_adj // 0) | tonum) as $oom | (.cpu_shares | tonum) as $shares |
+    (if $mem == null or $mem <= 0 then "service \($s): mem_limit is not set" else empty end),
+    (if $cpus == null or $cpus <= 0 or $cpus > 1.5 then "service \($s): cpus must be set, at most 1.5" else empty end),
+    (if $pids == null or $pids <= 0 or $pids > 2048 then "service \($s): pids_limit must be set, at most 2048" else empty end),
+    (if $shares != null and $shares > 1024 then "service \($s): cpu_shares may not exceed 1024" else empty end),
+    (if $oom == null or $oom < -900 or $oom > 1000 then "service \($s): oom_score_adj must be from -900 to 1000" else empty end),
+    (if $mem == null or $mem <= 0 then empty
+     elif $swap == null then "service \($s): memswap_limit is not set"
+     elif $swap < $mem or $swap > $mem + 268435456 then "service \($s): memswap_limit must be from mem_limit to mem_limit + 256m"
+     else empty end)'
 }
 
-# §8.6: a service without a profile runs all the time, so it must come back after a crash or reboot.
+# A service without a profile runs all the time, so it must come back after a crash or reboot.
 check_restart() {
-	rule 'services | select((((.value.profiles // []) | length) == 0) and .value.restart != "unless-stopped")
-		| "service \(.key) has no profile, so it needs restart: unless-stopped"'
+  rule 'services | select((((.value.profiles // []) | length) == 0) and .value.restart != "unless-stopped")
+    | "service \(.key) has no profile, so it needs restart: unless-stopped"'
 }
 
-# §5.1: the edge project alone publishes a port, from one service, 443/tcp only.
+# The edge project alone publishes a port, from one service, 443/tcp only.
 check_ports() {
-	rule '[services | select(((.value.ports // []) | length) > 0)] as $p
-		| (if ($p | length) > 1 then "only one edge service may publish a port" else empty end),
-		  ($p[] | .key as $s | .value.ports
-			| if length != 1 then "service \($s) may publish only 443:443/tcp"
-			  else .[0]
-				| if type == "string" then (if IN("443:443", "443:443/tcp") then empty else "service \($s) may publish only 443:443/tcp" end)
-				  elif ((.target | tonum) == 443) and (((.published // "") | tostring) == "443") and ((.protocol // "tcp") == "tcp")
-					and ((.host_ip // "") | IN("", "0.0.0.0")) then empty
-				  else "service \($s) may publish only 443:443/tcp" end
-			  end)'
+  rule '[services | select(((.value.ports // []) | length) > 0)] as $p
+    | (if ($p | length) > 1 then "only one edge service may publish a port" else empty end),
+      ($p[] | .key as $s | .value.ports
+      | if length != 1 then "service \($s) may publish only 443:443/tcp"
+        else .[0]
+        | if type == "string" then (if IN("443:443", "443:443/tcp") then empty else "service \($s) may publish only 443:443/tcp" end)
+          elif ((.target | tonum) == 443) and (((.published // "") | tostring) == "443") and ((.protocol // "tcp") == "tcp")
+          and ((.host_ip // "") | IN("", "0.0.0.0")) then empty
+          else "service \($s) may publish only 443:443/tcp" end
+        end)'
 }
 
-# The edge runs the image app-apply validates with: CADDY_IMAGE in /etc/apps/edge.conf (§5.6).
+# The edge runs the image app-apply validates with: CADDY_IMAGE in /etc/apps/edge.conf.
 check_edge_image() {
-	rule 'services | select(.value.image != $caddy)
-		| "service \(.key) runs \(.value.image // "no image"), not CADDY_IMAGE from /etc/apps/edge.conf (\($caddy))"'
+  rule 'services | select(.value.image != $caddy)
+    | "service \(.key) runs \(.value.image // "no image"), not CADDY_IMAGE from /etc/apps/edge.conf (\($caddy))"'
 }
 
 # The steady limits of an installed project in MiB, or 0 while its compose file isn't installed.
 installed_steady() { # installed_steady <app|edge>
-	(
-		load_conf "$1"
-		if [ ! -f "$PROJECT_DIR/$APP_COMPOSE_FILE" ]; then
-			echo 0
-			exit 0
-		fi
-		compose_json "$PROJECT_DIR/$APP_COMPOSE_FILE" "$work/steady-$1.json" 2>/dev/null || exit 1
-		jq -r "$JQ_LIB $STEADY_JQ" "$work/steady-$1.json" 2>/dev/null
-	)
+  (
+    load_conf "$1"
+    if [ ! -f "$PROJECT_DIR/$APP_COMPOSE_FILE" ]; then
+      echo 0
+      exit 0
+    fi
+    compose_json "$PROJECT_DIR/$APP_COMPOSE_FILE" "$work/steady-$1.json" 2>/dev/null || exit 1
+    jq -r "$JQ_LIB $STEADY_JQ" "$work/steady-$1.json" 2>/dev/null
+  )
 }
 
-# §6 and §8.6 sum rule: the steady mem_limit of every installed project, this file included, plus
+# Sum rule: the steady mem_limit of every installed project, this file included, plus
 # 1.5 GiB for the host stays below MemTotal, so the kernel never has to kill outside a cgroup.
 check_sum() {
-	local total mib name memtotal names=()
-	total=$(jqc "$STEADY_JQ") || {
-		problem "the memory limits could not be added up"
-		return 0
-	}
-	mapfile -t names < <(configured_apps)
-	for name in edge "${names[@]}"; do
-		if [ "$name" = "$project" ] || [ ! -f "/etc/apps/$name.conf" ]; then continue; fi
-		if ! mib=$(installed_steady "$name"); then
-			problem "the memory limits of $name could not be read"
-			continue
-		fi
-		total=$((total + mib))
-	done
-	memtotal=$(awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo)
-	if [ $((total + HOST_RESERVE_MIB)) -lt "$memtotal" ]; then
-		say "steady memory limits: $total MiB, plus $HOST_RESERVE_MIB MiB for the host, of $memtotal MiB"
-	else
-		problem "the steady memory limits of all projects ($total MiB) plus $HOST_RESERVE_MIB MiB for the host are not below MemTotal ($memtotal MiB)"
-	fi
+  local total mib name memtotal names=()
+  total=$(jqc "$STEADY_JQ") || {
+    problem "the memory limits could not be added up"
+    return 0
+  }
+  mapfile -t names < <(configured_apps)
+  for name in edge "${names[@]}"; do
+    if [ "$name" = "$project" ] || [ ! -f "/etc/apps/$name.conf" ]; then continue; fi
+    if ! mib=$(installed_steady "$name"); then
+      problem "the memory limits of $name could not be read"
+      continue
+    fi
+    total=$((total + mib))
+  done
+  memtotal=$(awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo)
+  if [ $((total + HOST_RESERVE_MIB)) -lt "$memtotal" ]; then
+    say "steady memory limits: $total MiB, plus $HOST_RESERVE_MIB MiB for the host, of $memtotal MiB"
+  else
+    problem "the steady memory limits of all projects ($total MiB) plus $HOST_RESERVE_MIB MiB for the host are not below MemTotal ($memtotal MiB)"
+  fi
+}
+
+# The directory app-config-archive writes to: Jainav's backup job mounts it read-only, and the
+# compose file's bind of it must find it. Ciphertext only, so any uid may read it.
+ensure_archive_dir() {
+  [ -n "${CONFIG_ARCHIVE_FILES-}" ] || return 0
+  [ -d "$PROJECT_DIR/backup-out" ] || install -d -m 0755 -o root -g root -- "$PROJECT_DIR/backup-out"
 }
 
 # app-apply <app|edge> compose <file>: every check, then the file goes in place with its sha256
-# pinned for app-deploy. Nothing is started; the admin runs app-compose next (§8.6).
+# pinned for app-deploy. Nothing is started; the admin runs app-compose next.
 cmd_compose() { # cmd_compose <app|edge> <file>
-	local live pin
-	project=$1
-	load_conf "$project"
-	allowed_edge=$(edge_networks_of "$project")
-	other_apps=$(configured_apps | grep -vxF -- "$project" | tr '\n' ' ') || true
-	if [ "$project" = edge ]; then extra_keys=ports; fi
-	take_in "$2" "$work/compose.yml"
-	check_compose_text "$work/compose.yml"
-	finish "the $project compose file"
-	compose_json "$work/compose.yml" "$work/config.json" || die "docker compose could not read the file (above)"
-	check_top_level
-	check_volumes
-	check_networks
-	if [ "$project" = edge ]; then
-		check_edge_aliases
-		check_ports
-		check_edge_image
-	else
-		check_edge_members
-	fi
-	check_service_keys
-	check_mounts
-	check_host_paths
-	check_caps
-	check_security_opt
-	check_limits
-	check_restart
-	check_sum
-	finish "the $project compose file"
-	if [ "$project" = edge ]; then
-		# The edge runs CADDY_IMAGE from its next start, so the live tree must pass with it.
-		edge_env_parse "$EDGE_DIR/edge.env" "$work/edge"
-		tree_validate "$EDGE_DIR/config" "$EDGE_DIR/certs" "$work/edge.docker"
-		finish "the edge compose file"
-	fi
-	live=$PROJECT_DIR/$APP_COMPOSE_FILE
-	pin=/etc/apps/$project.compose.sha256
-	# In sha256sum -c format: app-deploy refuses a deploy once the file stops matching.
-	printf '%s  %s\n' "$(sha256sum <"$work/compose.yml" | cut -d' ' -f1)" "$live" >"$work/compose.sha256"
-	keep_previous "$live" >/dev/null
-	keep_previous "$pin" >/dev/null
-	put "$work/compose.yml" "$live" 0644
-	put "$work/compose.sha256" "$pin" 0644
-	say "installed $live; its sha256 is pinned in $pin"
-	if [ "$project" = edge ]; then
-		say "next, between 01:00 and 07:00 IST: sudo app-compose edge up -d (this recreates Caddy)"
-	else
-		say "next: sudo app-compose $project up -d <the services that changed>"
-	fi
+  local live pin
+  project=$1
+  load_conf "$project"
+  allowed_edge=$(edge_networks_of "$project")
+  other_apps=$(configured_apps | grep -vxF -- "$project" | tr '\n' ' ') || true
+  if [ "$project" = edge ]; then extra_keys=ports; fi
+  take_in "$2" "$work/compose.yml"
+  check_compose_text "$work/compose.yml"
+  finish "the $project compose file"
+  compose_json "$work/compose.yml" "$work/config.json" || die "docker compose could not read the file (above)"
+  compose_json "$work/compose.yml" "$work/raw.json" raw || die "docker compose could not read the file (above)"
+  check_interpolation "$work/raw.json"
+  check_top_level
+  check_volumes
+  check_networks
+  if [ "$project" = edge ]; then
+    check_edge_aliases
+    check_ports
+    check_edge_image
+  else
+    check_edge_members
+  fi
+  check_edge_networks
+  check_service_keys
+  check_mounts
+  ensure_archive_dir
+  check_host_paths
+  check_caps
+  check_security_opt
+  check_limits
+  check_restart
+  check_sum
+  finish "the $project compose file"
+  if [ "$project" = edge ]; then
+    # The edge runs CADDY_IMAGE from its next start, so the live tree must pass with it.
+    edge_env_parse "$EDGE_DIR/edge.env" "$work/edge"
+    tree_validate "$EDGE_DIR/config" "$EDGE_DIR/certs" "$work/edge.docker"
+    finish "the edge compose file"
+  fi
+  live=$PROJECT_DIR/$APP_COMPOSE_FILE
+  pin=/etc/apps/$project.compose.sha256
+  # In sha256sum -c format: app-deploy refuses a deploy once the file stops matching.
+  printf '%s  %s\n' "$(sha256sum <"$work/compose.yml" | cut -d' ' -f1)" "$live" >"$work/compose.sha256"
+  create_edge_networks
+  # A running deploy of this app has checked the pin and may restart a service from this file
+  # again: it finishes before the new file replaces the old one.
+  exec 8>"$LOCK_DIR/app-deploy-$project.lock"
+  if ! flock -n 8; then
+    say "waiting for a running deploy of $project to finish"
+    flock -w 300 8 || die "a deploy of $project is still running"
+  fi
+  keep_previous "$live" >/dev/null
+  keep_previous "$pin" >/dev/null
+  put "$work/compose.yml" "$live" 0644
+  put "$work/compose.sha256" "$pin" 0644
+  exec 8>&-
+  say "installed $live; its sha256 is pinned in $pin"
+  if [ "$project" = edge ]; then
+    say "next, between 01:00 and 07:00 IST: sudo app-compose edge up -d (this recreates Caddy)"
+  else
+    say "next: sudo app-compose $project up -d <the services that changed>"
+  fi
 }
 
-# --- the edge (§5) ---
+# --- the edge ---
+
+# The ENV_PREFIX of every configured app, on one line.
+env_prefixes() {
+  local name
+  while IFS= read -r name; do
+    (load_conf "$name" && printf '%s ' "$ENV_PREFIX") || true
+  done < <(configured_apps)
+}
 
 # edge.env, read the way Compose's env_file reads it, so app-apply's throwaway Caddy sees what
 # edge-caddy-1 sees (docker run --env-file would keep the quotes). Values are plain, or in single
 # quotes when they hold a $ (bcrypt hashes). A value lands in site files through {$NAME} before
 # Caddy splits the text into tokens, so spaces, quotes, braces and # are refused: they could add
-# directives that the site check never saw.
+# directives that the site check never saw. Every name starts with the ENV_PREFIX of an app: Caddy
+# and Docker read other names themselves (CADDY_ADMIN, HTTP_PROXY, COMPOSE_*), and one app's line
+# must not change how the shared edge runs.
 edge_env_parse() { # edge_env_parse <edge.env> <prefix>: writes <prefix>.docker and <prefix>.keys
-	: >"$2.docker"
-	: >"$2.keys"
-	chmod 0600 "$2.docker"
-	if [ ! -f "$1" ]; then
-		problem "there is no $1"
-		return 0
-	fi
-	awk -v problems="$work/problems" -v out="$2.docker" -v keys="$2.keys" -v sq="'" '
-		function bad(m) { print "edge.env line " NR ": " m >> problems }
-		/^[ \t]*#/ || /^[ \t]*$/ { next }
-		{
-			eq = index($0, "=")
-			name = substr($0, 1, eq - 1)
-			value = substr($0, eq + 1)
-			if (eq < 2 || name !~ /^[A-Z][A-Z0-9_]*$/) { bad("not NAME=value"); next }
-			if (name in seen) { bad(name " is set twice"); next }
-			seen[name] = 1
-			if (substr(value, 1, 1) == sq) {
-				if (length(value) < 2 || substr(value, length(value), 1) != sq) { bad("the quote in " name " is not closed"); next }
-				value = substr(value, 2, length(value) - 2)
-				if (value !~ /^[A-Za-z0-9._@:\/+=,$-]*$/) { bad("the value of " name " may hold only letters, digits and ._@:/+=,$-"); next }
-			} else if (value !~ /^[A-Za-z0-9._@:\/+=,-]*$/) {
-				bad("the value of " name " must be plain, or in single quotes when it holds a $")
-				next
-			}
-			print name "=" value > out
-			if (value != "") print name > keys
-		}' "$1"
+  local prefixes
+  prefixes=$(env_prefixes)
+  : >"$2.docker"
+  : >"$2.keys"
+  chmod 0600 "$2.docker"
+  if [ ! -f "$1" ]; then
+    problem "there is no $1"
+    return 0
+  fi
+  awk -v problems="$work/problems" -v out="$2.docker" -v keys="$2.keys" -v sq="'" -v prefixes="$prefixes" '
+    function bad(m) { print "edge.env line " NR ": " m >> problems }
+    BEGIN { np = split(prefixes, pre, " ") }
+    /^[ \t]*#/ || /^[ \t]*$/ { next }
+    {
+      eq = index($0, "=")
+      name = substr($0, 1, eq - 1)
+      value = substr($0, eq + 1)
+      if (eq < 2 || name !~ /^[A-Z][A-Z0-9_]*$/) { bad("not NAME=value"); next }
+      ok = 0
+      for (i = 1; i <= np; i++) if (index(name, pre[i]) == 1) ok = 1
+      if (!ok) { bad(name " starts with no app ENV_PREFIX (" prefixes ")"); next }
+      if (name in seen) { bad(name " is set twice"); next }
+      seen[name] = 1
+      if (substr(value, 1, 1) == sq) {
+        if (length(value) < 2 || substr(value, length(value), 1) != sq) { bad("the quote in " name " is not closed"); next }
+        value = substr(value, 2, length(value) - 2)
+        if (value !~ /^[A-Za-z0-9._@:\/+=,$-]*$/) { bad("the value of " name " may hold only letters, digits and ._@:/+=,$-"); next }
+      } else if (value !~ /^[A-Za-z0-9._@:\/+=,-]*$/) {
+        bad("the value of " name " must be plain, or in single quotes when it holds a $")
+        next
+      }
+      print name "=" value > out
+      if (value != "") print name > keys
+    }' "$1"
 }
 
-# A throwaway Caddy from the pinned image (§5.6): no network, a read-only root with small tmpfs
-# mounts, the capabilities of edge-caddy-1, and no log driver, because the daemon's journald
-# default would copy what Caddy prints (the adapted JSON, secrets included) into the journal.
+# A throwaway Caddy from the pinned image: no network, a read-only root with small tmpfs mounts, the
+# capabilities of edge-caddy-1, and no log driver, because the daemon's journald default would copy
+# what Caddy prints (the adapted JSON, secrets included) into the journal. The limits are those of
+# every container; the label tells hostwatch's limits check to leave it out.
 caddy_run() { # caddy_run <config dir> <certs dir> <docker env file> <caddy args>...
-	local config=$1 certs=$2 envf=$3
-	shift 3
-	clean docker run --rm --network none --log-driver none --read-only \
-		--cap-drop ALL --cap-add NET_BIND_SERVICE --security-opt no-new-privileges:true \
-		--memory 256m --memory-swap 256m --pids-limit 64 \
-		--tmpfs /tmp:size=16m --tmpfs /data:size=16m --tmpfs /config:size=16m \
-		--env-file "$envf" \
-		--mount "type=bind,source=$config,target=/etc/caddy,readonly" \
-		--mount "type=bind,source=$certs,target=/certs,readonly" \
-		--entrypoint caddy "$CADDY_IMAGE" "$@"
+  local config=$1 certs=$2 envf=$3
+  shift 3
+  clean docker run --rm --network none --log-driver none --read-only \
+    --cap-drop ALL --cap-add NET_BIND_SERVICE --security-opt no-new-privileges:true \
+    --label kit.throwaway=1 --cpus 0.5 --memory 256m --memory-swap 256m --pids-limit 256 \
+    --tmpfs /tmp:size=16m --tmpfs /data:size=16m --tmpfs /config:size=16m \
+    --env-file "$envf" \
+    --mount "type=bind,source=$config,target=/etc/caddy,readonly" \
+    --mount "type=bind,source=$certs,target=/certs,readonly" \
+    --entrypoint caddy "$CADDY_IMAGE" "$@"
 }
 
 # A copy of the live config tree, to change and validate before anything live is touched.
 stage_tree() {
-	[ -d "$EDGE_DIR/config" ] || die "there is no $EDGE_DIR/config"
-	rm -rf -- "$work/tree"
-	mkdir -p -- "$work/tree/sites"
-	cp -a -- "$EDGE_DIR/config/." "$work/tree/"
+  [ -d "$EDGE_DIR/config" ] || die "there is no $EDGE_DIR/config"
+  rm -rf -- "$work/tree"
+  mkdir -p -- "$work/tree/sites"
+  cp -a -- "$EDGE_DIR/config/." "$work/tree/"
 }
 
-# §5.6 step 3: the whole tree, as it would be after the change, through the pinned Caddy's own
-# validate, which also loads every certificate.
+# Check 3 (docs/runbooks/edge.md §2): the whole tree, as it would be after the change, through the
+# pinned Caddy's own validate, which also loads every certificate.
 tree_validate() { # tree_validate <config dir> <certs dir> <docker env file>
-	if caddy_run "$1" "$2" "$3" validate --config /etc/caddy/Caddyfile --adapter caddyfile >"$work/validate.out" 2>&1; then
-		redact "$3" <"$work/validate.out" | journal
-		return 0
-	fi
-	problem "caddy validate failed:"
-	redact "$3" <"$work/validate.out" | grep -v '"level":"info"' | sed 's/^/    /' >>"$work/problems" || true
+  if caddy_run "$1" "$2" "$3" validate --config /etc/caddy/Caddyfile --adapter caddyfile >"$work/validate.out" 2>&1; then
+    redact "$3" <"$work/validate.out" | journal
+    return 0
+  fi
+  problem "caddy validate failed:"
+  redact "$3" <"$work/validate.out" | grep -v '"level":"info"' | sed 's/^/    /' >>"$work/problems" || true
 }
 
-# §5.1 and §5.7: a reload swaps Caddy's config without dropping connections. --force, because a
-# certificate change leaves the config text as it was and Caddy would skip an unchanged config.
-# A Caddy that isn't running reads the files when it starts.
+caddy_running() { [ "$(clean docker inspect -f '{{.State.Running}}' "$CADDY_CONTAINER" 2>/dev/null)" = true ]; }
+
+# The running container's own variables (the image's left out), in $work/running.env: a reload
+# adapts the files with these, and they differ from edge.env while a recreate is pending.
+running_env() {
+  clean docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$CADDY_CONTAINER" 2>/dev/null |
+    grep -Ev '^(PATH|HOME|HOSTNAME|CADDY_VERSION|XDG_CONFIG_HOME|XDG_DATA_HOME)=' >"$work/running.env" || true
+}
+
+# The checks adapt the files with edge.env on disk, but a reload adapts them with the environment
+# the container was created with. While those differ (app-apply edge env, recreate still to come)
+# a site could pass here and still load with an empty {$NAME}, so nothing is reloaded until Caddy
+# has been recreated. Only names are printed.
+check_edge_env_applied() {
+  local line
+  caddy_running || return 0
+  running_env
+  while IFS= read -r line; do
+    if ! grep -qxF -- "$line" "$work/running.env"; then
+      problem "edge.env differs from what $CADDY_CONTAINER was created with (${line%%=*}): recreate Caddy first (sudo app-compose edge up -d)"
+    fi
+  done <"$work/edge.docker"
+}
+
+# A reload swaps Caddy's config without dropping connections. --force, because a certificate change
+# leaves the config text as it was and Caddy would skip an unchanged config. A Caddy that isn't
+# running reads the files when it starts.
 reload_caddy() {
-	if [ "$(clean docker inspect -f '{{.State.Running}}' "$CADDY_CONTAINER" 2>/dev/null)" != true ]; then
-		say "$CADDY_CONTAINER is not running: the change applies when it starts"
-		return 0
-	fi
-	# The running container's own values too, for redacting what the reload prints: they differ
-	# from edge.env while a recreate is pending.
-	clean docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$CADDY_CONTAINER" 2>/dev/null |
-		grep -Ev '^(PATH|HOME|HOSTNAME|CADDY_VERSION|XDG_CONFIG_HOME|XDG_DATA_HOME)=' >"$work/running.env" || true
-	if clean docker exec "$CADDY_CONTAINER" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile --force \
-		>"$work/reload.out" 2>&1; then
-		redact "$work/edge.docker" "$work/running.env" <"$work/reload.out" | journal
-		say "reloaded $CADDY_CONTAINER"
-		return 0
-	fi
-	redact "$work/edge.docker" "$work/running.env" <"$work/reload.out" >"$work/reload.txt" || true
-	journal <"$work/reload.txt"
-	cat "$work/reload.txt" >&2 || true
-	return 1
+  if ! caddy_running; then
+    say "$CADDY_CONTAINER is not running: the change applies when it starts"
+    return 0
+  fi
+  running_env
+  if clean docker exec "$CADDY_CONTAINER" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile --force \
+    >"$work/reload.out" 2>&1; then
+    redact "$work/edge.docker" "$work/running.env" <"$work/reload.out" | journal
+    say "reloaded $CADDY_CONTAINER"
+    return 0
+  fi
+  redact "$work/edge.docker" "$work/running.env" <"$work/reload.out" >"$work/reload.txt" || true
+  journal <"$work/reload.txt"
+  cat "$work/reload.txt" >&2 || true
+  return 1
 }
 
 # Puts each staged file in place, keeping the one it replaces, then reloads Caddy. If the reload
-# fails, every old file goes back (a new one goes away) and Caddy reloads again (§5.6 step 3).
+# fails, every old file goes back (a new one goes away) and Caddy reloads again.
 swap_in() { # swap_in <staged> <live> <mode> [<staged> <live> <mode>]...
-	local live=() mode=() prev=() copy i
-	while [ $# -ge 3 ]; do
-		copy=$(keep_previous "$2")
-		live+=("$2")
-		mode+=("$3")
-		prev+=("$copy")
-		put "$1" "$2" "$3"
-		shift 3
-	done
-	if reload_caddy; then return 0; fi
-	for i in "${!live[@]}"; do
-		if [ -n "${prev[$i]}" ]; then put "${prev[$i]}" "${live[$i]}" "${mode[$i]}"; else rm -f -- "${live[$i]}"; fi
-	done
-	if ! reload_caddy; then
-		/usr/local/sbin/hostwatch alert "app-apply: Caddy's reload failed, and again after the old files went back" || true
-	fi
-	die "Caddy's reload failed (above); the previous files are back in place"
+  local live=() mode=() prev=() copy i
+  while [ $# -ge 3 ]; do
+    copy=$(keep_previous "$2")
+    live+=("$2")
+    mode+=("$3")
+    prev+=("$copy")
+    put "$1" "$2" "$3"
+    shift 3
+  done
+  if reload_caddy; then return 0; fi
+  for i in "${!live[@]}"; do
+    if [ -n "${prev[$i]}" ]; then put "${prev[$i]}" "${live[$i]}" "${mode[$i]}"; else rm -f -- "${live[$i]}"; fi
+  done
+  if ! reload_caddy; then
+    /usr/local/sbin/hostwatch alert "app-apply: Caddy's reload failed, and again after the old files went back" || true
+  fi
+  die "Caddy's reload failed (above); the previous files are back in place"
 }
 
-# --- site files (§5.6) ---
+# --- site files ---
 
-# §5.6 step 1: the site file's raw text against an allow-list. Caddy replaces {$NAME} before it
-# splits the text into tokens; edge_env_parse keeps every value to one token, so the tokens seen
-# here are the ones Caddy sees.
+# Check 1 (docs/runbooks/edge.md §2): the site file's raw text against an allow-list. Caddy replaces
+# {$NAME} before it splits the text into tokens; edge_env_parse keeps every value to one token, so
+# the tokens seen here are the ones Caddy sees.
 SITE_AWK=$(cat <<'AWK'
 function bad(m) { print label " line " NR ": " m >> problems; nbad++ }
 function short(t) { return length(t) > 40 ? substr(t, 1, 40) "..." : t }
@@ -721,209 +877,209 @@ function is_matcher(i) { return i <= ntok && !q[i] && (tok[i] == "*" || substr(t
 # Splits a line into tok[1..ntok]; q[i] marks a quoted token. Backquotes, heredocs and quoted
 # text over several lines are refused rather than parsed.
 function tokenize(s,    c, i, len, t) {
-	ntok = 0
-	len = length(s)
-	i = 1
-	while (i <= len) {
-		c = substr(s, i, 1)
-		if (c == " " || c == "\t") { i++; continue }
-		if (c == "#") break
-		if (c == "`") { err = "backquoted tokens are not allowed"; return 0 }
-		t = ""
-		if (c == "\"") {
-			for (i++; i <= len && substr(s, i, 1) != "\""; i++) {
-				if (substr(s, i, 1) == "\\" && i < len) i++
-				t = t substr(s, i, 1)
-			}
-			if (i > len) { err = "a quoted token must end on its own line"; return 0 }
-			i++
-			tok[++ntok] = t
-			q[ntok] = 1
-			continue
-		}
-		for (; i <= len; i++) {
-			c = substr(s, i, 1)
-			if (c == " " || c == "\t") break
-			if (c == "\"" || c == "`") { err = "quotes inside a token are not allowed"; return 0 }
-			t = t c
-		}
-		if (substr(t, 1, 2) == "<<") { err = "heredocs are not allowed"; return 0 }
-		tok[++ntok] = t
-		q[ntok] = 0
-	}
-	return 1
+  ntok = 0
+  len = length(s)
+  i = 1
+  while (i <= len) {
+    c = substr(s, i, 1)
+    if (c == " " || c == "\t") { i++; continue }
+    if (c == "#") break
+    if (c == "`") { err = "backquoted tokens are not allowed"; return 0 }
+    t = ""
+    if (c == "\"") {
+      for (i++; i <= len && substr(s, i, 1) != "\""; i++) {
+        if (substr(s, i, 1) == "\\" && i < len) i++
+        t = t substr(s, i, 1)
+      }
+      if (i > len) { err = "a quoted token must end on its own line"; return 0 }
+      i++
+      tok[++ntok] = t
+      q[ntok] = 1
+      continue
+    }
+    for (; i <= len; i++) {
+      c = substr(s, i, 1)
+      if (c == " " || c == "\t") break
+      if (c == "\"" || c == "`") { err = "quotes inside a token are not allowed"; return 0 }
+      t = t c
+    }
+    if (substr(t, 1, 2) == "<<") { err = "heredocs are not allowed"; return 0 }
+    tok[++ntok] = t
+    q[ntok] = 0
+  }
+  return 1
 }
 
 # Every {...} in a token is {$NAME} for this app's variables, set and not empty in edge.env, or a
 # request placeholder, which reads neither files nor the environment.
 function placeholders(t,    rest, p, e, inner) {
-	rest = t
-	while ((p = index(rest, "{")) > 0) {
-		if (index(substr(rest, 1, p - 1), "}") > 0) { bad("unbalanced } in " short(t)); return }
-		e = index(substr(rest, p + 1), "}")
-		if (e == 0) { bad("unbalanced { in " short(t)); return }
-		inner = substr(rest, p + 1, e - 1)
-		if (substr(inner, 1, 1) == "$") {
-			inner = substr(inner, 2)
-			if (inner !~ /^[A-Z][A-Z0-9_]*$/) bad("{$" short(inner) "}: env placeholders are {$NAME}, with no default")
-			else if (index(inner, prefix) != 1) bad("{$" inner "} is not this app's: its variables start with " prefix)
-			else if (!(inner in envkeys)) bad("{$" inner "} is not set in edge.env, or is empty")
-		} else if (inner !~ /^[A-Za-z0-9_.-]+$/ || inner ~ /^(env|file|system)\./)
-			bad("placeholder {" short(inner) "} is not allowed")
-		rest = substr(rest, p + e + 1)
-	}
-	if (index(rest, "}") > 0) bad("unbalanced } in " short(t))
+  rest = t
+  while ((p = index(rest, "{")) > 0) {
+    if (index(substr(rest, 1, p - 1), "}") > 0) { bad("unbalanced } in " short(t)); return }
+    e = index(substr(rest, p + 1), "}")
+    if (e == 0) { bad("unbalanced { in " short(t)); return }
+    inner = substr(rest, p + 1, e - 1)
+    if (substr(inner, 1, 1) == "$") {
+      inner = substr(inner, 2)
+      if (inner !~ /^[A-Z][A-Z0-9_]*$/) bad("{$" short(inner) "}: env placeholders are {$NAME}, with no default")
+      else if (index(inner, prefix) != 1) bad("{$" inner "} is not this app's: its variables start with " prefix)
+      else if (!(inner in envkeys)) bad("{$" inner "} is not set in edge.env, or is empty")
+    } else if (inner !~ /^[A-Za-z0-9_.-]+$/ || inner ~ /^(env|file|system)\./)
+      bad("placeholder {" short(inner) "} is not allowed")
+    rest = substr(rest, p + e + 1)
+  }
+  if (index(rest, "}") > 0) bad("unbalanced } in " short(t))
 }
 
 function close_block() {
-	if (depth == 0) { bad("} closes no block"); return }
-	if (stack[depth] == "proxy" && !imported[depth]) bad("the reverse_proxy of line " opened[depth] " needs import upstream")
-	if (stack[depth] == "site" && count[depth] < 2)
-		bad("the site block of line " opened[depth] " must start with import site_common and import tls_" app)
-	depth--
+  if (depth == 0) { bad("} closes no block"); return }
+  if (stack[depth] == "proxy" && !imported[depth]) bad("the reverse_proxy of line " opened[depth] " needs import upstream")
+  if (stack[depth] == "site" && count[depth] < 2)
+    bad("the site block of line " opened[depth] " must start with import site_common and import tls_" app)
+  depth--
 }
 
 # The top level holds site blocks with https:// addresses, and nothing else.
 function top_line(    i, a) {
-	if (!q[1] && tok[1] ~ /^\(/) { refuse("snippet definitions are not allowed"); return }
-	if (!q[1] && tok[1] ~ /^&\(/) { refuse("named routes are not allowed"); return }
-	if (!q[1] && tok[1] == "{") { refuse("global options are not allowed"); return }
-	if (!q[1] && tok[1] == "import") { refuse("import is allowed only as the first two lines of a site block"); return }
-	if (!opens || ntok < 2) { refuse("only site blocks (https://<host> {) are allowed here"); return }
-	for (i = 1; i < ntok; i++) {
-		a = tok[i]
-		sub(/,$/, "", a)
-		if (q[i] || a !~ /^https:\/\/[^\/:,]+(:443)?$/) { refuse("site address " short(tok[i]) " must be https://<host>"); return }
-	}
-	sites++
-	push("site")
+  if (!q[1] && tok[1] ~ /^\(/) { refuse("snippet definitions are not allowed"); return }
+  if (!q[1] && tok[1] ~ /^&\(/) { refuse("named routes are not allowed"); return }
+  if (!q[1] && tok[1] == "{") { refuse("global options are not allowed"); return }
+  if (!q[1] && tok[1] == "import") { refuse("import is allowed only as the first two lines of a site block"); return }
+  if (!opens || ntok < 2) { refuse("only site blocks (https://<host> {) are allowed here"); return }
+  for (i = 1; i < ntok; i++) {
+    a = tok[i]
+    sub(/,$/, "", a)
+    if (q[i] || a !~ /^https:\/\/[^\/:,]+(:443)?$/) { refuse("site address " short(tok[i]) " must be https://<host>"); return }
+  }
+  sites++
+  push("site")
 }
 
 # A line in a site block, or in a handle, handle_path or route block.
 function directive_line(    name, m, want, f) {
-	name = q[1] ? ("\"" tok[1] "\"") : tok[1]
-	if (stack[depth] == "site" && count[depth] < 2) {
-		count[depth]++
-		want = count[depth] == 1 ? "site_common" : ("tls_" app)
-		if (name != "import" || ntok != 2 || q[2] || tok[2] != want)
-			refuse("a site block starts with import site_common, then import tls_" app)
-		return
-	}
-	count[depth]++
-	if (name == "import") { refuse("import is allowed only as the first two lines of a site block and as import upstream"); return }
-	if (substr(name, 1, 1) == "@") { matcher_def(); return }
-	if (!(name in directive)) { refuse("directive " short(name) " is not allowed"); return }
-	m = is_matcher(2) ? 1 : 0
-	if (name == "handle" || name == "handle_path" || name == "route") {
-		if (!opens || ntok != 2 + m) refuse(name " takes an optional matcher and a block")
-		else push("route")
-	} else if (name == "reverse_proxy") {
-		if (!opens || ntok != 3 + m) refuse("reverse_proxy names one upstream and has a block with import upstream")
-		else {
-			if (q[2 + m] || !(tok[2 + m] in ups)) bad("upstream " short(tok[2 + m]) " is not in UPSTREAMS")
-			push("proxy")
-		}
-	} else if (name == "basic_auth") {
-		f = 2 + m
-		if (f < ntok && !q[f] && tok[f] == "bcrypt") f++
-		if (!opens || f != ntok) refuse("basic_auth takes an optional matcher, optionally bcrypt, and a block")
-		else push("auth")
-	} else if (name == "request_body") {
-		if (!opens || ntok != 2 + m) refuse("request_body takes an optional matcher and a block")
-		else push("body")
-	} else if (name == "header") {
-		if (opens) push("header")
-	} else if (name == "respond") {
-		if (opens) push("respond")
-	} else if (name == "request_header") {
-		if (opens) { refuse("request_header takes no block"); return }
-		if (ntok < 2 + m) { bad("request_header needs a field"); return }
-		f = tolower(tok[2 + m])
-		sub(/^[-+>?]/, "", f)
-		if (f in iphdr) bad("request_header can not change " short(tok[2 + m]) ": Caddy alone sets the client-IP headers")
-	} else if (opens) refuse(name " takes no block")
+  name = q[1] ? ("\"" tok[1] "\"") : tok[1]
+  if (stack[depth] == "site" && count[depth] < 2) {
+    count[depth]++
+    want = count[depth] == 1 ? "site_common" : ("tls_" app)
+    if (name != "import" || ntok != 2 || q[2] || tok[2] != want)
+      refuse("a site block starts with import site_common, then import tls_" app)
+    return
+  }
+  count[depth]++
+  if (name == "import") { refuse("import is allowed only as the first two lines of a site block and as import upstream"); return }
+  if (substr(name, 1, 1) == "@") { matcher_def(); return }
+  if (!(name in directive)) { refuse("directive " short(name) " is not allowed"); return }
+  m = is_matcher(2) ? 1 : 0
+  if (name == "handle" || name == "handle_path" || name == "route") {
+    if (!opens || ntok != 2 + m) refuse(name " takes an optional matcher and a block")
+    else push("route")
+  } else if (name == "reverse_proxy") {
+    if (!opens || ntok != 3 + m) refuse("reverse_proxy names one upstream and has a block with import upstream")
+    else {
+      if (q[2 + m] || !(tok[2 + m] in ups)) bad("upstream " short(tok[2 + m]) " is not in UPSTREAMS")
+      push("proxy")
+    }
+  } else if (name == "basic_auth") {
+    f = 2 + m
+    if (f < ntok && !q[f] && tok[f] == "bcrypt") f++
+    if (!opens || f != ntok) refuse("basic_auth takes an optional matcher, optionally bcrypt, and a block")
+    else push("auth")
+  } else if (name == "request_body") {
+    if (!opens || ntok != 2 + m) refuse("request_body takes an optional matcher and a block")
+    else push("body")
+  } else if (name == "header") {
+    if (opens) push("header")
+  } else if (name == "respond") {
+    if (opens) push("respond")
+  } else if (name == "request_header") {
+    if (opens) { refuse("request_header takes no block"); return }
+    if (ntok < 2 + m) { bad("request_header needs a field"); return }
+    f = tolower(tok[2 + m])
+    sub(/^[-+>?]/, "", f)
+    if (f in iphdr) bad("request_header can not change " short(tok[2 + m]) ": Caddy alone sets the client-IP headers")
+  } else if (opens) refuse(name " takes no block")
 }
 
 # @name <matcher> <args>, or @name { one matcher per line }.
 function matcher_def() {
-	if (q[1] || tok[1] !~ /^@[A-Za-z0-9_-]+$/) { refuse("matcher name " short(tok[1]) " is not allowed"); return }
-	if (opens) {
-		if (ntok != 2) refuse("a matcher block is @name {")
-		else push("matcher")
-		return
-	}
-	matcher_args(2)
+  if (q[1] || tok[1] !~ /^@[A-Za-z0-9_-]+$/) { refuse("matcher name " short(tok[1]) " is not allowed"); return }
+  if (opens) {
+    if (ntok != 2) refuse("a matcher block is @name {")
+    else push("matcher")
+    return
+  }
+  matcher_args(2)
 }
 function matcher_args(i) {
-	if (i > ntok) { bad("a matcher is missing"); return }
-	if (q[i] || !(tok[i] in matcher)) { bad("matcher " short(tok[i]) " is not allowed"); return }
-	if (tok[i] == "not" && (i + 1 > ntok || q[i + 1] || !(tok[i + 1] in matcher) || tok[i + 1] == "not"))
-		bad("not takes one allowed matcher")
+  if (i > ntok) { bad("a matcher is missing"); return }
+  if (q[i] || !(tok[i] in matcher)) { bad("matcher " short(tok[i]) " is not allowed"); return }
+  if (tok[i] == "not" && (i + 1 > ntok || q[i + 1] || !(tok[i + 1] in matcher) || tok[i + 1] == "not"))
+    bad("not takes one allowed matcher")
 }
 function matcher_line() {
-	if (opens) {
-		if (ntok == 2 && !q[1] && tok[1] == "not") push("matcher")
-		else refuse("only not opens a block inside a matcher")
-		return
-	}
-	matcher_args(1)
+  if (opens) {
+    if (ntok == 2 && !q[1] && tok[1] == "not") push("matcher")
+    else refuse("only not opens a block inside a matcher")
+    return
+  }
+  matcher_args(1)
 }
 
 function proxy_line() {
-	if (!q[1] && tok[1] == "import" && ntok == 2 && !q[2] && tok[2] == "upstream") {
-		if (imported[depth]++) bad("import upstream appears twice")
-		return
-	}
-	if (opens || q[1] || !(tok[1] in proxysub))
-		refuse("reverse_proxy allows import upstream, flush_interval, stream_close_delay, stream_timeout and header_down")
+  if (!q[1] && tok[1] == "import" && ntok == 2 && !q[2] && tok[2] == "upstream") {
+    if (imported[depth]++) bad("import upstream appears twice")
+    return
+  }
+  if (opens || q[1] || !(tok[1] in proxysub))
+    refuse("reverse_proxy allows import upstream, flush_interval, stream_close_delay, stream_timeout and header_down")
 }
 
 BEGIN {
-	n = split(upstreams, list, " ")
-	for (i = 1; i <= n; i++) ups[list[i]] = 1
-	while ((getline k < keysfile) > 0) envkeys[k] = 1
-	close(keysfile)
-	n = split("handle handle_path route rewrite uri redir respond abort header request_header basic_auth request_body log_skip reverse_proxy", list, " ")
-	for (i = 1; i <= n; i++) directive[list[i]] = 1
-	n = split("path path_regexp method header query not", list, " ")
-	for (i = 1; i <= n; i++) matcher[list[i]] = 1
-	n = split("flush_interval stream_close_delay stream_timeout header_down", list, " ")
-	for (i = 1; i <= n; i++) proxysub[list[i]] = 1
-	n = split("x-real-ip x-forwarded-for cf-connecting-ip sb-forwarded-for x-forwarded-host x-forwarded-proto true-client-ip x-client-ip forwarded", list, " ")
-	for (i = 1; i <= n; i++) iphdr[list[i]] = 1
+  n = split(upstreams, list, " ")
+  for (i = 1; i <= n; i++) ups[list[i]] = 1
+  while ((getline k < keysfile) > 0) envkeys[k] = 1
+  close(keysfile)
+  n = split("handle handle_path route rewrite uri redir respond abort header request_header basic_auth request_body log_skip reverse_proxy", list, " ")
+  for (i = 1; i <= n; i++) directive[list[i]] = 1
+  n = split("path path_regexp method header query not", list, " ")
+  for (i = 1; i <= n; i++) matcher[list[i]] = 1
+  n = split("flush_interval stream_close_delay stream_timeout header_down", list, " ")
+  for (i = 1; i <= n; i++) proxysub[list[i]] = 1
+  n = split("x-real-ip x-forwarded-for cf-connecting-ip sb-forwarded-for x-forwarded-host x-forwarded-proto x-forwarded-port true-client-ip x-client-ip forwarded", list, " ")
+  for (i = 1; i <= n; i++) iphdr[list[i]] = 1
 }
 
 {
-	if (!tokenize($0)) { bad(err); next }
-	if (ntok == 0) next
-	if (!q[ntok] && tok[ntok] ~ /\\$/) { bad("a line can not continue onto the next"); next }
-	opens = !q[ntok] && tok[ntok] == "{"
-	for (i = 1; i <= ntok; i++) {
-		if (!q[i] && tok[i] == "{" && i < ntok) { bad("{ must end its line"); next }
-		if (!q[i] && tok[i] == "}" && ntok > 1) { bad("} must be alone on its line"); next }
-		if (q[i] || (tok[i] != "{" && tok[i] != "}")) placeholders(tok[i])
-	}
-	if (!q[1] && tok[1] == "}") { close_block(); next }
-	ctx = depth ? stack[depth] : "top"
-	if (ctx == "top") top_line()
-	else if (ctx == "site" || ctx == "route") directive_line()
-	else if (ctx == "matcher") matcher_line()
-	else if (ctx == "proxy") proxy_line()
-	else if (ctx == "auth") { if (opens || ntok != 2) refuse("basic_auth lines are <user> <hash>") }
-	else if (ctx == "body") { if (opens || q[1] || tok[1] != "max_size" || ntok != 2) refuse("request_body allows only max_size <size>") }
-	else if (ctx == "header") { if (opens || ntok > 3) refuse("header lines are [+|-]<field> [<value> [<replacement>]]") }
-	else if (ctx == "respond") { if (opens || q[1] || (tok[1] != "body" && tok[1] != "close")) refuse("respond blocks allow body and close only") }
-	else if (opens) push("skip")
+  if (!tokenize($0)) { bad(err); next }
+  if (ntok == 0) next
+  if (!q[ntok] && tok[ntok] ~ /\\$/) { bad("a line can not continue onto the next"); next }
+  opens = !q[ntok] && tok[ntok] == "{"
+  for (i = 1; i <= ntok; i++) {
+    if (!q[i] && tok[i] == "{" && i < ntok) { bad("{ must end its line"); next }
+    if (!q[i] && tok[i] == "}" && ntok > 1) { bad("} must be alone on its line"); next }
+    if (q[i] || (tok[i] != "{" && tok[i] != "}")) placeholders(tok[i])
+  }
+  if (!q[1] && tok[1] == "}") { close_block(); next }
+  ctx = depth ? stack[depth] : "top"
+  if (ctx == "top") top_line()
+  else if (ctx == "site" || ctx == "route") directive_line()
+  else if (ctx == "matcher") matcher_line()
+  else if (ctx == "proxy") proxy_line()
+  else if (ctx == "auth") { if (opens || ntok != 2) refuse("basic_auth lines are <user> <hash>") }
+  else if (ctx == "body") { if (opens || q[1] || tok[1] != "max_size" || ntok != 2) refuse("request_body allows only max_size <size>") }
+  else if (ctx == "header") { if (opens || ntok > 3) refuse("header lines are [+|-]<field> [<value> [<replacement>]]") }
+  else if (ctx == "respond") { if (opens || q[1] || (tok[1] != "body" && tok[1] != "close")) refuse("respond blocks allow body and close only") }
+  else if (opens) push("skip")
 }
 
 END {
-	if (depth > 0) bad("the block of line " opened[depth] " is not closed")
-	if (sites == 0 && nbad == 0) print label ": the file has no site block" >> problems
+  if (depth > 0) bad("the block of line " opened[depth] " is not closed")
+  if (sites == 0 && nbad == 0) print label ": the file has no site block" >> problems
 }
 AWK
 )
 
-# §5.6 step 2, on Caddy's adapted JSON: what the site really does. Hosts stay in the app's zone,
+# Check 2, on Caddy's adapted JSON: what the site really does. Hosts stay in the app's zone,
 # handlers and upstreams come from the allow-lists, and TLS files from /certs/<app>/.
 SITE_JQ=$(cat <<'JQ'
 def words: split(" ") | map(select(. != ""));
@@ -962,7 +1118,7 @@ def in_zone($z): type == "string"
   (.. | objects | select(.handler == "headers") | (.request // {})
     | [((.set // {}) | keys[]), ((.add // {}) | keys[]), ((.replace // {}) | keys[]), (.delete // [])[]] | .[]
     | select(ascii_downcase | IN("x-real-ip", "x-forwarded-for", "cf-connecting-ip", "sb-forwarded-for", "x-forwarded-host",
-        "x-forwarded-proto", "true-client-ip", "x-client-ip", "forwarded"))
+        "x-forwarded-proto", "x-forwarded-port", "true-client-ip", "x-client-ip", "forwarded"))
     | "a header rule changes the request header \(.)"),
   ([.. | strings | select(test("\\{(env|file|system)\\."))] | if length > 0 then "the adapted config reads {env.*}, {file.*} or {system.*}" else empty end),
   ([(.apps.tls // {}), ((.apps.http.servers // {})[] | .tls_connection_policies // [])] | .. | strings
@@ -971,236 +1127,284 @@ JQ
 )
 
 site_text_check() { # site_text_check <app> <site file> <edge keys file>
-	awk -v app="$1" -v prefix="$ENV_PREFIX" -v upstreams="$UPSTREAMS" -v keysfile="$3" \
-		-v label="sites/$1.caddy" -v problems="$work/problems" "$SITE_AWK" "$2"
+  awk -v app="$1" -v prefix="$ENV_PREFIX" -v upstreams="$UPSTREAMS" -v keysfile="$3" \
+    -v label="sites/$1.caddy" -v problems="$work/problems" "$SITE_AWK" "$2"
 }
 
-# §5.6 step 2: the live snippets plus this one site, adapted by the pinned Caddy, then checked by
+# Check 2: the live snippets plus this one site, adapted by the pinned Caddy, then checked by
 # jq. The JSON holds edge.env's values, so it stays in /run and is deleted straight away.
 site_json_check() { # site_json_check <app> <site file> <snippets file> <docker env file>
-	local dir=$work/adapt-$1
-	if [ ! -f "$3" ]; then
-		problem "there is no $3"
-		return 0
-	fi
-	rm -rf -- "$dir"
-	mkdir -p -- "$dir/sites"
-	cp -- "$3" "$dir/snippets.caddy"
-	cp -- "$2" "$dir/sites/$1.caddy"
-	printf 'import /etc/caddy/snippets.caddy\nimport /etc/caddy/sites/%s.caddy\n' "$1" >"$dir/Caddyfile"
-	if ! caddy_run "$dir" "$work/empty" "$4" adapt --config /etc/caddy/Caddyfile --adapter caddyfile \
-		>"$dir/adapted.json" 2>"$dir/adapt.err"; then
-		problem "sites/$1.caddy: caddy adapt failed:"
-		redact "$4" <"$dir/adapt.err" | grep -v '"level":"info"' | sed 's/^/    /' >>"$work/problems" || true
-	elif ! jq -r --arg app "$1" --arg zone "$ZONE" --arg ups "$UPSTREAMS" "$SITE_JQ" "$dir/adapted.json" \
-		>"$dir/found" 2>/dev/null; then
-		problem "sites/$1.caddy: the adapted config could not be checked"
-	else
-		sed "s|^|sites/$1.caddy: |" "$dir/found" >>"$work/problems"
-		redact "$4" <"$dir/adapt.err" | journal
-	fi
-	rm -f -- "$dir/adapted.json"
+  local dir=$work/adapt-$1
+  if [ ! -f "$3" ]; then
+    problem "there is no $3"
+    return 0
+  fi
+  rm -rf -- "$dir"
+  mkdir -p -- "$dir/sites"
+  cp -- "$3" "$dir/snippets.caddy"
+  cp -- "$2" "$dir/sites/$1.caddy"
+  printf 'import /etc/caddy/snippets.caddy\nimport /etc/caddy/sites/%s.caddy\n' "$1" >"$dir/Caddyfile"
+  if ! caddy_run "$dir" "$work/empty" "$4" adapt --config /etc/caddy/Caddyfile --adapter caddyfile \
+    >"$dir/adapted.json" 2>"$dir/adapt.err"; then
+    problem "sites/$1.caddy: caddy adapt failed:"
+    redact "$4" <"$dir/adapt.err" | grep -v '"level":"info"' | sed 's/^/    /' >>"$work/problems" || true
+  elif ! jq -r --arg app "$1" --arg zone "$ZONE" --arg ups "$UPSTREAMS" "$SITE_JQ" "$dir/adapted.json" \
+    >"$dir/found" 2>/dev/null; then
+    problem "sites/$1.caddy: the adapted config could not be checked"
+  else
+    sed "s|^|sites/$1.caddy: |" "$dir/found" >>"$work/problems"
+    redact "$4" <"$dir/adapt.err" | journal
+  fi
+  rm -f -- "$dir/adapted.json"
 }
 
 # Steps 1 and 2 again for every installed site, against new snippets or a new edge.env.
 recheck_sites() { # recheck_sites <snippets file> <edge env prefix>
-	local site app
-	for site in "$EDGE_DIR"/config/sites/*.caddy; do
-		[ -f "$site" ] || continue
-		app=${site##*/}
-		app=${app%.caddy}
-		if [[ ! $app =~ ^[a-z0-9]+$ ]] || [ "$app" = edge ] || [ ! -f "/etc/apps/$app.conf" ]; then
-			problem "sites/${site##*/} belongs to no app in /etc/apps"
-			continue
-		fi
-		(
-			load_conf "$app"
-			site_text_check "$app" "$site" "$2.keys"
-			site_json_check "$app" "$site" "$1" "$2.docker"
-		) || problem "sites/$app.caddy could not be checked"
-	done
+  local site app
+  for site in "$EDGE_DIR"/config/sites/*.caddy; do
+    [ -f "$site" ] || continue
+    app=${site##*/}
+    app=${app%.caddy}
+    if [[ ! $app =~ ^[a-z0-9]+$ ]] || [ "$app" = edge ] || [ ! -f "/etc/apps/$app.conf" ]; then
+      problem "sites/${site##*/} belongs to no app in /etc/apps"
+      continue
+    fi
+    (
+      load_conf "$app"
+      site_text_check "$app" "$site" "$2.keys"
+      site_json_check "$app" "$site" "$1" "$2.docker"
+    ) || problem "sites/$app.caddy could not be checked"
+  done
 }
 
-# app-apply <app> site <file> (§5.6): the three checks in order, then the swap and the reload,
+# app-apply <app> site <file>: the three checks in order, then the swap and the reload,
 # with the previous file put back if the reload fails.
 cmd_site() { # cmd_site <app> <file>
-	local app=$1
-	load_conf "$app"
-	edge_image
-	take_in "$2" "$work/site.caddy"
-	edge_env_parse "$EDGE_DIR/edge.env" "$work/edge"
-	finish "$EDGE_DIR/edge.env"
-	site_text_check "$app" "$work/site.caddy" "$work/edge.keys"
-	finish "the $app site file"
-	site_json_check "$app" "$work/site.caddy" "$EDGE_DIR/config/snippets.caddy" "$work/edge.docker"
-	finish "the $app site file"
-	stage_tree
-	cp -- "$work/site.caddy" "$work/tree/sites/$app.caddy"
-	tree_validate "$work/tree" "$EDGE_DIR/certs" "$work/edge.docker"
-	finish "the $app site file"
-	swap_in "$work/site.caddy" "$EDGE_DIR/config/sites/$app.caddy" 0644
-	say "installed $EDGE_DIR/config/sites/$app.caddy"
+  local app=$1
+  load_conf "$app"
+  edge_image
+  take_in "$2" "$work/site.caddy"
+  edge_env_parse "$EDGE_DIR/edge.env" "$work/edge"
+  finish "$EDGE_DIR/edge.env"
+  site_text_check "$app" "$work/site.caddy" "$work/edge.keys"
+  finish "the $app site file"
+  site_json_check "$app" "$work/site.caddy" "$EDGE_DIR/config/snippets.caddy" "$work/edge.docker"
+  finish "the $app site file"
+  stage_tree
+  cp -- "$work/site.caddy" "$work/tree/sites/$app.caddy"
+  tree_validate "$work/tree" "$EDGE_DIR/certs" "$work/edge.docker"
+  check_edge_env_applied
+  finish "the $app site file"
+  swap_in "$work/site.caddy" "$EDGE_DIR/config/sites/$app.caddy" 0644
+  say "installed $EDGE_DIR/config/sites/$app.caddy"
 }
 
 # The shape cf-ranges writes: its comment line, then trusted_proxies static and the ranges on one
 # line. The file is imported inside the global servers block, so nothing else may get in.
 check_ranges_text() { # check_ranges_text <file>
-	awk -v problems="$work/problems" '
-		NR == 1 { if ($0 != "# Generated by cf-ranges from ips-v4.txt and ips-v6.txt. Do not edit.") bad = 1; next }
-		NR == 2 {
-			if ($1 != "trusted_proxies" || $2 != "static" || NF < 3) bad = 1
-			for (i = 3; i <= NF; i++)
-				if ($i !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/[0-9]+$/ && $i !~ /^[0-9a-fA-F:]+\/[0-9]+$/) bad = 1
-			next
-		}
-		{ bad = 1 }
-		END {
-			if (NR != 2 || bad)
-				print "cloudflare-ranges.caddy must be the cf-ranges comment line, then trusted_proxies static <ranges> on one line" >> problems
-		}' "$1"
+  awk -v problems="$work/problems" '
+    NR == 1 { if ($0 != "# Generated by cf-ranges from ips-v4.txt and ips-v6.txt. Do not edit.") bad = 1; next }
+    NR == 2 {
+      if ($1 != "trusted_proxies" || $2 != "static" || NF < 3) bad = 1
+      for (i = 3; i <= NF; i++)
+        if ($i !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/[0-9]+$/ && $i !~ /^[0-9a-fA-F:]+\/[0-9]+$/) bad = 1
+      next
+    }
+    { bad = 1 }
+    END {
+      if (NR != 2 || bad)
+        print "cloudflare-ranges.caddy must be the cf-ranges comment line, then trusted_proxies static <ranges> on one line" >> problems
+    }' "$1"
 }
 
 # app-apply edge config|ranges <file>: the Caddyfile, the snippets or the ranges, validated as part
-# of the staged tree, then swapped in and reloaded (§5.7).
+# of the staged tree, then swapped in and reloaded.
 cmd_edge_config() { # cmd_edge_config <file> [<name to install it as>]
-	local name=${2:-${1##*/}}
-	case $name in
-	Caddyfile | snippets.caddy | cloudflare-ranges.caddy) ;;
-	*) bad_arg "edge config installs Caddyfile, snippets.caddy or cloudflare-ranges.caddy, not $name" ;;
-	esac
-	load_conf edge
-	take_in "$1" "$work/candidate"
-	if [ "$name" = cloudflare-ranges.caddy ]; then check_ranges_text "$work/candidate"; fi
-	finish "$name"
-	edge_env_parse "$EDGE_DIR/edge.env" "$work/edge"
-	finish "$EDGE_DIR/edge.env"
-	stage_tree
-	cp -- "$work/candidate" "$work/tree/$name"
-	# New snippets change how every site adapts, so every installed site is checked again.
-	if [ "$name" = snippets.caddy ]; then recheck_sites "$work/tree/snippets.caddy" "$work/edge"; fi
-	tree_validate "$work/tree" "$EDGE_DIR/certs" "$work/edge.docker"
-	finish "$name"
-	swap_in "$work/candidate" "$EDGE_DIR/config/$name" 0644
-	say "installed $EDGE_DIR/config/$name"
+  local name=${2:-${1##*/}}
+  case $name in
+  Caddyfile | snippets.caddy | cloudflare-ranges.caddy) ;;
+  *) bad_arg "edge config installs Caddyfile, snippets.caddy or cloudflare-ranges.caddy, not $name" ;;
+  esac
+  load_conf edge
+  take_in "$1" "$work/candidate"
+  if [ "$name" = cloudflare-ranges.caddy ]; then check_ranges_text "$work/candidate"; fi
+  finish "$name"
+  edge_env_parse "$EDGE_DIR/edge.env" "$work/edge"
+  finish "$EDGE_DIR/edge.env"
+  stage_tree
+  cp -- "$work/candidate" "$work/tree/$name"
+  # New snippets change how every site adapts, so every installed site is checked again.
+  if [ "$name" = snippets.caddy ]; then recheck_sites "$work/tree/snippets.caddy" "$work/edge"; fi
+  tree_validate "$work/tree" "$EDGE_DIR/certs" "$work/edge.docker"
+  check_edge_env_applied
+  finish "$name"
+  swap_in "$work/candidate" "$EDGE_DIR/config/$name" 0644
+  say "installed $EDGE_DIR/config/$name"
 }
 
 # app-apply edge env <file>: the values behind {$NAME} in site files. Every site and the whole tree
-# must pass with the new values; Caddy gets them only when it is recreated (§5.7).
+# must pass with the new values; Caddy gets them only when it is recreated.
 cmd_edge_env() { # cmd_edge_env <file>
-	load_conf edge
-	take_in "$1" "$work/edge.env"
-	edge_env_parse "$work/edge.env" "$work/edge"
-	finish "the edge.env file"
-	recheck_sites "$EDGE_DIR/config/snippets.caddy" "$work/edge"
-	tree_validate "$EDGE_DIR/config" "$EDGE_DIR/certs" "$work/edge.docker"
-	finish "the edge.env file"
-	keep_previous "$EDGE_DIR/edge.env" >/dev/null
-	put "$work/edge.env" "$EDGE_DIR/edge.env" 0600
-	say "installed $EDGE_DIR/edge.env"
-	say "next, between 01:00 and 07:00 IST: sudo app-compose edge up -d (Caddy reads edge.env only when it is created)"
+  load_conf edge
+  take_in "$1" "$work/edge.env"
+  edge_env_parse "$work/edge.env" "$work/edge"
+  finish "the edge.env file"
+  recheck_sites "$EDGE_DIR/config/snippets.caddy" "$work/edge"
+  tree_validate "$EDGE_DIR/config" "$EDGE_DIR/certs" "$work/edge.docker"
+  finish "the edge.env file"
+  keep_previous "$EDGE_DIR/edge.env" >/dev/null
+  put "$work/edge.env" "$EDGE_DIR/edge.env" 0600
+  say "installed $EDGE_DIR/edge.env"
+  say "next, between 01:00 and 07:00 IST: sudo app-compose edge up -d (Caddy reads edge.env only when it is created)"
+}
+
+# What one app adds to the shared log redaction. snippets.caddy imports /etc/caddy/log-redact.d/*.caddy
+# right after the public URI filter (docs/runbooks/edge.md §7); the files exist only on the server,
+# because their patterns name an app's token paths. A line is request>uri regexp <pattern>
+# <replacement>, and nothing else gets in.
+check_redact_text() { # check_redact_text <file>
+  awk -v problems="$work/problems" '
+    function bad(m) { print "log-redact line " NR ": " m >> problems }
+    /^[ \t]*#/ || /^[ \t]*$/ { next }
+    {
+      if (NF != 4 || $1 != "request>uri" || $2 != "regexp") { bad("a line is: request>uri regexp <pattern> <replacement>"); next }
+      for (i = 3; i <= 4; i++) {
+        if ($i ~ /["`]/) bad("quotes and backquotes are not allowed")
+        else if ($i ~ /^(#|<<)/ || $i ~ /\\$/) bad("a token can not start a comment or heredoc, or end in a backslash")
+        else if ($i ~ /[{]([$]|env[.]|file[.]|system[.])/) bad("placeholders that read the environment or files are not allowed")
+      }
+    }' "$1"
+}
+
+# app-apply edge redact <app> <file>: the whole tree must pass with the file, then it goes in place
+# and Caddy reloads. Log lines written from then on are redacted.
+cmd_edge_redact() { # cmd_edge_redact <app> <file>
+  local app=$1
+  load_conf edge
+  take_in "$2" "$work/candidate"
+  check_redact_text "$work/candidate"
+  finish "the $app redaction file"
+  edge_env_parse "$EDGE_DIR/edge.env" "$work/edge"
+  finish "$EDGE_DIR/edge.env"
+  stage_tree
+  mkdir -p -- "$work/tree/log-redact.d"
+  cp -- "$work/candidate" "$work/tree/log-redact.d/$app.caddy"
+  tree_validate "$work/tree" "$EDGE_DIR/certs" "$work/edge.docker"
+  check_edge_env_applied
+  finish "the $app redaction file"
+  install -d -m 0755 -o root -g root -- "$EDGE_DIR/config/log-redact.d"
+  swap_in "$work/candidate" "$EDGE_DIR/config/log-redact.d/$app.caddy" 0644
+  say "installed $EDGE_DIR/config/log-redact.d/$app.caddy"
 }
 
 # Text checks only. Caddy's validate then loads the pair, which also proves the key fits.
 pem_check() { # pem_check <file> <name> cert|key
-	if [ "$3" = cert ]; then
-		grep -q -- '-----BEGIN CERTIFICATE-----' "$1" || problem "$2 holds no certificate"
-		! grep -q -- 'PRIVATE KEY' "$1" || problem "$2 holds a private key: only certificates go in it"
-	else
-		grep -Eq -- '-----BEGIN ([A-Z]+ )?PRIVATE KEY-----' "$1" || problem "$2 holds no private key"
-		! grep -q -- 'CERTIFICATE' "$1" || problem "$2 holds a certificate: only the key goes in it"
-	fi
+  if [ "$3" = cert ]; then
+    grep -q -- '-----BEGIN CERTIFICATE-----' "$1" || problem "$2 holds no certificate"
+    ! grep -q -- 'PRIVATE KEY' "$1" || problem "$2 holds a private key: only certificates go in it"
+  else
+    grep -Eq -- '-----BEGIN ([A-Z]+ )?PRIVATE KEY-----' "$1" || problem "$2 holds no private key"
+    ! grep -q -- 'CERTIFICATE' "$1" || problem "$2 holds a certificate: only the key goes in it"
+  fi
 }
 
-# app-apply edge cert <app> <origin.pem> <origin-key.pem> [<aop-ca.pem>] (§5.4): the zone's Origin
+# app-apply edge cert <app> <origin.pem> <origin-key.pem> [<aop-ca.pem>]: the zone's Origin
 # CA pair, and the CA certificate of our AOP client certificate. Validated with the staged
-# certificates, swapped in with their modes from §2.2, then reloaded.
+# certificates, swapped in with their modes (docs/runbooks/edge.md §3), then reloaded.
 cmd_edge_cert() { # cmd_edge_cert <app> <origin.pem> <origin-key.pem> [<aop-ca.pem>]
-	local app=$1 f mode args=()
-	load_conf edge
-	take_in "$2" "$work/origin.pem"
-	take_in "$3" "$work/origin-key.pem"
-	if [ -n "${4-}" ]; then take_in "$4" "$work/aop-ca.pem"; fi
-	pem_check "$work/origin.pem" origin.pem cert
-	pem_check "$work/origin-key.pem" origin-key.pem key
-	if [ -f "$work/aop-ca.pem" ]; then pem_check "$work/aop-ca.pem" aop-ca.pem cert; fi
-	finish "the $app certificates"
-	edge_env_parse "$EDGE_DIR/edge.env" "$work/edge"
-	finish "$EDGE_DIR/edge.env"
-	# The staged copy holds private keys too: it lives in /run, 0700, and goes with the work dir.
-	mkdir -p -- "$work/certs/$app"
-	if [ -d "$EDGE_DIR/certs" ]; then cp -a -- "$EDGE_DIR/certs/." "$work/certs/"; fi
-	for f in origin.pem origin-key.pem aop-ca.pem; do
-		[ -f "$work/$f" ] || continue
-		cp -- "$work/$f" "$work/certs/$app/$f"
-		mode=0644
-		if [ "$f" = origin-key.pem ]; then mode=0600; fi
-		args+=("$work/$f" "$EDGE_DIR/certs/$app/$f" "$mode")
-	done
-	tree_validate "$EDGE_DIR/config" "$work/certs" "$work/edge.docker"
-	finish "the $app certificates"
-	install -d -m 0750 -- "$EDGE_DIR/certs" "$EDGE_DIR/certs/$app"
-	swap_in "${args[@]}"
-	say "installed the $app certificates in $EDGE_DIR/certs/$app/"
+  local app=$1 f mode args=()
+  load_conf edge
+  take_in "$2" "$work/origin.pem"
+  take_in "$3" "$work/origin-key.pem"
+  if [ -n "${4-}" ]; then take_in "$4" "$work/aop-ca.pem"; fi
+  pem_check "$work/origin.pem" origin.pem cert
+  pem_check "$work/origin-key.pem" origin-key.pem key
+  if [ -f "$work/aop-ca.pem" ]; then pem_check "$work/aop-ca.pem" aop-ca.pem cert; fi
+  finish "the $app certificates"
+  edge_env_parse "$EDGE_DIR/edge.env" "$work/edge"
+  finish "$EDGE_DIR/edge.env"
+  # The staged copy holds private keys too: it lives in /run, 0700, and goes with the work dir.
+  mkdir -p -- "$work/certs/$app"
+  if [ -d "$EDGE_DIR/certs" ]; then cp -a -- "$EDGE_DIR/certs/." "$work/certs/"; fi
+  for f in origin.pem origin-key.pem aop-ca.pem; do
+    [ -f "$work/$f" ] || continue
+    cp -- "$work/$f" "$work/certs/$app/$f"
+    mode=0644
+    if [ "$f" = origin-key.pem ]; then mode=0600; fi
+    args+=("$work/$f" "$EDGE_DIR/certs/$app/$f" "$mode")
+  done
+  tree_validate "$EDGE_DIR/config" "$work/certs" "$work/edge.docker"
+  check_edge_env_applied
+  finish "the $app certificates"
+  install -d -m 0750 -- "$EDGE_DIR/certs" "$EDGE_DIR/certs/$app"
+  swap_in "${args[@]}"
+  say "installed the $app certificates in $EDGE_DIR/certs/$app/"
 }
 
-# The live tree's checks, for validate and reload: edge.env, the ranges file, steps 1 and 2 for
-# every site, then Caddy's validate of the whole tree (§5.7). A broken file would otherwise show
-# only at the next start.
+# The live tree's checks, for validate and reload: edge.env, the ranges file, checks 1 and 2 for
+# every site, then Caddy's validate of the whole tree. A broken file would otherwise show only at
+# the next start.
 check_live_edge() {
-	load_conf edge
-	edge_env_parse "$EDGE_DIR/edge.env" "$work/edge"
-	if [ -f "$EDGE_DIR/config/cloudflare-ranges.caddy" ]; then check_ranges_text "$EDGE_DIR/config/cloudflare-ranges.caddy"; fi
-	recheck_sites "$EDGE_DIR/config/snippets.caddy" "$work/edge"
-	tree_validate "$EDGE_DIR/config" "$EDGE_DIR/certs" "$work/edge.docker"
-	finish "the live edge tree"
+  load_conf edge
+  edge_env_parse "$EDGE_DIR/edge.env" "$work/edge"
+  if [ -f "$EDGE_DIR/config/cloudflare-ranges.caddy" ]; then check_ranges_text "$EDGE_DIR/config/cloudflare-ranges.caddy"; fi
+  recheck_sites "$EDGE_DIR/config/snippets.caddy" "$work/edge"
+  tree_validate "$EDGE_DIR/config" "$EDGE_DIR/certs" "$work/edge.docker"
+  finish "the live edge tree"
 }
 cmd_edge_validate() {
-	check_live_edge
-	say "the live edge tree is valid"
+  check_live_edge
+  say "the live edge tree is valid"
 }
 # For a file already written in place (prefer app-apply edge config|ranges, which can put the old
 # file back): Caddy reloads only a tree that passes.
 cmd_edge_reload() {
-	check_live_edge
-	reload_caddy || die "Caddy's reload failed (above): it keeps running its previous config"
+  check_live_edge
+  check_edge_env_applied
+  finish "the live edge tree"
+  reload_caddy || die "Caddy's reload failed (above): it keeps running its previous config"
 }
+
+# tests/host/app-apply.sh sources everything above and runs the checks on files of its own.
+if [ "${APP_APPLY_SOURCE_ONLY-}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
 
 # --- main ---
 
 # An app named on the command line: a configured app, never edge itself.
 check_app_arg() { # check_app_arg <name>
-	if [[ ! $1 =~ ^[a-z0-9]+$ ]] || [ "$1" = edge ]; then bad_arg "bad app name: $1"; fi
-	[ -f "/etc/apps/$1.conf" ] || bad_arg "unknown app $1: there is no /etc/apps/$1.conf"
+  if [[ ! $1 =~ ^[a-z0-9]+$ ]] || [ "$1" = edge ]; then bad_arg "bad app name: $1"; fi
+  [ -f "/etc/apps/$1.conf" ] || bad_arg "unknown app $1: there is no /etc/apps/$1.conf"
 }
 
 [ $# -ge 2 ] || usage
 if [ "$1" = edge ]; then
-	case "$2:$#" in
-	config:3 | ranges:3 | env:3 | compose:3 | validate:2 | reload:2 | cert:5 | cert:6) ;;
-	*) usage ;;
-	esac
-	if [ "$2" = cert ]; then check_app_arg "$3"; fi
+  case "$2:$#" in
+  config:3 | ranges:3 | env:3 | compose:3 | validate:2 | reload:2 | redact:4 | cert:5 | cert:6) ;;
+  *) usage ;;
+  esac
+  if [ "$2" = cert ] || [ "$2" = redact ]; then check_app_arg "$3"; fi
 else
-	case "$2:$#" in
-	compose:3 | site:3) ;;
-	*) usage ;;
-	esac
-	check_app_arg "$1"
+  case "$2:$#" in
+  compose:3 | site:3) ;;
+  *) usage ;;
+  esac
+  check_app_arg "$1"
 fi
 [ "$(id -u)" = 0 ] || die "run it as root: sudo app-apply ..."
 
 # One app-apply at a time, whatever it changes: they share the edge tree and the sum of limits.
-exec 9>/run/lock/app-apply.lock
+lock_dir
+exec 9>"$LOCK_DIR/app-apply.lock"
 if ! flock -n 9; then
-	say "waiting for another app-apply to finish"
-	flock -w 600 9 || die "another app-apply is still running"
+  say "waiting for another app-apply to finish"
+  flock -w 600 9 || die "another app-apply is still running"
 fi
 # The work directory holds copies with secrets in them (compose config, adapted JSON, keys): it
 # lives in /run, 0700, and goes when app-apply exits.
 work=$(mktemp -d /run/app-apply.XXXXXX)
 cleanup() {
-	rm -rf -- "$work"
-	if [ "${#tmpfiles[@]}" -gt 0 ]; then rm -f -- "${tmpfiles[@]}"; fi
+  rm -rf -- "$work"
+  if [ "${#tmpfiles[@]}" -gt 0 ]; then rm -f -- "${tmpfiles[@]}"; fi
 }
 trap cleanup EXIT
 trap 'exit 130' INT
@@ -1212,6 +1416,7 @@ case "$1:$2" in
 edge:config) cmd_edge_config "$3" ;;
 edge:ranges) cmd_edge_config "$3" cloudflare-ranges.caddy ;;
 edge:env) cmd_edge_env "$3" ;;
+edge:redact) cmd_edge_redact "$3" "$4" ;;
 edge:cert) cmd_edge_cert "$3" "$4" "$5" "${6-}" ;;
 edge:compose) cmd_compose edge "$3" ;;
 edge:validate) cmd_edge_validate ;;
