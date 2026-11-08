@@ -1,0 +1,3 @@
+#!/bin/bash
+# Stand-in for sleep: counts the waits instead of waiting.
+printf 'sleep %s\n' "$*" >>"$STUB_STATE/calls"

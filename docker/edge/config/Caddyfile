@@ -1,0 +1,31 @@
+# The edge (spec §16, §18): the one Caddy on the server. Cloudflare terminates visitors' TLS and
+# connects here over HTTPS with SSL "Full (strict)", so every site uses its zone's Cloudflare Origin
+# CA certificate. Compression and caching headers come from Next.js and Cloudflare.
+# The admin edits this file and snippets.caddy; each app's site file is installed by app-apply.
+import /etc/caddy/snippets.caddy
+
+# Global options. This comment also keeps caddy fmt from joining the brace to the import line.
+{
+	# No automatic certificates or redirects: the Origin CA certificates are mounted at /certs.
+	auto_https off
+	# The admin API listens on loopback inside this container, where the healthcheck reads it. Set
+	# here, a CADDY_ADMIN variable can not move it onto the edge networks.
+	admin 127.0.0.1:2019
+	servers {
+		# Only Cloudflare's ranges (written by cf-ranges apply) may say who the visitor is, through
+		# the CF-Connecting-IP header Cloudflare sets.
+		import /etc/caddy/cloudflare-ranges.caddy
+		client_ip_headers CF-Connecting-IP
+		# The Host header must match the TLS server name (needed once client certificates are on).
+		strict_sni_host on
+	}
+	# Every other log, because upstream errors (e.g. an app restarting) log the whole request. It
+	# keeps Caddy's default output, stderr, so Docker's journald driver marks Caddy's own errors.
+	log default {
+		format filter {
+			import log_fields
+		}
+	}
+}
+
+import /etc/caddy/sites/*.caddy

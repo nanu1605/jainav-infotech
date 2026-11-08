@@ -1,0 +1,5 @@
+#!/bin/bash
+# Stand-in for systemd-cat: what would reach the journal goes to $STUB_STATE/journal.
+[ "${1-}" != -t ] || shift 2
+[ $# -eq 0 ] || exec "$@" >>"$STUB_STATE/journal" 2>&1
+exec cat >>"$STUB_STATE/journal"

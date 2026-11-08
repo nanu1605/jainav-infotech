@@ -1,0 +1,8 @@
+#!/bin/bash
+# Stand-in for df -Pk: every path has $STUB_STATE/df-kb KiB free (plenty by default).
+free=99999999
+[ ! -e "$STUB_STATE/df-kb" ] || free=$(cat "$STUB_STATE/df-kb")
+echo 'Filesystem 1024-blocks Used Available Capacity Mounted on'
+for a in "$@"; do
+  case $a in -*) ;; *) printf 'stub 999999999 1 %s 1%% %s\n' "$free" "$a" ;; esac
+done

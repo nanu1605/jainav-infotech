@@ -1,0 +1,13 @@
+# Daily reports and housekeeping: journal size against its retention period, line counts, limits,
+# memory peaks, writable layers, unused images, the edge config, certificate expiry, cloudflared's age.
+# hostwatch-daily.timer starts it.
+[Unit]
+Description=Daily host reports and housekeeping
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hostwatch daily
+SyslogIdentifier=hostwatch
+# It counts the journal's lines, runs docker ps -s and validates the edge: minutes, not seconds.
+TimeoutStartSec=30min

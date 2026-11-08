@@ -1,0 +1,19 @@
+# Loads the Cloudflare-only filters (iptables and ip6tables) before the network is up and before
+# Docker starts (docs/runbooks/server.md). It loads them in two transactions, drop first, so a
+# failure leaves 443 closed, not open. Stopping or restarting this unit does not remove the
+# filters; range changes go through "cf-ranges apply".
+[Unit]
+Description=Cloudflare-only inbound filters
+DefaultDependencies=no
+After=local-fs.target systemd-modules-load.service
+Before=network-pre.target docker.service shutdown.target
+Wants=network-pre.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/cf-ranges firewall
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+# Encrypts the settings of the app named by the instance (app-config-archive@<app>) into its
+# backup-out/ directory. The timer of the same name starts it.
+[Unit]
+Description=Encrypted archive of the %i settings
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/app-config-archive %i
+SyslogIdentifier=app-config-archive
+TimeoutStartSec=5min

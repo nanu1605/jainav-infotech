@@ -31,8 +31,11 @@ updates:
       - dependency-name: postgres
         update-types: ['version-update:semver-major']
 
+  # The edge's Caddy tag is also CADDY_IMAGE in docker/host/apps/edge.conf, which Dependabot can't
+  # edit: the bump's pull request gets that line by hand, and CI (host-scripts) fails until the two
+  # match.
   - package-ecosystem: docker-compose
-    directory: /docker
+    directories: [/docker, /docker/edge]
     schedule: { interval: weekly, day: monday }
     cooldown: { default-days: 14 }
     # Postgres stays on 17 (docs/decisions.md): a new major can't open the old data directory.

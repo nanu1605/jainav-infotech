@@ -1,0 +1,10 @@
+# Compares Cloudflare's published IP ranges with the lists in /etc/cf-ranges and alerts on any
+# difference. It changes nothing: the hPanel rules need the same change by hand.
+[Unit]
+Description=Compare Cloudflare's IP ranges with the installed lists
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cf-ranges check

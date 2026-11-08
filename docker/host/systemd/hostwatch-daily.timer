@@ -1,0 +1,11 @@
+# 23:00 UTC is 04:30 IST: after every backup (20:30-21:30 UTC) and Umami's prune (22:00), and in the
+# quiet hours. Persistent: a server that was off at 23:00 runs it at its next start.
+[Unit]
+Description=Daily host reports at 23:00 UTC
+
+[Timer]
+OnCalendar=*-*-* 23:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

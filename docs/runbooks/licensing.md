@@ -26,12 +26,12 @@ Each environment has its own set: staging never uses production's keys (a stagin
 
    It prints the four `KEY=value` lines and the public key as a JWK, and writes no files. Don't paste the output into chats, tickets or commits.
 
-2. Put the four lines into the app's env file on the server, `/srv/jainav/production.env` (or `staging.env`) ([server.md](server.md), section 2), which stays `chmod 600`. They never go into the repository, `.env.example`, GitHub variables or the image.
+2. Put the four lines into the app's env file on the server with `sudoedit /srv/jainav/production.env` (or `staging.env`) ([server.md §2](server.md#2-put-the-files-in-place)); it stays `chmod 600`. They never go into the repository, `.env.example`, GitHub variables or the image.
 3. Keep a copy of all four values in the password manager, next to the backup key ([backups.md](backups.md)). A restored database is only usable with the same encryption key and pepper.
-4. Restart the app so it reads them, in `/srv/jainav`:
+4. Restart the app so it reads them:
 
    ```bash
-   docker compose -f compose.prod.yml up -d --force-recreate app   # app-staging for staging
+   sudo app-compose jainav up -d --force-recreate app   # app-staging for staging
    ```
 
 5. Check: `curl -s https://{{DOMAIN}}/api/v1/licensing/health` answers `{"ok":true}`, and `curl -s https://{{DOMAIN}}/api/v1/licensing/keys` lists the new `kid` with the same `x` as the printed JWK.

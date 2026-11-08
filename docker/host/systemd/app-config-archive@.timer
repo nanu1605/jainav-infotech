@@ -1,0 +1,19 @@
+# One timer per app: systemctl enable --now app-config-archive@<app>.timer
+# 20:50 UTC suits jainav: ten minutes before its 21:00 backup, which uploads the newest archive and
+# refuses one more than 2 hours old. Another app gets its own time with a drop-in, so this file stays
+# the same for every app:
+#   systemctl edit app-config-archive@<app>.timer
+#   [Timer]
+#   OnCalendar=
+#   OnCalendar=*-*-* 20:20:00 UTC
+# The empty OnCalendar= clears the line above, otherwise both times would fire.
+[Unit]
+Description=Daily encrypted archive of the %i settings
+
+[Timer]
+OnCalendar=*-*-* 20:50:00 UTC
+AccuracySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

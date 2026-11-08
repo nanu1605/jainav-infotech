@@ -63,8 +63,9 @@ jobs:
       - name: No high or critical advisories in production dependencies
         run: pnpm audit --prod --audit-level high
 
-  # The production image builds (no push): catches Dockerfile and standalone-output breakage
-  # before a deploy does.
+  # The production image and the backup image build (no push): catches Dockerfile and
+  # standalone-output breakage before a deploy does, and a broken docker/backup before the merge to
+  # main on which backup-image.yml first builds it.
   image:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -79,3 +80,50 @@ jobs:
           push: false
           cache-from: type=gha,scope=ci-image
           cache-to: type=gha,mode=max,scope=ci-image
+      - name: The backup image builds
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: docker/backup
+          push: false
+
+  # The server's root scripts (docker/host), the backup scripts and the Postgres role script:
+  # shellcheck, which the runner image ships, then app-deploy against stubs of docker and the host
+  # tools, and app-apply against this repository's own compose and site files (it needs docker and
+  # jq, both on the runner, and pulls the pinned Caddy image). The docker lists are explicit, so
+  # each new script joins one on purpose; every shell file under tests/host, stubs included, is found
+  # by its shebang.
+  host-scripts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Shellcheck
+        run: >-
+          shellcheck --version &&
+          shellcheck
+          docker/host/app-deploy docker/host/app-compose docker/host/app-apply
+          docker/host/app-config-archive docker/host/cf-ranges docker/host/hostwatch
+          docker/host/install.sh
+          docker/backup/backup.sh docker/backup/prune-umami.sh docker/backup/restore-test.sh
+          docker/postgres/roles.sh
+          $(grep -rlE '^#!.*sh' tests/host)
+      # Dependabot bumps the tag in compose.yml only, and app-apply refuses that file once it
+      # differs from CADDY_IMAGE in edge.conf (the image its validation runs with).
+      - name: The edge's Caddy image is the same in compose.yml and edge.conf
+        run: |
+          in_compose=$(sed -nE "s/^[[:space:]]+image:[[:space:]]*[\"']?(caddy:[^\"'[:space:]]+).*/\1/p" docker/edge/compose.yml)
+          in_conf=$(sed -nE "s/^CADDY_IMAGE=[\"']?([^\"'[:space:]]+).*/\1/p" docker/host/apps/edge.conf)
+          echo "docker/edge/compose.yml:     ${in_compose:-no caddy image}"
+          echo "docker/host/apps/edge.conf:  ${in_conf:-no CADDY_IMAGE}"
+          if [ -z "$in_compose" ] || [ "$in_compose" != "$in_conf" ]; then
+            echo "::error::docker/edge/compose.yml and docker/host/apps/edge.conf name different images"
+            exit 1
+          fi
+      - name: app-deploy refuses bad requests and rolls back
+        run: bash tests/host/app-deploy.sh
+      - name: app-apply accepts the repository's own files and refuses bad ones
+        run: bash tests/host/app-apply.sh

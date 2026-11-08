@@ -1,0 +1,4 @@
+#!/bin/bash
+# Stand-in for flock: records the call, and fails while $STUB_STATE/lock-busy exists.
+printf 'flock %s\n' "$*" >>"$STUB_STATE/calls"
+[ ! -e "$STUB_STATE/lock-busy" ]

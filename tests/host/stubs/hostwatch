@@ -1,0 +1,4 @@
+#!/bin/bash
+# Stand-in for /usr/local/sbin/hostwatch: alerts are lines in $STUB_STATE/alerts.
+printf 'hostwatch %s\n' "$*" >>"$STUB_STATE/calls"
+[ "${1-}" != alert ] || { shift; printf '%s\n' "$*" >>"$STUB_STATE/alerts"; }

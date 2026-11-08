@@ -1,0 +1,68 @@
+# Shared by every site file. Only the admin edits this file (docs/runbooks/edge.md). A site file may
+# import site_common, its own tls_<app> and upstream, and nothing else.
+
+# What a log line keeps of a request: its time, method, host, path, status, size and duration, and
+# Cloudflare's address (remote_ip). Gone are request headers (visitor IPs, Access identities), the
+# visitor's address Caddy resolved from them (client_ip), response headers (Location holds 5-minute
+# signed file URLs), staging's login name, the whole query string (newsletter tokens, order numbers,
+# form prefills) and the token in Payload's password reset path. A path can still identify a record.
+# Another app's token-bearing paths are redacted by its own file on the server,
+# /srv/edge/config/log-redact.d/<app>.caddy (root's, 0644, never in git; installed with app-apply
+# edge redact, docs/runbooks/edge.md §7): one `request>uri regexp <pattern> <replacement>` line,
+# applied after the public one below, so the import must stay after it. A glob that matches no file
+# only warns.
+(log_fields) {
+	wrap json
+	request>headers delete
+	request>client_ip delete
+	request>uri regexp (/admin/reset)/[^?]*|\?.* ${1}
+	import /etc/caddy/log-redact.d/*.caddy
+	resp_headers delete
+	headers delete
+	user_id delete
+}
+
+(site_common) {
+	log {
+		output stdout
+		format filter {
+			import log_fields
+		}
+	}
+}
+
+# Inside every reverse_proxy. An app gets one client address, the one Cloudflare sent in
+# CF-Connecting-IP (trusted only from Cloudflare's ranges), and nothing a client sent in its place.
+# Caddy keeps incoming X-Forwarded-* values from a trusted peer, hence the explicit overrides (it
+# still logs "Unnecessary header_up X-Forwarded-Host" on every load: that line is needed). The edge
+# serves TLS only on 443 and the zones keep Always Use HTTPS on, so the protocol and port are
+# fixed. The retries hide an app that is restarting for a deploy.
+(upstream) {
+	header_up X-Real-IP {client_ip}
+	header_up X-Forwarded-For {client_ip}
+	header_up CF-Connecting-IP {client_ip}
+	header_up Sb-Forwarded-For {client_ip}
+	header_up X-Forwarded-Host {host}
+	header_up X-Forwarded-Proto https
+	header_up X-Forwarded-Port 443
+	header_up -True-Client-IP
+	header_up -X-Client-IP
+	header_up -Forwarded
+	lb_try_duration 30s
+	lb_try_interval 250ms
+	transport http {
+		keepalive 4s # below Node's 5 s default: Caddy never reuses a connection the app is closing
+	}
+}
+
+# Cloudflare's Origin CA certificate for this app's zone, made from a CSR on the server.
+(tls_jainav) {
+	tls /certs/jainav/origin.pem /certs/jainav/origin-key.pem {
+		# The admin enables this at launch, after zone-level Authenticated Origin Pulls is on at Cloudflare.
+		# client_auth {
+		# 	mode require_and_verify
+		# 	trust_pool file /certs/jainav/aop-ca.pem
+		# }
+	}
+}
+# Every app has its own tls_<app> snippet like this one, for its own zone's certificates.
