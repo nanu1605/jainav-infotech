@@ -66,7 +66,7 @@ Tasks from spec §20. Each phase ends with all checks green, a phase report, and
 
 In the repository (done; rehearsed locally, see docs/runbooks/server.md#rehearsal):
 
-- [x] Docker images (runner + tools); `compose.prod.yml` (app, app-staging, postgres, umami, caddy, backup).
+- [x] Docker images (runner + tools); `compose.prod.yml` (app, app-staging, postgres, umami, backup); the shared edge Caddy in `docker/edge/`; the server kit in `docker/host/` (deploy, compose and config scripts, hostwatch, firewall) with tests in `tests/host/`; server shared with MenuMesh (docs/decisions.md, Phase 6).
 - [x] Per-environment image builds; deploy workflow (staging on `main`, production on `v*` tags after approval, automatic rollback, smoke tests); `prodMigrations` on container start via `/api/v1/health`.
 - [x] Sentry and Umami wired in (off until configured); Telegram alerts from the backup job.
 - [x] Backups + restore runbook; restore test passed locally.
@@ -80,10 +80,10 @@ In the repository (done; rehearsed locally, see docs/runbooks/server.md#rehearsa
 On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/launch.md):
 
 - [x] Before going live (docs/decisions.md, "October advisories"): Node image 24.22.1 (done 2026-11-08). Payload 3.92.0 is in.
-- [ ] Provision the VPS; firewall to Cloudflare's ranges.
+- [ ] Provision the Hostinger KVM 4 (docs/runbooks/server.md); firewall to Cloudflare's ranges and authenticated origin pulls on every zone (docs/runbooks/edge.md); Web Console login checked before hardening.
 - [ ] Cloudflare: DNS, SSL Full (strict), Origin CA certificate, WAF skip rule, Bot Fight Mode off, Access on `/admin*` and `/api/users/*`; R2 buckets + custom domains.
 - [ ] GitHub environments, secrets, production reviewer, `DEPLOY_ENABLED`; staging and production live.
-- [ ] Sentry project, Umami website, external uptime monitor + status page; an uptime alert reaches Telegram.
+- [ ] Sentry project, Umami website, HetrixTools monitors, heartbeats and status page; an uptime alert reaches Telegram.
 - [ ] A real restore test on the server.
 - [ ] SPF / DKIM / DMARC; mail-tester ≥ 9/10.
 - [ ] Legal review (docs/decisions.md, "Legal drafts"): blanks filled, then the Owner publishes every legal page but the EULA (§8.13). Final content check.
