@@ -311,6 +311,9 @@ if [ "$caddy_ready" = 1 ]; then
   cp -r "$root/docker/edge/config/." "$cfg/"
   openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj '/CN=example.test' \
     -keyout "$certs/jainav/origin-key.pem" -out "$certs/jainav/origin.pem" 2>/dev/null
+  # Caddy runs as root without DAC_OVERRIDE. On the server root owns the real key; here the
+  # runner's user owns this throwaway one, so it must be readable by everyone.
+  chmod 0644 "$certs/jainav/origin-key.pem"
   hash=$(docker run --rm "$image" caddy hash-password --plaintext 'test-only')
   {
     echo 'JAINAV_DOMAIN=example.test'
