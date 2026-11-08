@@ -9,12 +9,12 @@ How to switch on accounts and checkout on staging with Razorpay's test mode. Pro
 
 ## Steps
 
-1. **Secrets** in the staging app's environment (`/srv/jainav/staging.env`, see `server.md`):
+1. **Secrets** in the staging app's environment (edit `/srv/jainav/staging.env` with `sudoedit`, see [server.md §2](server.md#2-put-the-files-in-place)):
    - `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` (test mode);
    - `RAZORPAY_WEBHOOK_SECRET`: a new random value, also entered in step 2 (`openssl rand -hex 32`);
    - `OTP_PEPPER`: a new random value (`openssl rand -hex 32`). Changing it later invalidates codes in flight only.
 
-   Restart the staging app so it reads them: in `/srv/jainav`, `docker compose -f compose.prod.yml up -d --force-recreate app-staging`.
+   Restart the staging app so it reads them: `sudo app-compose jainav up -d --force-recreate app-staging`.
 
 2. **Webhook** (Razorpay Dashboard, test mode → Webhooks → Add): URL `https://staging.{{DOMAIN}}/api/v1/webhooks/razorpay` (Caddy lets it past basic auth), the secret from step 1, events `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid`, `refund.created`, `refund.processed`, `refund.failed`, and the six dispute events `payment.dispute.created`, `.won`, `.lost`, `.closed`, `.under_review`, `.action_required`.
 3. **Capture:** Dashboard → Account & Settings → Payment capture: automatic.

@@ -7,10 +7,10 @@ Do these in the Cloudflare dashboard for the domain's zone.
 
 | Name                | Type                                                                  | Value                                                             | Proxy    |
 | ------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------- | -------- |
-| `{{DOMAIN}}` (apex) | A / AAAA                                                              | the VPS                                                           | proxied  |
-| `www`               | A / AAAA                                                              | the VPS (Caddy redirects to the apex with a 308)                  | proxied  |
-| `staging`           | A / AAAA                                                              | the VPS                                                           | proxied  |
-| `analytics`         | A / AAAA                                                              | the VPS (Umami)                                                   | proxied  |
+| `{{DOMAIN}}` (apex) | A                                                                     | the VPS                                                           | proxied  |
+| `www`               | A                                                                     | the VPS's IPv4 address (Caddy redirects to the apex with a 308)   | proxied  |
+| `staging`           | A                                                                     | the VPS                                                           | proxied  |
+| `analytics`         | A                                                                     | the VPS (Umami)                                                   | proxied  |
 | `ssh`               | created by the tunnel ([SSH tunnel](#ssh-tunnel))                     | the VPS's SSH, behind Access                                      | proxied  |
 | `status`            | CNAME                                                                 | the uptime monitor's status page ([monitoring.md](monitoring.md)) | DNS only |
 | `cdn`               | R2 custom domain on the public bucket (media)                         |                                                                   | proxied  |
@@ -18,13 +18,22 @@ Do these in the Cloudflare dashboard for the domain's zone.
 | `cdn-staging`       | R2 custom domain on staging's public bucket (media and installers)    |                                                                   | proxied  |
 | mail records        | see [Email](#email)                                                   |                                                                   | DNS only |
 
+All the site names are **A records only**: no AAAA record anywhere, because the origin takes no IPv6 traffic. Nothing that is DNS-only points at the server: a DNS-only record would show its address and let anyone connect around Cloudflare. Mail and `status` records point at the mail provider and the status page, never at the VPS.
+
 ## SSL
 
 - SSL/TLS → Overview: **Full (strict)**.
-- SSL/TLS → Origin Server → Create Certificate: RSA, hostnames `{{DOMAIN}}` and
-  `*.{{DOMAIN}}`, 15 years. Save the certificate as `/srv/jainav/certs/origin.pem` and the
-  private key as `/srv/jainav/certs/origin-key.pem` (`chmod 600`). Caddy serves it for every
-  site; browsers never see it, only Cloudflare does.
+- SSL/TLS → Origin Server → Create Certificate → _Use my private key and CSR_, hostnames
+  `{{DOMAIN}}` and `*.{{DOMAIN}}`, 15 years. The CSR is made on the server, so the private key
+  never leaves it ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls)). The
+  certificate and key live in `/srv/edge/certs/jainav/` (`origin.pem`, `origin-key.pem`), installed with
+  `sudo app-apply edge cert jainav …`. Caddy serves it for every site of the zone; browsers never see
+  it, only Cloudflare does.
+- **Authenticated Origin Pulls**: SSL/TLS → Origin Server → Authenticated Origin Pulls →
+  _Zone-level_, with our own client certificate (not Cloudflare's shared one), then turned on.
+  It must be on for every zone before a second app runs on the server
+  ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls)). It has no effect on the
+  `ssh.` tunnel hostname.
 - Edge Certificates: Always Use HTTPS on; minimum TLS 1.2. The app sends HSTS itself
   (`max-age=31536000; includeSubDomains`, no preload).
 
@@ -42,8 +51,11 @@ Do these in the Cloudflare dashboard for the domain's zone.
   starts_with(http.request.uri.path, "/api/v1/downloads/")
   ```
 
-- **Origin firewall:** only Cloudflare reaches the VPS (provider firewall,
-  [server.md](server.md#1-provision-the-vps)). That is also why the app can trust the
+- **Origin firewall:** only Cloudflare reaches the VPS, in four layers: Hostinger's firewall in
+  hPanel (443 from Cloudflare's ranges; nothing else open once SSH runs through the tunnel), the
+  host's own rules, Caddy's trusted proxies and authenticated origin pulls
+  ([edge.md §1](edge.md#1-how-the-edge-works)). When Cloudflare changes its ranges, change them in
+  hPanel too ([edge.md §4](edge.md#4-cloudflares-ranges-and-the-origin-firewall)). That is also why the app can trust the
   `CF-Connecting-IP` header for rate limits.
 - **Cloudflare Access** (Zero Trust → Access → Applications → Add → Self-hosted). One
   application, with these paths:
@@ -63,30 +75,35 @@ The VPS's SSH port stays closed to the internet. Deploys from GitHub, and your o
 reach it through a Cloudflare Tunnel.
 
 1. Zero Trust → Networks → Tunnels → Create a tunnel (Cloudflared), named `jainav-vps`. Run
-   the install command it shows on the VPS: Debian package plus `cloudflared service install
-<token>`. The connector only makes outbound connections.
+   the install command it shows on the VPS: the pinned `cloudflared` release the kit names, checked against its published sha256
+   ([server.md §1](server.md#1-provision-the-vps)), then `cloudflared service install` with the
+   token read from a file, not typed in a command line. The connector only makes outbound
+   connections and is never auto-updated; update it by hand within a year of Cloudflare's latest
+   release.
 2. In the tunnel, add a public hostname `ssh.{{DOMAIN}}` with service `ssh://localhost:22`.
-3. Zero Trust → Access → Service Auth → Create service token `github-deploy`. Its client ID and
-   secret go in the GitHub environment secrets `CF_ACCESS_CLIENT_ID` and
+3. Zero Trust → Access → Service Auth → Create one service token per app that deploys:
+   `github-deploy-jainav` here, and another for each further app. Each token's client ID and
+   secret go in that app's GitHub environment secrets `CF_ACCESS_CLIENT_ID` and
    `CF_ACCESS_CLIENT_SECRET` ([server.md §4](server.md#4-github-setup-once)).
 4. Access → Applications → Add → Self-hosted, domain `ssh.{{DOMAIN}}`, two policies:
-   - _Service Auth_: include the service token `github-deploy`;
+   - _Service Auth_: include every `github-deploy-<app>` token;
    - _Allow_: include your own email, for interactive sessions.
 5. On your machine, install `cloudflared` and add the `Host jainav` block from
    [server.md §1](server.md#1-provision-the-vps). `ssh jainav` opens a browser sign-in the
    first time.
-6. Once `ssh jainav` works, close port 22 in the provider firewall.
+6. Once `ssh jainav` works, close port 22 in Hostinger's firewall (hPanel → VPS → Security →
+   Firewall) and run `install.sh --harden` ([server.md §1](server.md#1-provision-the-vps)).
 
 ## R2
 
 Create these buckets (R2 → Create bucket, location hint Asia-Pacific):
 
-| Bucket                                            | Public                                         | Used for                    | Env vars                                                 |
-| ------------------------------------------------- | ---------------------------------------------- | --------------------------- | -------------------------------------------------------- |
-| `jainav-public`                                   | custom domains `cdn.` and `downloads.`         | media, installers           | `S3_BUCKET`, `NEXT_PUBLIC_CDN_URL`, `DOWNLOADS_BASE_URL` |
-| `jainav-private`                                  | no                                             | CVs, later invoices         | `S3_PRIVATE_BUCKET`                                      |
-| `jainav-backups`                                  | no                                             | encrypted database dumps    | `BACKUP_BUCKET` (server `.env`)                          |
-| `jainav-staging-public`, `jainav-staging-private` | custom domain `cdn-staging.` on the public one | staging's files, kept apart | staging.env                                              |
+| Bucket                                            | Public                                         | Used for                                       | Env vars                                                 |
+| ------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------- |
+| `jainav-public`                                   | custom domains `cdn.` and `downloads.`         | media, installers                              | `S3_BUCKET`, `NEXT_PUBLIC_CDN_URL`, `DOWNLOADS_BASE_URL` |
+| `jainav-private`                                  | no                                             | CVs, later invoices                            | `S3_PRIVATE_BUCKET`                                      |
+| `jainav-backups`                                  | no                                             | encrypted database dumps and settings archives | `BACKUP_BUCKET` (server `.env`)                          |
+| `jainav-staging-public`, `jainav-staging-private` | custom domain `cdn-staging.` on the public one | staging's files, kept apart                    | staging.env                                              |
 
 Staging uses `https://cdn-staging.{{DOMAIN}}` for the repository variable `STAGING_CDN_URL` and for
 `NEXT_PUBLIC_CDN_URL` and `DOWNLOADS_BASE_URL` in staging.env (installers sit under `downloads/` in

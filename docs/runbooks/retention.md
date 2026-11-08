@@ -17,10 +17,9 @@ Deleted records can't be brought back from the admin. Backups keep them for abou
 Umami has no retention setting, so the `backup` container deletes old visitor data at 03:30 IST: `UMAMI_RETENTION_DAYS` in `/srv/jainav/.env`, empty by default, which keeps everything. The script refuses fewer than 30 days, and Telegram hears. To set it, for example to 13 months:
 
 ```bash
-cd /srv/jainav
-echo 'UMAMI_RETENTION_DAYS=396' >> .env
-docker compose -f compose.prod.yml up -d --build backup
-docker compose -f compose.prod.yml exec backup prune-umami.sh   # run once now
+sudoedit /srv/jainav/.env     # add the line UMAMI_RETENTION_DAYS=396
+sudo app-compose jainav up -d --force-recreate backup
+sudo app-compose jainav exec backup prune-umami.sh   # run once now
 ```
 
 Reports for older dates are then empty, and the policy's "no end date" line for analytics must change. A new Umami version can add a table that holds visitor data: when bumping the image, compare `prisma/schema.prisma` with `docker/backup/prune-umami.sh`. A table Umami drops makes the script fail, and Telegram hears about it.
