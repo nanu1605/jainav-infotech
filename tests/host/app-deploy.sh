@@ -38,7 +38,7 @@ eenv=$T/srv/example/images.env
 # A fresh server for each case: both apps' confs (the repo's, with paths moved and a test age
 # recipient), approved compose files, images.env from the example, an empty stub state.
 reset() {
-  rm -rf "$T/etc" "$T/srv" "$T/run" "$T/var" "$STUB_STATE"
+  rm -rf "${T:?}/etc" "${T:?}/srv" "${T:?}/run" "${T:?}/var" "$STUB_STATE"
   mkdir -p "$T/etc/apps" "$T/srv/jainav" "$T/srv/example" "$T/run/app-locks" "$T/run/hostwatch" \
     "$T/var/lib/docker" "$T/var/lib/containerd" "$STUB_STATE"
   chmod 0700 "$T/run/app-locks"
@@ -86,6 +86,7 @@ deploy() {
   done
   set +e
   if [ "$user" = root ]; then
+    # shellcheck disable=SC2016 # the inner bash expands $$ and $STUB_STATE, not this shell
     out=$(cd / && env -u SUDO_USER bash -c 'echo $$ >"$STUB_STATE/pid"; exec bash "$@"' _ \
       "$T/app-deploy" "$@" <"$T/stdin" 2>&1)
   else
@@ -102,7 +103,7 @@ finish() { [ "$failed" -ne "$before" ] || printf 'ok - %s\n' "$name"; }
 bad() {
   failed=$((failed + 1))
   printf 'not ok - %s: %s\n' "$name" "$1"
-  sed 's/^/    | /' <<<"$out"
+  printf '%s\n' "$out" | sed 's/^/    | /'
 }
 expect_status() { checks=$((checks + 1)); [ "$status" = "$1" ] || bad "exit $1, not $status"; }
 expect_says() { checks=$((checks + 1)); [[ $out == *"$1"* ]] || bad "says: $1"; }

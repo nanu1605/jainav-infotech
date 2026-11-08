@@ -33,8 +33,9 @@ case "$caller:$#" in
 esac
 case $app in '' | *[!a-z0-9]*) die "bad app name" ;; esac
 [ -f "/etc/apps/$app.conf" ] || die "unknown app"
-sound /etc/apps/ && sound "/etc/apps/$app.conf" ||
+if ! sound /etc/apps/ || ! sound "/etc/apps/$app.conf"; then
   die "/etc/apps and /etc/apps/$app.conf must belong to root and be writable by no one else"
+fi
 # Only the conf sets these, never the caller's environment.
 PROJECT_DIR='' APP_COMPOSE_FILE='' ENV_FILES='' CI_USER='' CI_ENVS='' REPO='' REGISTRY_USER=''
 HEALTH_TIMEOUT='' EXTRA_TAG='' EXTRA_MODE='' EXTRA_KEEP='' EXTRA_VAR='' PREDEPLOY_DB=''

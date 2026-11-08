@@ -91,10 +91,10 @@ PROBLEMS=0
 TG_BAD=0                                # BOT_TOKEN or CHAT_ID is set but not valid
 CLEAR_RUNS=2                            # clean runs in a row before "resolved" (the daily run uses 1)
 TG_FAILS=0
-BOT_TOKEN= CHAT_ID= HEARTBEAT_URL=
+BOT_TOKEN='' CHAT_ID='' HEARTBEAT_URL=''
 CONTAINERS=
 CPU_BUSY=0 CPU_STEAL=0
-a_since= a_last= a_level=0 a_items= a_ok=0 a_text=
+a_since='' a_last='' a_level=0 a_items='' a_ok=0 a_text=''
 DIGEST=()
 
 # ---------------------------------------------------------------------------------------------
@@ -151,7 +151,7 @@ apps() {  # the configured apps, one per line; edge is the proxy, not an app
 # /etc/hostwatch.env is read, not sourced: a heartbeat URL has & and ? in it.
 load_env() {
   local line key val
-  BOT_TOKEN= CHAT_ID= HEARTBEAT_URL= TG_BAD=0
+  BOT_TOKEN='' CHAT_ID='' HEARTBEAT_URL='' TG_BAD=0
   [ -r "$ENV_FILE" ] || return 1
   while IFS= read -r line || [ -n "$line" ]; do
     line=${line%$'\r'}
@@ -174,11 +174,11 @@ load_env() {
   done <"$ENV_FILE"
   if [ -n "$BOT_TOKEN" ] && ! [[ $BOT_TOKEN =~ $RE_TOKEN ]]; then
     say "hostwatch: BOT_TOKEN in $ENV_FILE is not a bot token; no message can be sent"
-    BOT_TOKEN= TG_BAD=1
+    BOT_TOKEN='' TG_BAD=1
   fi
   if [ -n "$CHAT_ID" ] && ! [[ $CHAT_ID =~ $RE_CHAT ]]; then
     say "hostwatch: CHAT_ID in $ENV_FILE is not a chat id; no message can be sent"
-    CHAT_ID= TG_BAD=1
+    CHAT_ID='' TG_BAD=1
   fi
   if [ -n "$HEARTBEAT_URL" ] && ! [[ $HEARTBEAT_URL =~ $RE_URL ]]; then
     say "hostwatch: HEARTBEAT_URL in $ENV_FILE is not a URL; no heartbeat"
@@ -298,7 +298,7 @@ state_init() { install -d -m 0700 "$STATE_DIR" "$STATE_DIR/alerts" "$STATE_DIR/s
 
 load_alert() {
   local f=$STATE_DIR/alerts/$1 k v
-  a_since= a_last= a_level=0 a_items= a_ok=0 a_text=
+  a_since='' a_last='' a_level=0 a_items='' a_ok=0 a_text=''
   [ -r "$f" ] || return 0
   while IFS='=' read -r k v; do
     case $k in
@@ -455,7 +455,7 @@ oom_last_cursor() { sed -n 's/^-- cursor: //p' | tail -n 1; }
 oom_save() { if [ -n "$1" ]; then printf '%s\n' "$1" >"$STATE_DIR/oom-cursor"; fi; }
 
 check_oom() {
-  local out cursor= next= constraint memcg task id name why summary= key
+  local out cursor='' next='' constraint memcg task id name why summary='' key
   local -A seen=()
   if [ "$MODE" = check ]; then
     out=$(timeout 60 journalctl --quiet --no-pager -k -o cat --since '-1 hour' 2>/dev/null) || out=
@@ -509,7 +509,7 @@ cpu_sample() {  # -> busy total steal, in jiffies since boot
 }
 
 cpu_rates() {
-  local now b t s pe= pb= pt= ps= dt
+  local now b t s pe='' pb='' pt='' ps='' dt
   now=$(date +%s)
   read -r b t s <<<"$(cpu_sample)" || return 1
   if ! is_num "$b" || ! is_num "$t" || ! is_num "$s"; then return 1; fi
@@ -586,7 +586,7 @@ check_cpu() {
 }
 
 check_containers() {
-  local id name restarting restarts health unhealthy= looping= risen= saved=
+  local id name restarting restarts health unhealthy='' looping='' risen='' saved=''
   local -A prev=()
   if [ -r "$STATE_DIR/restarts" ]; then
     while read -r id restarts; do prev[$id]=$restarts; done <"$STATE_DIR/restarts"
@@ -701,7 +701,7 @@ check_listeners() {
 # cf-ranges verify covers the chains; the INPUT policies are read here as well, because a v6 hole
 # is the one a missing rule never shows (docs/runbooks/edge.md §4).
 check_firewall() {
-  local out pol bad= items=
+  local out pol bad='' items=''
   if ! out=$(timeout 60 "$CF_RANGES" verify 2>&1); then
     bad+="cf-ranges verify failed ($(first_lines "$out")); "
     items+=" cf-ranges-verify"
@@ -947,7 +947,7 @@ caddy_hosts() {  # "count host", busiest first, from Caddy's access log lines of
 # host is in; what is left of the edge's lines, plus every line from outside a container, is
 # "edge+host".
 daily_lines() {
-  local app p total n host zone budget label over= summary= top= rest used=0 shown=0
+  local app p total n host zone budget label over='' summary='' top='' rest used=0 shown=0
   local -a app_list=() projects=()
   local -A count=() zones=()
   mapfile -t app_list < <(apps)
@@ -1057,7 +1057,7 @@ sample_heap() {
 # memory.peak per container since it was created (it includes page cache), and the day's heap
 # maximum beside it: the data for sizing the next app.
 daily_peaks() {
-  local id name mem peak f pct high= heap hl= top
+  local id name mem peak f pct high='' heap hl='' top
   local -A heaps=()
   if [ -r "$STATE_DIR/heap-max" ]; then
     while read -r name heap; do if is_num "$heap"; then heaps[$name]=$heap; fi; done <"$STATE_DIR/heap-max"
@@ -1126,7 +1126,7 @@ compose_images() {  # app -> the images its compose file names, every profile; f
 # The apps' own repositories are app-deploy's. If any compose file can't be read, nothing is
 # removed: an empty list would otherwise say every image is unused.
 daily_images() {
-  local out freed app ref repo size listing removed=0 names= dfline
+  local out freed app ref repo size listing removed=0 names='' dfline
   local -a app_list=() imgs=()
   local -A protect=() repos=()
   mapfile -t app_list < <(apps)
@@ -1233,7 +1233,7 @@ daily_edge_validate() {
 # Every public certificate under certs/<app>/ is read, the authenticated-origin-pull client
 # certificate (aop-client.pem) among them; a file with "key" in its name is never opened.
 daily_certs() {
-  local dir f end exp now days name near= near_days= bad= detail= level=0
+  local dir f end exp now days name near='' near_days='' bad='' detail='' level=0
   dir=$(conf_get edge PROJECT_DIR)
   dir=${dir:-$EDGE_DIR}
   now=$(date +%s)

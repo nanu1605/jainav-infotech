@@ -66,8 +66,9 @@ sound() {
   read -r owner perm < <(stat -c '%u %a' -- "$1") || return 1
   [ "$owner" = "$(id -u)" ] && [ $((8#$perm & 022)) -eq 0 ]
 }
-sound /etc/apps/ && sound "/etc/apps/$app.conf" ||
+if ! sound /etc/apps/ || ! sound "/etc/apps/$app.conf"; then
   die "/etc/apps and /etc/apps/$app.conf must belong to root and be writable by no one else"
+fi
 # Only the conf sets these, never the caller's environment.
 PROJECT_DIR='' APP_COMPOSE_FILE='' ENV_FILES='' REPO='' EXTRA_TAG='' EXTRA_MODE='' EXTRA_VAR=''
 SERVICE=''

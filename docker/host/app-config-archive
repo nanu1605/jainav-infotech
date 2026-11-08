@@ -37,7 +37,9 @@ fail() {
 # Root's lock files live in a directory only root can enter: /run/lock is writable by every user.
 lock_dir() {
   local uid mode
-  [ -d "$LOCK_DIR" ] && [ ! -L "$LOCK_DIR" ] || install -d -m 0700 -o root -g root -- "$LOCK_DIR"
+  if [ ! -d "$LOCK_DIR" ] || [ -L "$LOCK_DIR" ]; then
+    install -d -m 0700 -o root -g root -- "$LOCK_DIR"
+  fi
   read -r uid mode < <(stat -c '%u %a' -- "$LOCK_DIR") || fail "cannot read $LOCK_DIR"
   if [ "$uid" != 0 ] || [ $((8#$mode & 8#022)) != 0 ] || [ -L "$LOCK_DIR" ]; then
     fail "$LOCK_DIR must be a directory of root's that nobody else can write to"

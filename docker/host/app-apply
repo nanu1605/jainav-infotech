@@ -71,7 +71,9 @@ journal() { systemd-cat -t app-apply || true; }
 # who could then hold a lock root waits for.
 lock_dir() {
   local uid mode
-  [ -d "$LOCK_DIR" ] && [ ! -L "$LOCK_DIR" ] || install -d -m 0700 -o root -g root -- "$LOCK_DIR"
+  if [ ! -d "$LOCK_DIR" ] || [ -L "$LOCK_DIR" ]; then
+    install -d -m 0700 -o root -g root -- "$LOCK_DIR"
+  fi
   read -r uid mode < <(stat -c '%u %a' -- "$LOCK_DIR") || die "cannot read $LOCK_DIR"
   if [ "$uid" != 0 ] || [ $((8#$mode & 8#022)) != 0 ] || [ -L "$LOCK_DIR" ]; then
     die "$LOCK_DIR must be a directory of root's that nobody else can write to"
@@ -168,7 +170,7 @@ load_conf() { # load_conf <app|edge>
   local conf=/etc/apps/$1.conf f files=() list=()
   [ -f "$conf" ] || die "there is no $conf"
   root_path "$conf" || die "$conf must be root's and writable by root alone"
-  PROJECT_DIR= APP_COMPOSE_FILE= ENV_FILES= UPSTREAMS= ZONE= ENV_PREFIX= EDGE_NETWORKS= CONFIG_ARCHIVE_FILES=
+  PROJECT_DIR='' APP_COMPOSE_FILE='' ENV_FILES='' UPSTREAMS='' ZONE='' ENV_PREFIX='' EDGE_NETWORKS='' CONFIG_ARCHIVE_FILES=''
   # An app's conf leaves CADDY_IMAGE alone: site checks load an app on top of the edge's.
   if [ "$1" = edge ]; then CADDY_IMAGE=; fi
   # shellcheck source=/dev/null
@@ -1366,6 +1368,7 @@ cmd_edge_reload() {
 }
 
 # tests/host/app-apply.sh sources everything above and runs the checks on files of its own.
+# shellcheck disable=SC2317 # return fails when the file is run, not sourced, and exit 0 follows
 if [ "${APP_APPLY_SOURCE_ONLY-}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
 
 # --- main ---

@@ -51,6 +51,7 @@ skip() { printf 'skip - %s\n' "$1"; }
 
 # In a subshell: app-apply's functions, with what sourcing changes put back and the commands that
 # need a server stubbed. work is a fresh directory with an empty problems file.
+# shellcheck disable=SC2317 # clean, journal, logger and env_prefixes are called by app-apply's functions
 setup_lib() {
   local path=$PATH
   # shellcheck source=/dev/null
@@ -111,6 +112,7 @@ expect_refused 'text: a complex key in a flow mapping' "$(text_case jainav "$(ym
 expect_refused 'text: a complex key in a flow sequence' "$(text_case jainav "$(yml cplx4 "$head" 'services: [ ? a : b ]')")" 'complex keys'
 expect_refused 'text: an alias as a key' "$(text_case jainav "$(yml alias "$head" 'x-a: &a 1' 'services:' '  *a : b')")" 'alias'
 expect_refused 'text: another project name' "$(text_case jainav "$(yml other 'name: menumesh' 'services: {}')")" 'project name must be jainav'
+# shellcheck disable=SC2016 # ${MM_NAME:-jainav} is compose text under test, not for this shell to expand
 expect_refused 'text: an interpolated project name' "$(text_case jainav "$(yml namevar 'name: ${MM_NAME:-jainav}' 'services: {}')")" 'project name must be jainav'
 expect_refused 'text: a top-level key' "$(text_case jainav "$(yml top "$head" 'configs:' '  c: {}')")" 'top-level keys'
 
@@ -144,6 +146,7 @@ expect_clean 'redact: comments, blank lines and a group' \
   "$(redact_case $'# a token path\n\nrequest>uri regexp ^/x/([a-z]+)(/|$) /x/_${1}')"
 expect_refused 'redact: another directive' "$(redact_case 'header_up X-Test 1')" 'request>uri regexp'
 expect_refused 'redact: a third argument' "$(redact_case 'request>uri regexp a b c')" 'request>uri regexp'
+# shellcheck disable=SC2016 # {$X} is a Caddy placeholder under test, not for this shell to expand
 expect_refused 'redact: an env placeholder' "$(redact_case 'request>uri regexp {$X} y')" 'environment or files'
 expect_refused 'redact: a file placeholder' "$(redact_case 'request>uri regexp a {file./etc/passwd}')" 'environment or files'
 expect_refused 'redact: a quote' "$(redact_case 'request>uri regexp "a" b')" 'quotes'
@@ -172,6 +175,7 @@ repo_case() { # repo_case <app> <compose file>: what the checks refuse
     # shellcheck source=/dev/null
     . "$root/docker/host/apps/$app.conf"
     project=$app
+    # shellcheck disable=SC2034 # read by compose_json in app-apply, sourced in setup_lib
     PROJECT_DIR=$T/srv/$app
     allowed_edge=$EDGE_NETWORKS
     other_apps='menumesh '
@@ -236,8 +240,10 @@ rules_case() { # rules_case <json file> <app> <function>...: what the checks ref
 interp_case() { # interp_case <json file>: check_interpolation on raw JSON
   (
     setup_lib
+    # shellcheck disable=SC2034 # read by jqc in app-apply, sourced in setup_lib
     project=jainav
-    UPSTREAMS= allowed_edge= other_apps= extra_keys= CADDY_IMAGE=
+    # shellcheck disable=SC2034 # read by jqc in app-apply, sourced in setup_lib
+    UPSTREAMS='' allowed_edge='' other_apps='' extra_keys='' CADDY_IMAGE=''
     cp "$1" "$work/raw.json"
     check_interpolation "$work/raw.json"
     cat "$work/problems"
@@ -266,12 +272,16 @@ if [ "$have_jq" = 1 ]; then
   expect_refused 'networks: an external network with an ipam config' "$(rules_case "$(json net2 "$ipam")" jainav check_networks)" 'sets ipam'
   expect_refused 'networks: another app'"'"'s edge network' \
     "$(rules_case "$(json net3 "${ext//edge-jainav/edge-menumesh}")" jainav check_networks)" 'is not one of'
+  # shellcheck disable=SC2016 # the ${...} in the JSON is text for check_interpolation to find, not for this shell
   expect_refused 'interpolation: privileged from the env files' \
     "$(interp_case "$(json int1 '{"name":"jainav","services":{"app":{"image":"${APP_IMAGE:?x}","privileged":"${MM_PRIV:-false}"}}}')")" 'privileged takes a value'
+  # shellcheck disable=SC2016 # the ${...} in the JSON is text for check_interpolation to find, not for this shell
   expect_refused 'interpolation: a bind source from the env files' \
     "$(interp_case "$(json int2 '{"name":"jainav","services":{"app":{"image":"x","volumes":["${MM_CFG:-./config}:/cfg:ro"]}}}')")" 'volumes takes a value'
+  # shellcheck disable=SC2016 # the ${...} in the JSON is text for check_interpolation to find, not for this shell
   expect_refused 'interpolation: a network name from the env files' \
     "$(interp_case "$(json int3 '{"name":"jainav","services":{},"networks":{"n":{"name":"${MM_NET}"}}}')")" 'n takes a value'
+  # shellcheck disable=SC2016 # the ${...} in the JSON is text for check_interpolation to find, not for this shell
   expect_clean 'interpolation: image, environment, command and healthcheck' \
     "$(interp_case "$(json int4 '{"name":"jainav","services":{"app":{"image":"${APP_IMAGE:?x}","environment":{"A":"${B:-c}"},"command":["sh","-c","echo $${HOME}"],"healthcheck":{"test":["CMD","true","${X}"]},"x-note":"${Y}"}}}')")"
 else
@@ -330,9 +340,11 @@ if [ "$caddy_ready" = 1 ]; then
   site_case() { # site_case: what the site file's checks refuse
     (
       setup_lib
+      # shellcheck disable=SC2034 # read by caddy_run in app-apply, sourced in setup_lib
       CADDY_IMAGE=$image
       # shellcheck source=/dev/null
       . "$root/docker/host/apps/jainav.conf"
+      # shellcheck disable=SC2034 # read by site_json_check in app-apply, sourced in setup_lib
       ZONE=example.test
       edge_env_parse "$T/caddy/edge.env" "$work/edge"
       site_text_check jainav "$cfg/sites/jainav.caddy" "$work/edge.keys"
