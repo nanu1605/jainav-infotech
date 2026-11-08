@@ -44,7 +44,10 @@ minutes before the dump), encrypts them as they are at that moment:
   never enter the long-running container.
 
 The timer is enabled by hand ([server.md §3](server.md#3-first-start)), and `hostwatch` alerts
-when it isn't ([monitoring.md](monitoring.md#hostwatch)). Check it:
+when it isn't ([monitoring.md](monitoring.md#hostwatch)). Another app gets its own timer,
+`app-config-archive@<app>.timer`. If its backup runs at another time, a drop-in moves the timer to
+ten minutes before it (`sudo systemctl edit app-config-archive@<app>.timer`; the comment in
+`docker/host/systemd/app-config-archive@.timer` has the lines). Check it:
 
 ```bash
 systemctl list-timers 'app-config-archive@*'
