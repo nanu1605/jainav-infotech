@@ -27,9 +27,12 @@ x-app: &app
       condition: service_healthy
   # Healthcheck comes from the image (/api/v1/health, which also applies pending migrations).
   # The host's journal: a container's own log file goes with it on every deploy, and the journal
-  # keeps lines for a known period (docs/runbooks/server.md §1). LOG_DRIVER is for local rehearsals.
+  # keeps lines for a known period (docs/runbooks/server.md §1). A literal, not a variable:
+  # app-apply takes values from the env files only in image, environment, command, entrypoint and
+  # healthcheck. Docker Desktop has no journald: a local rehearsal adds docker/compose.local.yml,
+  # which swaps in json-file for each service that sets this.
   logging: &logging
-    driver: ${LOG_DRIVER:-journald}
+    driver: journald
 
 services:
   app:
@@ -156,7 +159,8 @@ services:
     <<: *hardened
     image: ${BACKUP_IMAGE:?set BACKUP_IMAGE in images.env}
     restart: unless-stopped
-    # crond changes user for each job, even root's.
+    # crond changes user for each job, even root's. The container runs as root (no user:) with no
+    # other capability: without DAC_OVERRIDE it reads only what root owns or everyone may read.
     cap_add: [SETUID, SETGID]
     depends_on:
       postgres:
@@ -181,8 +185,9 @@ services:
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
       # Pinged after every full success; the monitor alerts when 26 hours pass without one.
       HEARTBEAT_URL: ${BACKUP_HEARTBEAT_URL:-}
-    # The host's timer writes the encrypted settings archives here (docs/runbooks/backups.md). This
-    # container sees ciphertext only, read-only: the settings files never enter it.
+    # The host's timer writes the encrypted settings archives here (docs/runbooks/backups.md): the
+    # settings files never enter this container, only ciphertext, read-only. The directory and the
+    # archives are readable by every user (0755, 0644), so reading them needs no capability.
     volumes:
       - ./backup-out:/config-out:ro
     mem_limit: 384m
@@ -232,6 +237,8 @@ services:
     <<: *hardened
     image: ${BACKUP_IMAGE:?set BACKUP_IMAGE in images.env}
     profiles: [restore-test]
+    # Runs as root (no user:) without DAC_OVERRIDE, like backup: it reads the age key it is given
+    # (-v /run/age:/run/age:ro, docs/runbooks/backups.md) only when root owns it.
     depends_on:
       restore-db:
         condition: service_healthy
@@ -258,9 +265,9 @@ services:
     pids_limit: 256
 
 networks:
-  # Caddy's way in, one network per environment. The admin creates them as internal networks
-  # (docker network create --internal <name>); only Caddy and these services join them, under
-  # aliases that start with jainav-.
+  # Caddy's way in, one network per environment. app-apply creates a missing one as an internal
+  # network (docker network create --internal <name>) and refuses one that is not internal; only
+  # Caddy and these services join them, under aliases that start with jainav-.
   edge-jainav:
     external: true
   edge-jainav-staging:

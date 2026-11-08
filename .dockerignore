@@ -24,5 +24,7 @@ blob-report
 graphify-out
 *.tsbuildinfo
 next-env.d.ts
-# Server files: nothing in the image uses them, and editing one would invalidate the COPY . . layer.
+# Server files and their tests: nothing in the image uses them, and editing one would invalidate the
+# COPY . . layer.
 docker/
+tests/host/

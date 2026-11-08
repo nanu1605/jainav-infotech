@@ -1,0 +1,22 @@
+# A local rehearsal of docker/compose.prod.yml on Docker Desktop, which has no journald: add this
+# file after the production one and every service that sets the journald driver logs to a file.
+#   docker compose -f docker/compose.prod.yml -f docker/compose.local.yml \
+#     --project-directory <dir> ...
+# It is for rehearsals only (docs/runbooks/server.md §10): app-apply never installs it. A service
+# that gains a `logging` key in compose.prod.yml needs an entry here too.
+services:
+  app:
+    logging:
+      driver: json-file
+  app-staging:
+    logging:
+      driver: json-file
+  postgres:
+    logging:
+      driver: json-file
+  umami:
+    logging:
+      driver: json-file
+  backup:
+    logging:
+      driver: json-file

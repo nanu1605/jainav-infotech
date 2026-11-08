@@ -5,7 +5,8 @@
 # PGHOST (a throwaway one: the restore-db service) and checks that the data is really there. Each
 # dump streams from the bucket through age into pg_restore, so no decrypted copy touches a disk, and
 # the databases go one at a time. It also decrypts the newest settings archive to list the names of
-# its files (never their contents). Needs the age private key at AGE_IDENTITY_FILE.
+# its files (never their contents). Needs the age private key at AGE_IDENTITY_FILE, owned by root:
+# the container's root has no DAC_OVERRIDE, so it can't read another user's file.
 # Exit 0 = the backups can be restored.
 set -eu -o pipefail
 

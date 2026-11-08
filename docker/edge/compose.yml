@@ -12,7 +12,7 @@ services:
     image: caddy:2.11.7-alpine
     restart: unless-stopped
     # Only 443: Cloudflare connects over HTTPS (SSL Full (strict)); the firewall admits only
-    # Cloudflare's IP ranges (docs/runbooks/server.md).
+    # Cloudflare's IP ranges (docs/runbooks/edge.md §4).
     ports:
       - '443:443/tcp'
     env_file: edge.env
@@ -43,9 +43,9 @@ services:
       - edge-jainav-staging
       - edge-menumesh
       - edge-menumesh-staging
-    # The admin API stays on its default, localhost:2019 inside this container: nothing publishes
-    # it. The check says 127.0.0.1 because busybox's wget resolves localhost to ::1, where Caddy
-    # doesn't listen. The answer holds the loaded config, secrets included, so it is thrown away.
+    # The Caddyfile pins the admin API to 127.0.0.1:2019, inside this container: nothing publishes
+    # it. The check uses that address, because busybox's wget resolves localhost to ::1. The answer
+    # holds the loaded config, secrets included, so it is thrown away.
     healthcheck:
       test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:2019/config/']
       interval: 30s
@@ -54,8 +54,9 @@ services:
       start_period: 10s
 
 networks:
-  # Every app's edge networks, created by the admin as internal networks (docker network create
-  # --internal <name>). Each holds only Caddy and that app's own services.
+  # Every app's edge networks, the ones listed in /etc/apps/edge.conf. app-apply creates a missing
+  # one as an internal network (docker network create --internal <name>) and refuses one that is
+  # not internal. Each holds only Caddy and that app's own services.
   edge-jainav:
     external: true
   edge-jainav-staging:
