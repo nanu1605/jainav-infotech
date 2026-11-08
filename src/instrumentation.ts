@@ -16,14 +16,17 @@ export async function register() {
     process.env.NEXT_PHASE !== 'phase-production-build' &&
     process.env.SKIP_DB_AT_BUILD !== '1'
   ) {
-    try {
-      const { getClient } = await import('@/lib/cms')
-      await getClient()
-    } catch (error) {
-      console.error(
-        'Payload did not start at boot:',
-        error instanceof Error ? error.message : error,
-      )
+    // Vercel's instances start on demand, and /api/v1/cron runs the queue there.
+    if (!process.env.VERCEL) {
+      try {
+        const { getClient } = await import('@/lib/cms')
+        await getClient()
+      } catch (error) {
+        console.error(
+          'Payload did not start at boot:',
+          error instanceof Error ? error.message : error,
+        )
+      }
     }
     // Sign-in codes and form emails don't run as jobs, so their failures only reach the logs, and
     // the alert after a job's last retry may not come until the first sale.

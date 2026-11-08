@@ -3,10 +3,14 @@ import type { Metadata, MetadataRoute } from 'next'
 import type { Locale } from '@/i18n/routing'
 import type { Media } from '@/payload-types'
 
-export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(
-  /\/$/,
-  '',
-)
+// A Vercel preview has no site URL of its own, so its links stay on its branch's URL.
+const branchUrl = process.env.NEXT_PUBLIC_VERCEL_BRANCH_URL
+
+export const SITE_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (branchUrl && `https://${branchUrl}`) ||
+  'http://localhost:3000'
+).replace(/\/$/, '')
 
 export type HiStatus = 'missing' | 'draft' | 'ready'
 
