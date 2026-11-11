@@ -13,7 +13,7 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
 | International sales at launch | Off (INR only)                                                                                              |
 | Hosting                       | VPS + Docker (§18.2); one KVM 4 shared with MenuMesh (Phase 6)                                              |
 | Admin protection              | Cloudflare Access + login lockout; TOTP later                                                               |
-| Mailbox provider              | Tanishq's choice                                                                                            |
+| Mailbox provider              | GoDaddy email, bought with the domain (Phase 6)                                                             |
 | Domain                        | `jainavinfotech.in`; `http://localhost:3000` in development                                                 |
 
 ## Phase 0
