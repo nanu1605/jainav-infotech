@@ -52,9 +52,8 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
    in `/etc/fstab`). Reboot if the kernel changed.
 
 5. **Docker** from Docker's apt repository (docs.docker.com/engine/install/ubuntu), at pinned
-   versions, then held. Pin the newest Docker 29 and Compose 5 releases that are at least 14 days
-   old (Docker 29.9.3 is allowed from 2026-11-17, Compose 5.7.0 from 2026-11-16). List them with
-   `apt-cache madison docker-ce docker-compose-plugin`:
+   versions, then held: Docker 29.9.3 and Compose 5.7.0, or a later 29.x and 5.x release once it
+   is 14 days old. List them with `apt-cache madison docker-ce docker-compose-plugin`:
 
    ```bash
    apt-get install -y docker-ce=<version> docker-ce-cli=<version> containerd.io \
