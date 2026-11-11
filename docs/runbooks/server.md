@@ -47,9 +47,9 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
    - the Monarx agent, Hostinger's malware scanner for PHP sites. It runs as root, can upload
      files to its vendor, and comes with its own apt source, a signing key trusted for every
      source and a cron job that reinstalls it every week;
-   - cron jobs that prune Docker every night (`docker image prune -af --filter until=24h`). They
-     would delete the previous image and the tools images, which `app-deploy` keeps for rollbacks
-     and one-off commands (§5, §8);
+   - cron jobs that prune Docker: every night `docker image prune -af --filter until=24h`, which
+     would delete the previous image and the tools images that `app-deploy` keeps for rollbacks
+     and one-off commands (§5, §8), and every week a prune of the build cache;
    - Docker itself (step 5).
 
    Remove the first two. hPanel's Malware Scanner installs the agent again, so leave it off:
@@ -59,14 +59,19 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
    apt-get -y purge monarx-agent monarx-protect monarx-protect-autodetect
    rm -f /etc/apt/sources.list.d/monarx.list /etc/apt/trusted.gpg.d/monarx.asc \
      /etc/cron.d/monarx-update /etc/monarx-agent.conf \
-     /etc/cron.d/docker-image-prune /etc/cron.d/docker-builder-prune
+     /etc/cron.d/docker-image-prune /etc/cron.d/docker-builder-prune \
+     /etc/systemd/system/multi-user.target.wants/monarx-agent.service \
+     /var/lib/systemd/deb-systemd-helper-enabled/*monarx* \
+     /var/lib/systemd/deb-systemd-helper-enabled/*/*monarx*
    rm -rf /var/cache/monarx-agent /var/lib/monarx-agent /var/log/monarx-agent.log
    systemctl daemon-reload
+   apt-get update                   # also drops the package lists of the Monarx source
    find / -xdev -iname '*monarx*'   # prints nothing once it is all gone; remove what it lists
    ```
 
-   A reinstall from hPanel brings them back; `install.sh` warns while any of them is there
-   (step 8).
+   Where Monarx is already gone, the first two commands say that the unit or the package doesn't
+   exist; carry on. A reinstall from hPanel brings all of it back, and `install.sh` warns while
+   any of it is there (step 8).
 
    Hold the image's Docker packages before upgrading, so the upgrade doesn't move them past the
    pinned versions (step 5). `jq` and `age` are needed by the host scripts; `install.sh` stops
@@ -93,9 +98,11 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
    ```
 
    Hostinger's image already has Docker from Docker's repository, held since step 4. Compare its
-   versions with the ones above (`dpkg -l | grep -E 'docker|containerd'`). If they differ, run
-   `apt-mark unhold` on the four packages, install the pinned versions as above and hold them
-   again. Then remove the two extras the image adds (nothing builds images here):
+   versions with the ones above (`dpkg -l | grep -E 'docker|containerd'`). Keep them if they are
+   the pinned ones, or a later 29.x and 5.x release that is 14 days old. Otherwise run
+   `apt-mark unhold` on the four packages, install the pinned versions as above (adding
+   `--allow-downgrades` if the image's are newer) and hold them again. Then remove the two extras
+   the image adds (nothing builds images here):
    `apt-get -y purge docker-buildx-plugin docker-ce-rootless-extras`.
 
    Do not add anyone to the `docker` group. `install.sh` warns if one of the four packages is not

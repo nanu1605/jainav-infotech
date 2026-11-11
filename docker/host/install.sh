@@ -531,9 +531,10 @@ setup_firewall() {
 }
 
 # Hostinger's Ubuntu image adds the Monarx agent (a root file scanner with its own apt source, a key
-# trusted for every source and a job that reinstalls it weekly) and cron jobs that prune Docker
-# every night, deleting the rollback and tools images app-deploy keeps (docs/runbooks/server.md §1,
-# step 4). A reinstall from hPanel brings them back, so every run looks for them.
+# trusted for every source and a job that reinstalls it weekly) and cron jobs that prune Docker;
+# the nightly image prune would delete the rollback and tools images app-deploy keeps
+# (docs/runbooks/server.md §1, step 4). A reinstall from hPanel brings them back, so every run
+# looks for them.
 check_image_leftovers() {
   local f
   local -a cron=(/etc/crontab /etc/cron.d/* /etc/cron.hourly/* /etc/cron.daily/* /etc/cron.weekly/*
