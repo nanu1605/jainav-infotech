@@ -18,12 +18,16 @@ import {
 import type { AutoReplyKind } from '@/emails'
 import { sendEmail } from '@/lib/notify'
 import { OUTBOX_DIR, outboxAdapter } from '@/lib/outbox'
+import { tokens } from '@/styles/tokens.generated'
 
 import en from '../../messages/en.json'
 import hi from '../../messages/hi.json'
 
 const locales = { en, hi }
 const kinds: AutoReplyKind[] = ['contact', 'project', 'waitlist', 'careers']
+
+// Body repeats lang on its wrapper cell, so every lang attribute has to name the locale.
+const langs = (html: string) => new Set(html.match(/\blang="[^"]*"/g))
 
 describe('outboxAdapter in production', () => {
   afterEach(() => {
@@ -52,7 +56,7 @@ describe('autoReplyEmail', () => {
         const email = await autoReplyEmail({ locale, kind, product: 'VYRO' })
         const subject = locales[locale].email.autoReply[kind].subject.replace('{product}', 'VYRO')
         expect(email.subject).toBe(subject)
-        expect(email.html).toContain(`lang="${locale}"`)
+        expect(langs(email.html)).toEqual(new Set([`lang="${locale}"`]))
         expect(email.text).toContain(locales[locale].email.greeting)
         expect(email.text).toContain(locales[locale].email.note)
       }
@@ -159,12 +163,38 @@ describe('notificationEmail', () => {
       ],
     })
     expect(email.subject).toBe('New contact message')
-    expect(email.html).toContain('lang="en"')
+    expect(langs(email.html)).toEqual(new Set(['lang="en"']))
     expect(email.html).not.toContain('<script>')
     expect(email.html).toContain('&lt;script&gt;')
     expect(email.html).toContain('http://localhost:3000/admin/collections/leads/42')
     expect(email.text).toMatch(/Message +first line\r?\n +second line/)
     expect(email.text).toContain(en.email.openInAdmin)
+  })
+})
+
+describe('email colors', () => {
+  it('come only from the light theme tokens', async () => {
+    const palette = new Set<string>(Object.values(tokens.light))
+    const rendered = await Promise.all([
+      autoReplyEmail({ locale: 'hi', kind: 'contact', product: 'VYRO' }),
+      newsletterConfirmEmail({
+        locale: 'en',
+        confirmUrl: 'https://jainavinfotech.com/api/v1/forms/newsletter/confirm?token=abc',
+        unsubscribeUrl: 'https://jainavinfotech.com/api/v1/forms/unsubscribe?token=xyz',
+      }),
+      notificationEmail({
+        title: 'New contact message',
+        adminUrl: 'http://localhost:3000/admin/collections/leads/42',
+        fields: [['Name', 'Asha']],
+      }),
+    ])
+    for (const { html } of rendered) {
+      // react-email's components carry default colors; ours have to replace every one of them.
+      // Entities such as &#8202; are characters, not colors.
+      const colors = html.match(/(?<!&)#[0-9a-f]{3,8}\b/gi) ?? []
+      expect(colors.length).toBeGreaterThan(0)
+      expect(colors.filter((color) => !palette.has(color.toLowerCase()))).toEqual([])
+    }
   })
 })
 
@@ -230,7 +260,7 @@ describe('orderConfirmationEmail', () => {
     const email = await orderConfirmationEmail({ locale, ...order })
     const m = locales[locale].email.order
     expect(email.subject).toBe(m.subject.replace('{orderNumber}', order.orderNumber))
-    expect(email.html).toContain(`lang="${locale}"`)
+    expect(langs(email.html)).toEqual(new Set([`lang="${locale}"`]))
     expect(email.html).toContain(order.accountUrl)
     for (const part of [
       m.thanks,
