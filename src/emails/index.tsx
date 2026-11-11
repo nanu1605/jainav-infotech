@@ -16,7 +16,7 @@ import {
   Row,
   Section,
   Text,
-} from '@react-email/components'
+} from 'react-email'
 import { createTranslator } from 'next-intl'
 import type { CSSProperties, ReactElement, ReactNode } from 'react'
 
@@ -84,7 +84,11 @@ function Layout({
     <Html lang={locale}>
       <Head />
       <Preview>{preview}</Preview>
-      <Body style={{ margin: 0, padding: '24px 8px', backgroundColor: c.bg, fontFamily }}>
+      {/* Body repeats lang on its wrapper cell and would say "en" there unless told otherwise. */}
+      <Body
+        lang={locale}
+        style={{ margin: 0, padding: '24px 8px', backgroundColor: c.bg, fontFamily }}
+      >
         <Container
           style={{
             maxWidth: '560px',
@@ -116,7 +120,8 @@ function Layout({
           {children}
           {footer && (
             <>
-              <Hr style={{ margin: '32px 0 16px', borderColor: c.border }} />
+              {/* Hr's own border-top would win over a border color, so set the whole edge. */}
+              <Hr style={{ margin: '32px 0 16px', borderTop: `1px solid ${c.border}` }} />
               <Section>{footer}</Section>
             </>
           )}
