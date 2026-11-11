@@ -6,7 +6,7 @@
 #   docker build -f docker/Dockerfile --target runner -t jainav-app .
 #   docker build -f docker/Dockerfile --target tools -t jainav-tools .
 
-ARG NODE_IMAGE=node:24.22.1-alpine
+ARG NODE_IMAGE=node:24.22.2-alpine
 
 FROM ${NODE_IMAGE} AS base
 # libc6-compat: prebuilt native modules that expect glibc symbols. HUSKY=0: no git hooks here.
