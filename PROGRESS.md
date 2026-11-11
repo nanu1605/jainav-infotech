@@ -81,7 +81,7 @@ On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/la
 
 - [x] Before going live (docs/decisions.md, "October advisories"): Node image 24.22.1 (done 2026-11-08). Payload 3.93.0 is in (2026-11-11).
 - [ ] Provision the Hostinger KVM 4 (docs/runbooks/server.md); firewall to Cloudflare's ranges and authenticated origin pulls on every zone (docs/runbooks/edge.md); Web Console login checked before hardening. Bought 2026-11-11 and set up through `install.sh` (server.md §1, steps 1–8); the tunnel and the hardening come next.
-- [ ] Cloudflare: DNS, SSL Full (strict), Origin CA certificate, WAF skip rule, Bot Fight Mode off, Access on `/admin*` and `/api/users/*`; R2 buckets + custom domains.
+- [ ] Cloudflare: DNS, SSL Full (strict), Origin CA certificate, WAF skip rule, Bot Fight Mode off, Access on `/admin*` and `/api/users/*`; R2 buckets + custom domains. The zone moved from GoDaddy on 2026-11-11 (nameservers only; the registration and the mailbox stay at GoDaddy, and its mail records came over).
 - [ ] GitHub environments, secrets, production reviewer, `DEPLOY_ENABLED`; staging and production live.
 - [ ] Sentry project, Umami website, HetrixTools monitors, heartbeats and status page; an uptime alert reaches Telegram.
 - [ ] A real restore test on the server.

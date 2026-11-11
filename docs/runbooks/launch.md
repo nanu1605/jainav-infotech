@@ -76,8 +76,8 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
      a sample invoice. Shipping stays live too.
 10. **VYRO download** (if it goes live): `sudo app-compose jainav tools production - pnpm import:release <tag>`
     ([server.md §8](server.md#8-one-off-commands)), then the Owner publishes the release.
-11. **Email** ([cloudflare.md](cloudflare.md#email)): Resend domain verified, mailboxes, SPF,
-    DKIM, DMARC `p=none`.
+11. **Email** ([cloudflare.md](cloudflare.md#email)): Resend domain verified, the mailbox
+    addresses, SPF, DKIM, and our DMARC record (`p=none`) in place of GoDaddy's.
 12. **Monitoring** ([monitoring.md](monitoring.md)):
     - HetrixTools monitors, heartbeats, status page and Telegram alerts, with one test alert of
       each kind;
