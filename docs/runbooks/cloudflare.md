@@ -1,22 +1,22 @@
 # Cloudflare, R2 and email DNS
 
-Everything public goes through Cloudflare (spec §16, §18.6). `{{DOMAIN}}` is the company domain.
+Everything public goes through Cloudflare (spec §16, §18.6). `jainavinfotech.in` is the company domain.
 Do these in the Cloudflare dashboard for the domain's zone.
 
 ## DNS
 
-| Name                | Type                                                                  | Value                                                             | Proxy    |
-| ------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------- | -------- |
-| `{{DOMAIN}}` (apex) | A                                                                     | the VPS                                                           | proxied  |
-| `www`               | A                                                                     | the VPS's IPv4 address (Caddy redirects to the apex with a 308)   | proxied  |
-| `staging`           | A                                                                     | the VPS                                                           | proxied  |
-| `analytics`         | A                                                                     | the VPS (Umami)                                                   | proxied  |
-| `ssh`               | created by the tunnel ([SSH tunnel](#ssh-tunnel))                     | the VPS's SSH, behind Access                                      | proxied  |
-| `status`            | CNAME                                                                 | the uptime monitor's status page ([monitoring.md](monitoring.md)) | DNS only |
-| `cdn`               | R2 custom domain on the public bucket (media)                         |                                                                   | proxied  |
-| `downloads`         | R2 custom domain on the public bucket (installers under `downloads/`) |                                                                   | proxied  |
-| `cdn-staging`       | R2 custom domain on staging's public bucket (media and installers)    |                                                                   | proxied  |
-| mail records        | see [Email](#email)                                                   |                                                                   | DNS only |
+| Name                       | Type                                                                  | Value                                                             | Proxy    |
+| -------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------- | -------- |
+| `jainavinfotech.in` (apex) | A                                                                     | the VPS                                                           | proxied  |
+| `www`                      | A                                                                     | the VPS's IPv4 address (Caddy redirects to the apex with a 308)   | proxied  |
+| `staging`                  | A                                                                     | the VPS                                                           | proxied  |
+| `analytics`                | A                                                                     | the VPS (Umami)                                                   | proxied  |
+| `ssh`                      | created by the tunnel ([SSH tunnel](#ssh-tunnel))                     | the VPS's SSH, behind Access                                      | proxied  |
+| `status`                   | CNAME                                                                 | the uptime monitor's status page ([monitoring.md](monitoring.md)) | DNS only |
+| `cdn`                      | R2 custom domain on the public bucket (media)                         |                                                                   | proxied  |
+| `downloads`                | R2 custom domain on the public bucket (installers under `downloads/`) |                                                                   | proxied  |
+| `cdn-staging`              | R2 custom domain on staging's public bucket (media and installers)    |                                                                   | proxied  |
+| mail records               | see [Email](#email)                                                   |                                                                   | DNS only |
 
 All the site names are **A records only**: no AAAA record anywhere, because the origin takes no IPv6 traffic. Nothing that is DNS-only points at the server: a DNS-only record would show its address and let anyone connect around Cloudflare. Mail and `status` records point at the mail provider and the status page, never at the VPS.
 
@@ -24,7 +24,7 @@ All the site names are **A records only**: no AAAA record anywhere, because the 
 
 - SSL/TLS → Overview: **Full (strict)**.
 - SSL/TLS → Origin Server → Create Certificate → _Use my private key and CSR_, hostnames
-  `{{DOMAIN}}` and `*.{{DOMAIN}}`, 15 years. The CSR is made on the server, so the private key
+  `jainavinfotech.in` and `*.jainavinfotech.in`, 15 years. The CSR is made on the server, so the private key
   never leaves it ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls)). The
   certificate and key live in `/srv/edge/certs/jainav/` (`origin.pem`, `origin-key.pem`), installed with
   `sudo app-apply edge cert jainav …`. Caddy serves it for every site of the zone; browsers never see
@@ -59,9 +59,9 @@ All the site names are **A records only**: no AAAA record anywhere, because the 
   `CF-Connecting-IP` header for rate limits.
 - **Cloudflare Access** (Zero Trust → Access → Applications → Add → Self-hosted). One
   application, with these paths:
-  - `{{DOMAIN}}/admin` and `{{DOMAIN}}/admin/*`
-  - `{{DOMAIN}}/api/users/*`
-  - the same three paths on `staging.{{DOMAIN}}`
+  - `jainavinfotech.in/admin` and `jainavinfotech.in/admin/*`
+  - `jainavinfotech.in/api/users/*`
+  - the same three paths on `staging.jainavinfotech.in`
 
   Policy: _Allow_, include the emails of the people who run the site; one-time PIN or Google as
   the login method; session 24 hours. Payload's own login (5 attempts, then a 15-minute lock)
@@ -80,12 +80,12 @@ reach it through a Cloudflare Tunnel.
    token read from a file, not typed in a command line. The connector only makes outbound
    connections and is never auto-updated; update it by hand within a year of Cloudflare's latest
    release.
-2. In the tunnel, add a public hostname `ssh.{{DOMAIN}}` with service `ssh://localhost:22`.
+2. In the tunnel, add a public hostname `ssh.jainavinfotech.in` with service `ssh://localhost:22`.
 3. Zero Trust → Access → Service Auth → Create one service token per app that deploys:
    `github-deploy-jainav` here, and another for each further app. Each token's client ID and
    secret go in that app's GitHub environment secrets `CF_ACCESS_CLIENT_ID` and
    `CF_ACCESS_CLIENT_SECRET` ([server.md §4](server.md#4-github-setup-once)).
-4. Access → Applications → Add → Self-hosted, domain `ssh.{{DOMAIN}}`, two policies:
+4. Access → Applications → Add → Self-hosted, domain `ssh.jainavinfotech.in`, two policies:
    - _Service Auth_: include every `github-deploy-<app>` token;
    - _Allow_: include your own email, for interactive sessions.
 5. On your machine, install `cloudflared` and add the `Host jainav` block from
@@ -105,7 +105,7 @@ Create these buckets (R2 → Create bucket, location hint Asia-Pacific):
 | `jainav-backups`                                  | no                                             | encrypted database dumps and settings archives | `BACKUP_BUCKET` (server `.env`)                          |
 | `jainav-staging-public`, `jainav-staging-private` | custom domain `cdn-staging.` on the public one | staging's files, kept apart                    | staging.env                                              |
 
-Staging uses `https://cdn-staging.{{DOMAIN}}` for the repository variable `STAGING_CDN_URL` and for
+Staging uses `https://cdn-staging.jainavinfotech.in` for the repository variable `STAGING_CDN_URL` and for
 `NEXT_PUBLIC_CDN_URL` and `DOWNLOADS_BASE_URL` in staging.env (installers sit under `downloads/` in
 the same bucket). Without it, staging's media and installer links 404.
 
@@ -120,7 +120,7 @@ API tokens (R2 → Manage API tokens), each _Object Read & Write_ on the named b
 
 ## Turnstile
 
-Turnstile → Add widget for `{{DOMAIN}}` and `staging.{{DOMAIN}}`, managed mode. The site key goes
+Turnstile → Add widget for `jainavinfotech.in` and `staging.jainavinfotech.in`, managed mode. The site key goes
 in the repository variables `STAGING_TURNSTILE_SITE_KEY` / `PRODUCTION_TURNSTILE_SITE_KEY`, the secret in
 `TURNSTILE_SECRET_KEY` (production.env / staging.env).
 
@@ -129,17 +129,17 @@ in the repository variables `STAGING_TURNSTILE_SITE_KEY` / `PRODUCTION_TURNSTILE
 Two kinds of mail, kept apart:
 
 - **The site's mail** (auto-replies, alerts, newsletter): sent by Resend from a subdomain.
-  Resend → Domains → Add `send.{{DOMAIN}}` (or the name Resend suggests) and create the records
+  Resend → Domains → Add `send.jainavinfotech.in` (or the name Resend suggests) and create the records
   it lists: its DKIM `TXT`, plus the `MX` and SPF `TXT` (`v=spf1 include:amazonses.com ~all`)
   on its return-path subdomain. `EMAIL_FROM` is an address on that domain.
 - **Mailboxes** (hello@, sales@, support@, careers@, privacy@): the provider Tanishq picks
   (Zoho Mail, Google Workspace…). Add its `MX` records and its SPF `TXT` on the apex, e.g.
   `v=spf1 include:zoho.in ~all`. One SPF record per name.
 
-DMARC, on `_dmarc.{{DOMAIN}}`:
+DMARC, on `_dmarc.jainavinfotech.in`:
 
 ```
-v=DMARC1; p=none; rua=mailto:dmarc@{{DOMAIN}}; adkim=s; aspf=r; fo=1
+v=DMARC1; p=none; rua=mailto:dmarc@jainavinfotech.in; adkim=s; aspf=r; fo=1
 ```
 
 Start at `p=none` and read the reports. After 2–4 clean weeks, move to `p=quarantine`.

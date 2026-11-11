@@ -9,7 +9,7 @@ name: edge
 
 services:
   caddy:
-    image: caddy:2.11.7-alpine
+    image: caddy:2.11.9-alpine
     restart: unless-stopped
     # Only 443: Cloudflare connects over HTTPS (SSL Full (strict)); the firewall admits only
     # Cloudflare's IP ranges (docs/runbooks/edge.md §4).

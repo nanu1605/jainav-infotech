@@ -4,7 +4,7 @@ Phase 6 in order (spec §20). Each step names who does it. Details are in the ot
 
 ## Before: inputs from Tanishq (spec §21)
 
-- [ ] Domain (`{{DOMAIN}}`) added to Cloudflare, nameservers switched.
+- [ ] Domain (`jainavinfotech.in`) added to Cloudflare, nameservers switched.
 - [ ] Hostinger account with two-factor login; Cloudflare account; Resend account; mailbox
       provider; Telegram bots (one for the server, one for the site).
 - [ ] Final company details:
@@ -88,11 +88,6 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
 
 ## Gates before the first production deploy
 
-- **Caddy 2.11.9.** The edge runs `caddy:2.11.7-alpine` for rehearsals only. Authenticated origin
-  pulls need 2.11.9, available from 2026-11-19. Change the tag in `docker/edge/compose.yml` and
-  the matching `CADDY_IMAGE` in `docker/host/apps/edge.conf` together (CI compares them), and
-  the `hash-password` commands in the runbooks; then install the file with `sudo app-apply edge compose <file>` and
-  recreate Caddy with `sudo app-compose edge up -d`.
 - **Authenticated origin pulls** are on for the site's zone and tested, and stay on for every zone
   before a second app's containers run on the server
   ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls)).
@@ -113,7 +108,7 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
       alert).
 - [ ] mail-tester scores at least 9/10.
 - [ ] The pages Razorpay checks are live (step 9).
-- [ ] Lighthouse on the production URLs: `LHCI_BASE_URL=https://{{DOMAIN}} pnpm lhci` (spec
+- [ ] Lighthouse on the production URLs: `LHCI_BASE_URL=https://jainavinfotech.in pnpm lhci` (spec
       §15; Phase 5 measured locally only).
 
 **After launch (Tanishq):** once the pricing page shows real VYRO prices, apply for Razorpay

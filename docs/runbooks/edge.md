@@ -102,7 +102,7 @@ generated on the server, so the private key never leaves it.
    ```bash
    umask 077 && mkdir ~/csr && cd ~/csr
    openssl req -new -newkey rsa:2048 -nodes -keyout origin-key.pem -out origin.csr \
-     -subj '/CN={{DOMAIN}}' -addext 'subjectAltName=DNS:{{DOMAIN}},DNS:*.{{DOMAIN}}'
+     -subj '/CN=jainavinfotech.in' -addext 'subjectAltName=DNS:jainavinfotech.in,DNS:*.jainavinfotech.in'
    cat origin.csr
    ```
 
@@ -122,9 +122,10 @@ generated on the server, so the private key never leaves it.
 
 Cloudflare's shared client certificate proves only that a request came from Cloudflare's
 network, which every Cloudflare customer shares. So each zone uses a certificate from our own
-CA. **It must be on for every zone before a second app's containers run on the server.** It
-needs Caddy 2.11.9 or later, which treats conflicting `client_auth` policies as an error
-([launch.md](launch.md#gates-before-the-first-production-deploy)).
+CA. **It must be on for every zone before a second app's containers run on the server**
+([launch.md](launch.md#gates-before-the-first-production-deploy)). It relies on Caddy 2.11.9 or
+later, which treats conflicting `client_auth` policies as an error instead of dropping the
+stricter one, so the edge never goes below that version.
 
 1. On your machine, make a private CA and one client certificate per zone with `openssl`. The
    CA key goes in the password manager and stays off the server.
@@ -228,6 +229,15 @@ A `verify` alert means a rule is missing or out of place. Run `sudo cf-ranges fi
 `compose.yml` (`app-apply edge compose <file>` first) or to Caddy's image. Everything else, site
 files, snippets, ranges and certificates, is a reload that `app-apply` does itself.
 
+**A new Caddy version.** In the repository, change the tag in `docker/edge/compose.yml` and
+`CADDY_IMAGE` in `docker/host/apps/edge.conf` together; CI fails while they differ. On the server:
+
+1. Set the same `CADDY_IMAGE` in `/etc/apps/edge.conf` (`sudoedit`).
+2. `sudo app-apply edge compose compose.yml`. It refuses a file whose image differs from
+   `CADDY_IMAGE`, and validates the live config with the new image.
+3. `sudo app-compose edge up -d` to recreate Caddy, then run the leak test
+   ([§6](#6-the-leak-test)).
+
 ## 6. The leak test
 
 Run it after any change to headers, logs or certificates, and before a new app goes live.
@@ -235,10 +245,10 @@ Run it after any change to headers, logs or certificates, and before a new app g
 1. **Forged headers.** Start a throwaway container on `edge-jainav` that answers with the
    values of `X-Real-IP`, `X-Forwarded-For`, `CF-Connecting-IP`, `Sb-Forwarded-For`,
    `X-Forwarded-Host`, `True-Client-IP`, `X-Client-IP` and `Forwarded`. For the test only, add it
-   to `UPSTREAMS` and install a `leaktest.{{DOMAIN}}` site file for it. Through Cloudflare:
+   to `UPSTREAMS` and install a `leaktest.jainavinfotech.in` site file for it. Through Cloudflare:
 
    ```bash
-   curl -s https://leaktest.{{DOMAIN}}/ \
+   curl -s https://leaktest.jainavinfotech.in/ \
      -H 'X-Forwarded-For: 203.0.113.9' -H 'True-Client-IP: 203.0.113.9' \
      -H 'CF-Connecting-IP: 203.0.113.9' -H 'X-Real-IP: 203.0.113.9' \
      -H 'X-Client-IP: 203.0.113.9' -H 'Forwarded: for=203.0.113.9'
@@ -267,7 +277,7 @@ Run it after any change to headers, logs or certificates, and before a new app g
    [§3](#3-certificates-and-authenticated-origin-pulls)):
 
    ```bash
-   curl -sk --max-time 5 --resolve {{DOMAIN}}:443:127.0.0.1 https://{{DOMAIN}}/ ; echo "exit $?"   # must not be 0
+   curl -sk --max-time 5 --resolve jainavinfotech.in:443:127.0.0.1 https://jainavinfotech.in/ ; echo "exit $?"   # must not be 0
    ```
 
 5. Remove the test site, the container and the `UPSTREAMS` entry.

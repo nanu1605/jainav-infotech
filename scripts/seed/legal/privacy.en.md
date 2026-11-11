@@ -54,7 +54,7 @@ For cookies and browser storage, see the [Cookie Policy](/legal/cookies).
 
 - **Our staff:** all staff can see form data and CVs and download form data as a file. Only owner and support staff see privacy requests, accounts, orders and licenses. If you gave a phone number, staff may call or WhatsApp you to reply.
 - **Cloudflare:** all site traffic is decrypted there and encrypted again, so it handles your IP address, browser details and everything you send, to deliver and protect the site. It also stores CVs, invoice PDFs and encrypted backups.
-- **{{HOSTING_PROVIDER}}:** runs the server that holds our database and logs.
+- **Hostinger:** runs the server that holds our database and logs.
 - **Resend:** sends our emails, so it receives their addresses, content and attachments, including staff alerts with everything you typed in a form, sign-in codes, license keys and invoices.
 - **{{MAILBOX_PROVIDER}}:** hosts our mailbox, which receives those alerts and your emails, and sends our replies.
 - **Razorpay:** only when you pay. It receives the amount, order number, your name, email and phone, and what you enter in its window.
@@ -67,7 +67,7 @@ For cookies and browser storage, see the [Cookie Policy](/legal/cookies).
 
 ## Outside India
 
-Our server is in {{SERVER_LOCATION}}. We ask Cloudflare to store files in its Asia-Pacific region, which can be outside India. The other providers named here may also handle your data in other countries, which we cannot yet list in full.
+Our server is in Mumbai, India. We ask Cloudflare to store files in its Asia-Pacific region, which can be outside India. The other providers named here may also handle your data in other countries, which we cannot yet list in full.
 
 ## How long we keep it
 
