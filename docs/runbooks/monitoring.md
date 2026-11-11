@@ -8,10 +8,10 @@ Stack, recorded in [decisions](../decisions.md)). If a limit of the free tier ge
 healthchecks.io takes over the heartbeats.
 
 - Uptime monitors, every minute:
-  - `https://{{DOMAIN}}/`: HTTP 200.
-  - `https://{{DOMAIN}}/api/v1/health`: HTTP 200 with `"ok":true`. The app and its database
+  - `https://jainavinfotech.in/`: HTTP 200.
+  - `https://jainavinfotech.in/api/v1/health`: HTTP 200 with `"ok":true`. The app and its database
     answer.
-  - From Phase 8: `https://{{DOMAIN}}/api/v1/licensing/health`: HTTP 200 with `"ok":true`. The
+  - From Phase 8: `https://jainavinfotech.in/api/v1/licensing/health`: HTTP 200 with `"ok":true`. The
     licensing keys are set and the database answers ([licensing.md](licensing.md)).
   - Staging, every 15 minutes, where its basic auth allows.
   - The site's update feed is not monitored.
@@ -23,7 +23,7 @@ healthchecks.io takes over the heartbeats.
     unable to reach Telegram, because the ping stops in both cases.
 - Alerts: the provider's Telegram integration, to the same chat as the site's alerts
   (`TELEGRAM_CHAT_ID`). Phase 6 is done only when a test alert has reached Telegram.
-- Status page on `status.{{DOMAIN}}`: create it at the provider, then add the `CNAME` it shows
+- Status page on `status.jainavinfotech.in`: create it at the provider, then add the `CNAME` it shows
   (DNS only, [cloudflare.md](cloudflare.md#dns)).
 
 ## Hostwatch
@@ -167,14 +167,14 @@ retention period is up. Quiet a noisy success path in the Caddyfile rather than 
 
 ## Umami (analytics)
 
-Umami runs on the VPS at `https://analytics.{{DOMAIN}}`. It is cookie-free, so the site has no
+Umami runs on the VPS at `https://analytics.jainavinfotech.in`. It is cookie-free, so the site has no
 cookie banner.
 
 1. Sign in with Umami's default account (`admin` / `umami`) and **change the password
    immediately**.
-2. Settings → Websites → Add `{{DOMAIN}}`. Copy its website ID into the repository variable
+2. Settings → Websites → Add `jainavinfotech.in`. Copy its website ID into the repository variable
    `PRODUCTION_UMAMI_WEBSITE_ID`, and set `PRODUCTION_UMAMI_URL` to
-   `https://analytics.{{DOMAIN}}`. Leave the `STAGING_UMAMI_*` ones empty, so tests don't count.
+   `https://analytics.jainavinfotech.in`. Leave the `STAGING_UMAMI_*` ones empty, so tests don't count.
    Redeploy.
 3. Events (spec §17):
    - `cta_click`, `chip_click` and `download` come from `data-umami-event` attributes on

@@ -102,7 +102,7 @@ generated on the server, so the private key never leaves it.
    ```bash
    umask 077 && mkdir ~/csr && cd ~/csr
    openssl req -new -newkey rsa:2048 -nodes -keyout origin-key.pem -out origin.csr \
-     -subj '/CN={{DOMAIN}}' -addext 'subjectAltName=DNS:{{DOMAIN}},DNS:*.{{DOMAIN}}'
+     -subj '/CN=jainavinfotech.in' -addext 'subjectAltName=DNS:jainavinfotech.in,DNS:*.jainavinfotech.in'
    cat origin.csr
    ```
 
@@ -245,10 +245,10 @@ Run it after any change to headers, logs or certificates, and before a new app g
 1. **Forged headers.** Start a throwaway container on `edge-jainav` that answers with the
    values of `X-Real-IP`, `X-Forwarded-For`, `CF-Connecting-IP`, `Sb-Forwarded-For`,
    `X-Forwarded-Host`, `True-Client-IP`, `X-Client-IP` and `Forwarded`. For the test only, add it
-   to `UPSTREAMS` and install a `leaktest.{{DOMAIN}}` site file for it. Through Cloudflare:
+   to `UPSTREAMS` and install a `leaktest.jainavinfotech.in` site file for it. Through Cloudflare:
 
    ```bash
-   curl -s https://leaktest.{{DOMAIN}}/ \
+   curl -s https://leaktest.jainavinfotech.in/ \
      -H 'X-Forwarded-For: 203.0.113.9' -H 'True-Client-IP: 203.0.113.9' \
      -H 'CF-Connecting-IP: 203.0.113.9' -H 'X-Real-IP: 203.0.113.9' \
      -H 'X-Client-IP: 203.0.113.9' -H 'Forwarded: for=203.0.113.9'
@@ -277,7 +277,7 @@ Run it after any change to headers, logs or certificates, and before a new app g
    [§3](#3-certificates-and-authenticated-origin-pulls)):
 
    ```bash
-   curl -sk --max-time 5 --resolve {{DOMAIN}}:443:127.0.0.1 https://{{DOMAIN}}/ ; echo "exit $?"   # must not be 0
+   curl -sk --max-time 5 --resolve jainavinfotech.in:443:127.0.0.1 https://jainavinfotech.in/ ; echo "exit $?"   # must not be 0
    ```
 
 5. Remove the test site, the container and the `UPSTREAMS` entry.

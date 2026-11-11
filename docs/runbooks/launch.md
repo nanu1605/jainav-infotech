@@ -4,7 +4,7 @@ Phase 6 in order (spec §20). Each step names who does it. Details are in the ot
 
 ## Before: inputs from Tanishq (spec §21)
 
-- [ ] Domain (`{{DOMAIN}}`) added to Cloudflare, nameservers switched.
+- [ ] Domain (`jainavinfotech.in`) added to Cloudflare, nameservers switched.
 - [ ] Hostinger account with two-factor login; Cloudflare account; Resend account; mailbox
       provider; Telegram bots (one for the server, one for the site).
 - [ ] Final company details:
@@ -108,7 +108,7 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
       alert).
 - [ ] mail-tester scores at least 9/10.
 - [ ] The pages Razorpay checks are live (step 9).
-- [ ] Lighthouse on the production URLs: `LHCI_BASE_URL=https://{{DOMAIN}} pnpm lhci` (spec
+- [ ] Lighthouse on the production URLs: `LHCI_BASE_URL=https://jainavinfotech.in pnpm lhci` (spec
       §15; Phase 5 measured locally only).
 
 **After launch (Tanishq):** once the pricing page shows real VYRO prices, apply for Razorpay

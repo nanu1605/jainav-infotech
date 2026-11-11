@@ -16,7 +16,7 @@ How to switch on accounts and checkout on staging with Razorpay's test mode. Pro
 
    Restart the staging app so it reads them: `sudo app-compose jainav up -d --force-recreate app-staging`.
 
-2. **Webhook** (Razorpay Dashboard, test mode → Webhooks → Add): URL `https://staging.{{DOMAIN}}/api/v1/webhooks/razorpay` (Caddy lets it past basic auth), the secret from step 1, events `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid`, `refund.created`, `refund.processed`, `refund.failed`, and the six dispute events `payment.dispute.created`, `.won`, `.lost`, `.closed`, `.under_review`, `.action_required`.
+2. **Webhook** (Razorpay Dashboard, test mode → Webhooks → Add): URL `https://staging.jainavinfotech.in/api/v1/webhooks/razorpay` (Caddy lets it past basic auth), the secret from step 1, events `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid`, `refund.created`, `refund.processed`, `refund.failed`, and the six dispute events `payment.dispute.created`, `.won`, `.lost`, `.closed`, `.under_review`, `.action_required`.
 3. **Capture:** Dashboard → Account & Settings → Payment capture: automatic.
 4. **Admin** (staging, as Owner):
    - Settings → Commerce settings: the SAC code, invoice prefixes and, once the CA confirms, "Charge GST" (needs the company GSTIN in Site settings first); the current Terms and EULA versions (they are recorded with every order).

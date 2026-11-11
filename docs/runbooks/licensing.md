@@ -34,7 +34,7 @@ Each environment has its own set: staging never uses production's keys (a stagin
    sudo app-compose jainav up -d --force-recreate app   # app-staging for staging
    ```
 
-5. Check: `curl -s https://{{DOMAIN}}/api/v1/licensing/health` answers `{"ok":true}`, and `curl -s https://{{DOMAIN}}/api/v1/licensing/keys` lists the new `kid` with the same `x` as the printed JWK.
+5. Check: `curl -s https://jainavinfotech.in/api/v1/licensing/health` answers `{"ok":true}`, and `curl -s https://jainavinfotech.in/api/v1/licensing/keys` lists the new `kid` with the same `x` as the printed JWK.
 6. Give the public JWK (not the private key) to the VYRO build: release builds embed production's key; test builds may also embed staging's.
 
 ## Rotating the signing key
@@ -84,8 +84,8 @@ pnpm license-test-client update-check --version 0.0.1
 **Staging:** the licensing and update paths skip staging's basic auth. As Owner on staging, issue a complimentary license to your own address (above), then:
 
 ```bash
-pnpm license-test-client --base https://staging.{{DOMAIN}} activate --key <key>
-pnpm license-test-client --base https://staging.{{DOMAIN}} scenario --key <another key> --yes
+pnpm license-test-client --base https://staging.jainavinfotech.in activate --key <key>
+pnpm license-test-client --base https://staging.jainavinfotech.in scenario --key <another key> --yes
 ```
 
 `scenario` runs spec §20 Phase 8's "done when" on fresh device names and prints PASS/FAIL per step: both device slots, the device limit, a deactivation, validation, the monthly deactivation limit, trial start and resume. It needs a license with no active devices, uses up that license's deactivations for the month and leaves its devices active (it lists them at the end), so issue a license just for it (Support can untick them afterwards). It stays under the server's limit of 20 calls per key and hour. The "100 days past exp" step needs the server's signing key on your machine, so it runs locally only and shows SKIP against staging; never copy staging's or production's private key to do it.
@@ -96,4 +96,4 @@ Rate limits: 60 licensing calls per IP per 10 minutes, 20 per license key per ho
 
 ## Uptime monitor
 
-Add `https://{{DOMAIN}}/api/v1/licensing/health` to the uptime monitor ([monitoring.md](monitoring.md)): HTTP 200 with `"ok":true`. It answers 503 when the licensing keys are missing or the database doesn't answer, so it also catches an app started without its licensing variables.
+Add `https://jainavinfotech.in/api/v1/licensing/health` to the uptime monitor ([monitoring.md](monitoring.md)): HTTP 200 with `"ok":true`. It answers 503 when the licensing keys are missing or the database doesn't answer, so it also catches an app started without its licensing variables.

@@ -118,7 +118,7 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
 
     ```
     Host jainav
-      HostName ssh.{{DOMAIN}}
+      HostName ssh.jainavinfotech.in
       User ops
       ProxyCommand cloudflared access ssh --hostname %h
     ```
@@ -129,7 +129,7 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
 
     ```bash
     printf 'v1 ping\n' | ssh -i gha-jainav-staging -o ProxyCommand='cloudflared access ssh --hostname %h' \
-      deploy-jainav@ssh.{{DOMAIN}}
+      deploy-jainav@ssh.jainavinfotech.in
     # expect: pong jainav staging
     ```
 
@@ -176,7 +176,7 @@ replaces. Copy files to `/home/ops/incoming` and name them in the command.
 
 | Path                                                | Owner and mode | Put there by                                                                                   |
 | --------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------- |
-| `/etc/apps/jainav.conf`, `edge.conf`                | root, 0644     | `install.sh` once; fill `BACKUP_RECIPIENT` and `ZONE`                                          |
+| `/etc/apps/jainav.conf`, `edge.conf`                | root, 0644     | `install.sh` once; fill `BACKUP_RECIPIENT`                                                     |
 | `/srv/jainav`                                       | root, 0750     | `install.sh`                                                                                   |
 | `/srv/jainav/compose.prod.yml`                      | root, 0644     | `app-apply jainav compose <file>`                                                              |
 | `/srv/jainav/postgres/roles.sh`                     | root, 0755     | `sudo install` by hand, from `docker/postgres/`                                                |
@@ -205,7 +205,7 @@ another owner or can be written by others.
    because every `app-apply edge` command validates the whole tree and a tree without them can't
    pass. Then `sudo cf-ranges apply` writes `cloudflare-ranges.caddy` and validates the tree. Later
    changes to either file go through `sudo app-apply edge config <file>`.
-3. Create the Origin CA certificate for `{{DOMAIN}}` and `*.{{DOMAIN}}`
+3. Create the Origin CA certificate for `jainavinfotech.in` and `*.jainavinfotech.in`
    ([cloudflare.md](cloudflare.md#ssl)), then
    `sudo app-apply edge cert jainav origin.pem origin-key.pem`.
 4. `sudo app-apply jainav site jainav.caddy` and `sudo app-apply edge compose compose.yml`.
@@ -220,8 +220,8 @@ another owner or can be written by others.
     `/etc/apps/jainav.conf`. Compose checks every required value on every command, so nothing
     starts without it.
 - `production.env` and `staging.env`: the apps' settings, keys from `/.env.example`.
-  - `NODE_ENV=production`, `NEXT_PUBLIC_SITE_URL` (`https://{{DOMAIN}}` /
-    `https://staging.{{DOMAIN}}`), `PAYLOAD_SECRET`, `CRON_SECRET`.
+  - `NODE_ENV=production`, `NEXT_PUBLIC_SITE_URL` (`https://jainavinfotech.in` /
+    `https://staging.jainavinfotech.in`), `PAYLOAD_SECRET`, `CRON_SECRET`.
   - `DATABASE_URL=postgres://jainav:<APP_DB_PASSWORD>@postgres:5432/jainav`; staging uses
     `jainav_staging` with `STAGING_DB_PASSWORD`.
   - R2 (`S3_*`, `NEXT_PUBLIC_CDN_URL`, `DOWNLOADS_BASE_URL`), Turnstile, Telegram, Sentry.
@@ -237,7 +237,7 @@ another owner or can be written by others.
     ([licensing.md](licensing.md)). Without them the licensing API answers 503 and paid orders
     can't be fulfilled. The last two must never change once licenses exist.
   - Staging only: `STAGING_BASIC_AUTH=1`, Razorpay test keys and webhook secret
-    ([store.md](store.md)), its own R2 buckets and `https://cdn-staging.{{DOMAIN}}`
+    ([store.md](store.md)), its own R2 buckets and `https://cdn-staging.jainavinfotech.in`
     ([cloudflare.md](cloudflare.md#r2)).
 - Install each env file as root: `sudo install -m 600 -o root -g root .env /srv/jainav/.env`.
   Env-file lines may not start with `COMPOSE_`.
@@ -302,7 +302,7 @@ sudo app-compose jainav tools production - pnpm seed
 ```
 
 Production never creates the dev admin. Create the Owner account in the admin's first-user
-screen (`https://{{DOMAIN}}/admin`, behind Cloudflare Access), then review and publish the seeded
+screen (`https://jainavinfotech.in/admin`, behind Cloudflare Access), then review and publish the seeded
 drafts there. The legal pages need their approved texts first (spec §8.13).
 
 ## 4. GitHub setup (once)
@@ -321,12 +321,12 @@ drafts there. The legal pages need their approved texts first (spec §8.13).
 - **Repository secret** `SMOKE_BASIC_AUTH` = `user:password` of the staging basic auth.
 - **Environments** `staging` and `production` (Settings → Environments), each with these
   secrets:
-  - `DEPLOY_HOST` = `ssh.{{DOMAIN}}`, `DEPLOY_USER` = `deploy-jainav` (the same in both).
+  - `DEPLOY_HOST` = `ssh.jainavinfotech.in`, `DEPLOY_USER` = `deploy-jainav` (the same in both).
   - `DEPLOY_SSH_KEY`: the private key of that environment, made in §1 step 6: `gha-jainav-staging`
     for `staging`, `gha-jainav-production` for `production`. Each key's public half is on the
     server with a forced command that deploys only its own environment, so a staging key cannot
     deploy to production.
-  - `DEPLOY_KNOWN_HOSTS`: `ssh.{{DOMAIN}} ` followed by the contents of the server's
+  - `DEPLOY_KNOWN_HOSTS`: `ssh.jainavinfotech.in ` followed by the contents of the server's
     `/etc/ssh/ssh_host_ed25519_key.pub`.
   - `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET`: the Access service token
     `github-deploy-jainav` for the SSH tunnel ([cloudflare.md](cloudflare.md#ssh-tunnel)).

@@ -14,7 +14,7 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
 | Hosting                       | VPS + Docker (§18.2); one KVM 4 shared with MenuMesh (Phase 6)                                              |
 | Admin protection              | Cloudflare Access + login lockout; TOTP later                                                               |
 | Mailbox provider              | Tanishq's choice                                                                                            |
-| Domain                        | `{{DOMAIN}}` placeholder; `http://localhost:3000` in development                                            |
+| Domain                        | `jainavinfotech.in`; `http://localhost:3000` in development                                                 |
 
 ## Phase 0
 
@@ -182,7 +182,7 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
   - `smoke`: installs dependencies and runs `tests/smoke`; it holds no deploy secret.
 
   Other choices:
-  - **SSH goes through a Cloudflare Tunnel** (`ssh.{{DOMAIN}}`, an Access service token, `cloudflared` pinned and checked against its release digest). GitHub's runner IPs change constantly, and the VPS keeps port 22 closed to the internet.
+  - **SSH goes through a Cloudflare Tunnel** (`ssh.jainavinfotech.in`, an Access service token, `cloudflared` pinned and checked against its release digest). GitHub's runner IPs change constantly, and the VPS keeps port 22 closed to the internet.
   - **Public build values are repository variables** (`STAGING_*`, `PRODUCTION_*`), so the build job needs no environment and production is approved once. Images are never promoted.
   - **Registry access:** the VPS pulls the app and tools images with the job's short-lived token and signs out afterwards.
   - **The deploy model.** CI holds one SSH key per environment, and each key is forced (`restrict,command=`) into `sudo app-deploy <env>`, a root script on the server that reads the request from stdin: a tag, never a path, a registry or a command. The deploy user is `deploy-jainav`, with no docker group. `app-deploy` checks the tag against the pattern in `/etc/apps/jainav.conf`, pulls `REPO@digest`, and accepts the image only if its `org.opencontainers.image.version` label equals the requested tag (CI sets the label on every image it builds). Each environment has a single slot: the new image replaces the old one, the script waits for the healthcheck and rolls back to the previous image if it never turns healthy. The extra image (`tools` for Jainav) is recorded as `tag@digest` in `images.env` per environment, so `app-compose jainav tools` runs by digest and cleanup keeps it. The ref is always named: `app-compose <app> tools <env> <tag>@sha256:<digest>|- <command>`, where `-` is the environment's recorded one, because the command words follow the ref and an omitted ref would be ambiguous. For `EXTRA_MODE=pull` the conf names that `images.env` line per environment (`EXTRA_VAR` in `env_config`). Every production rollback alerts through hostwatch, and every failed or rolled-back deploy adds a line to `deploys.log` ("migrations from <extra> stay applied; <service> runs <old>" when a migration ran first). Locks are in `/run/app-locks`, a root-only directory. The workflow's `build` job runs only for `main` and `v*` tags, so a dispatch from another branch pushes nothing. Steps: [server.md §5](runbooks/server.md#5-deploy) and §6.

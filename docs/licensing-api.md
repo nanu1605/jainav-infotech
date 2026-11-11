@@ -2,7 +2,7 @@
 
 The contract between the website and the VYRO desktop app (spec §12). The website side is built in Phase 8; this document comes first so the app work can start now. The endpoints, fields and error codes below are fixed: changing them needs Tanishq's approval (spec §0.6), and once a public VYRO build uses them they only ever gain optional fields.
 
-- **Base URL:** `https://{{DOMAIN}}/api/v1/licensing`
+- **Base URL:** `https://jainavinfotech.in/api/v1/licensing`
 - **Transport:** HTTPS only. JSON request and response bodies (`Content-Type: application/json`, UTF-8). Request bodies larger than 4 KB are refused.
 - **Clients:** call from Rust (or the Tauri HTTP plugin), not from webview `fetch`: the API sends no CORS headers.
 - **User agent:** please send `User-Agent: VYRO/{appVersion} ({os})`, e.g. `VYRO/1.0.1 (Windows 11 26100)`. It is used in logs and support only.
@@ -224,7 +224,7 @@ The public keys as a JWKS. The app embeds these at build time; this endpoint is 
 Not part of this API. VYRO doesn't use it: installed copies update from GitHub (`nanu1605/vyro-releases`, the release's `latest.json`; docs/decisions.md, "VYRO updates"). The site's feed (spec §12.5, built in Phase 3) stays for a later switch:
 
 ```
-GET https://{{DOMAIN}}/api/v1/updates/vyro/{{target}}/{{arch}}/{{current_version}}?channel=stable
+GET https://jainavinfotech.in/api/v1/updates/vyro/{{target}}/{{arch}}/{{current_version}}?channel=stable
 ```
 
 200 with Tauri's `{ version, notes, pub_date, url, signature }`, or 204 when there is no newer release. Whichever feed the app reads, it compares `pub_date` with the token's `upd` before installing and warns instead of auto-updating when the update is past the customer's update period.
@@ -232,7 +232,7 @@ GET https://{{DOMAIN}}/api/v1/updates/vyro/{{target}}/{{arch}}/{{current_version
 ## Quick test with curl
 
 ```bash
-curl -s https://{{DOMAIN}}/api/v1/licensing/trial \
+curl -s https://jainavinfotech.in/api/v1/licensing/trial \
   -H 'Content-Type: application/json' \
   -d '{"product":"vyro","deviceId":"0000000000000000000000000000000000000000000000000000000000000000","appVersion":"1.0.1"}'
 ```
