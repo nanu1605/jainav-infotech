@@ -27,7 +27,8 @@ Do these in order. Keep the root session open until the end of step 14.
 1. **Buy:** Hostinger KVM 4 for 24 months, location Mumbai 2 (not the cart's default), plain
    Ubuntu 24.04 with your public key, a strong root password saved in the password manager, and
    two-factor sign-in on the Hostinger account. Once the VPS exists, turn off its automatic
-   backups in hPanel. The server's IP address goes only into hPanel and Cloudflare.
+   backups in hPanel, and leave its Malware Scanner off (step 4). The server's IP address goes
+   only into hPanel and Cloudflare.
 2. **Firewall in hPanel, before anything else.** Docker publishes container ports through its own
    iptables rules, which bypass ufw, so the provider's network firewall is the first layer
    (`cf-ranges` on the host is the second, [edge.md §4](edge.md#4-cloudflares-ranges-and-the-origin-firewall)).
@@ -38,11 +39,46 @@ Do these in order. Keep the root session open until the end of step 14.
    - nothing else: everything else is dropped, and port 80 stays closed.
 3. **Look around** as root (`ssh root@<ip>`): `uname -m` (x86_64), `free -m`, `ip route show
 default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (clock
-   synchronised), `ssh-keygen -lf /root/.ssh/authorized_keys` (which keys are there).
-4. **Updates and tools.** `jq` and `age` are needed by the host scripts; `install.sh` stops
+   synchronised), `ssh-keygen -lf /root/.ssh/authorized_keys` (which keys are there). Next to
+   yours, hPanel keeps an RSA key there for its own tools, marked `#hostinger-managed-key` and
+   given an `expiry-time`. Leave it: root's SSH login ends at step 14.
+4. **Hostinger's extras, then updates and tools.** Hostinger's Ubuntu 24.04 image adds three
+   things to plain Ubuntu:
+   - the Monarx agent, Hostinger's malware scanner for PHP sites. It runs as root, can upload
+     files to its vendor, and comes with its own apt source, a signing key trusted for every
+     source and a cron job that reinstalls it every week;
+   - cron jobs that prune Docker: every night `docker image prune -af --filter until=24h`, which
+     would delete the previous image and the tools images that `app-deploy` keeps for rollbacks
+     and one-off commands (§5, §8), and every week a prune of the build cache;
+   - Docker itself (step 5).
+
+   Remove the first two. hPanel's Malware Scanner installs the agent again, so leave it off:
+
+   ```bash
+   systemctl disable --now monarx-agent
+   apt-get -y purge monarx-agent monarx-protect monarx-protect-autodetect
+   rm -f /etc/apt/sources.list.d/monarx.list /etc/apt/trusted.gpg.d/monarx.asc \
+     /etc/cron.d/monarx-update /etc/monarx-agent.conf \
+     /etc/cron.d/docker-image-prune /etc/cron.d/docker-builder-prune \
+     /etc/systemd/system/multi-user.target.wants/monarx-agent.service \
+     /var/lib/systemd/deb-systemd-helper-enabled/*monarx* \
+     /var/lib/systemd/deb-systemd-helper-enabled/*/*monarx*
+   rm -rf /var/cache/monarx-agent /var/lib/monarx-agent /var/log/monarx-agent.log
+   systemctl daemon-reload
+   apt-get update                   # also drops the package lists of the Monarx source
+   find / -xdev -iname '*monarx*'   # prints nothing once it is all gone; remove what it lists
+   ```
+
+   Where Monarx is already gone, the first two commands say that the unit or the package doesn't
+   exist; carry on. A reinstall from hPanel brings all of it back, and `install.sh` warns while
+   any of it is there (step 8).
+
+   Hold the image's Docker packages before upgrading, so the upgrade doesn't move them past the
+   pinned versions (step 5). `jq` and `age` are needed by the host scripts; `install.sh` stops
    without them:
 
    ```bash
+   apt-mark hold docker-ce docker-ce-cli containerd.io docker-compose-plugin
    apt-get update && apt-get -y full-upgrade
    apt-get -y install unattended-upgrades jq age curl openssl
    dpkg-reconfigure -f noninteractive unattended-upgrades   # security updates, no automatic reboot
@@ -61,8 +97,18 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
    apt-mark hold docker-ce docker-ce-cli containerd.io docker-compose-plugin
    ```
 
+   Hostinger's image already has Docker from Docker's repository, held since step 4. Compare its
+   versions with the ones above (`dpkg -l | grep -E 'docker|containerd'`). Keep them if they are
+   the pinned ones, or a later 29.x and 5.x release that is 14 days old. Otherwise run
+   `apt-mark unhold` on the four packages, install the pinned versions as above (adding
+   `--allow-downgrades` if the image's are newer) and hold them again. Then remove the two extras
+   the image adds (nothing builds images here):
+   `apt-get -y purge docker-buildx-plugin docker-ce-rootless-extras`.
+
    Do not add anyone to the `docker` group. `install.sh` warns if one of the four packages is not
-   held or the group has members. Docker's own settings come from the kit in step 8.
+   held, either extra is installed or the group has members. Docker's own settings come from the
+   kit in step 8: `install.sh` replaces the image's `/etc/docker/daemon.json` and keeps it as
+   `daemon.json.bak`.
 
 6. **Deploy keys, on your machine.** One key pair per environment, made only for deploys:
 
@@ -88,8 +134,8 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
    It creates `ops` and the deploy users, installs the scripts, sudoers, `daemon.json`, journald
    and sysctl settings and the units, loads the origin firewall before Docker and restarts Docker,
    installs the deploy keys and `/etc/apps/*.conf`, and prints what is left to do, including the
-   exact command to enable each timer. It is safe to run again. Then set a password for `ops`
-   (sudo asks for it):
+   exact command to enable each timer. It also warns about anything from steps 4 and 5 that is
+   still there. It is safe to run again. Then set a password for `ops` (sudo asks for it):
 
    ```bash
    passwd ops

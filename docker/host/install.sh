@@ -530,6 +530,28 @@ setup_firewall() {
   fi
 }
 
+# Hostinger's Ubuntu image adds the Monarx agent (a root file scanner with its own apt source, a key
+# trusted for every source and a job that reinstalls it weekly) and cron jobs that prune Docker;
+# the nightly image prune would delete the rollback and tools images app-deploy keeps
+# (docs/runbooks/server.md §1, step 4). A reinstall from hPanel brings them back, so every run
+# looks for them.
+check_image_leftovers() {
+  local f
+  local -a cron=(/etc/crontab /etc/cron.d/* /etc/cron.hourly/* /etc/cron.daily/* /etc/cron.weekly/*
+    /etc/cron.monthly/* /var/spool/cron/crontabs/*)
+  if dpkg-query -W -f='${Status}\n' 'monarx*' 2>/dev/null | grep -q 'install ok installed'; then
+    warn "the Monarx agent is installed: remove it (docs/runbooks/server.md §1, step 4)"
+  fi
+  for f in /etc/apt/sources.list.d/*monarx* /etc/apt/trusted.gpg.d/*monarx* /etc/apt/keyrings/*monarx* \
+    /usr/share/keyrings/*monarx* /etc/cron.d/*monarx* /etc/monarx*; do
+    warn "Monarx left $f: remove it (docs/runbooks/server.md §1, step 4)"
+  done
+  # /etc/crontab is named even when it is missing, so grep never falls back to reading stdin.
+  while IFS= read -r f; do
+    warn "$f runs a Docker prune: remove it, app-deploy does its own cleanup (docs/runbooks/server.md §1, step 4)"
+  done < <(grep -lsE 'docker[[:space:]]+([a-z]+[[:space:]]+)?prune' "${cron[@]}" || true)
+}
+
 report() {
   local members line pkg held
   say "--- iptables -S DOCKER-USER"
@@ -554,6 +576,13 @@ report() {
       grep -qxF -- "$pkg" <<<"$held" || warn "$pkg is installed but not held: apt-mark hold $pkg"
     fi
   done
+  # Only those four: nothing builds images here, and Hostinger's image brings these two as well.
+  for pkg in docker-buildx-plugin docker-ce-rootless-extras; do
+    if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q 'install ok installed'; then
+      warn "$pkg is installed: apt-get purge $pkg (docs/runbooks/server.md §1, step 5)"
+    fi
+  done
+  check_image_leftovers
   if [ "${CLOUDFLARED_DIRTY:-0}" = 1 ] && systemctl cat cloudflared.service >/dev/null 2>&1; then
     say "restart cloudflared to apply its new drop-in (not done here: it would cut tunnel sessions)"
   fi
