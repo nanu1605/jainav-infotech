@@ -122,9 +122,10 @@ generated on the server, so the private key never leaves it.
 
 Cloudflare's shared client certificate proves only that a request came from Cloudflare's
 network, which every Cloudflare customer shares. So each zone uses a certificate from our own
-CA. **It must be on for every zone before a second app's containers run on the server.** It
-needs Caddy 2.11.9 or later, which treats conflicting `client_auth` policies as an error
-([launch.md](launch.md#gates-before-the-first-production-deploy)).
+CA. **It must be on for every zone before a second app's containers run on the server**
+([launch.md](launch.md#gates-before-the-first-production-deploy)). It relies on Caddy 2.11.9 or
+later, which treats conflicting `client_auth` policies as an error instead of dropping the
+stricter one, so the edge never goes below that version.
 
 1. On your machine, make a private CA and one client certificate per zone with `openssl`. The
    CA key goes in the password manager and stays off the server.
@@ -227,6 +228,15 @@ A `verify` alert means a rule is missing or out of place. Run `sudo cf-ranges fi
 **Recreate or reload?** Recreate (`app-compose edge up -d`) after a change to `edge.env`, to
 `compose.yml` (`app-apply edge compose <file>` first) or to Caddy's image. Everything else, site
 files, snippets, ranges and certificates, is a reload that `app-apply` does itself.
+
+**A new Caddy version.** In the repository, change the tag in `docker/edge/compose.yml` and
+`CADDY_IMAGE` in `docker/host/apps/edge.conf` together; CI fails while they differ. On the server:
+
+1. Set the same `CADDY_IMAGE` in `/etc/apps/edge.conf` (`sudoedit`).
+2. `sudo app-apply edge compose compose.yml`. It refuses a file whose image differs from
+   `CADDY_IMAGE`, and validates the live config with the new image.
+3. `sudo app-compose edge up -d` to recreate Caddy, then run the leak test
+   ([§6](#6-the-leak-test)).
 
 ## 6. The leak test
 

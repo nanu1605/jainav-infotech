@@ -88,11 +88,6 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
 
 ## Gates before the first production deploy
 
-- **Caddy 2.11.9.** The edge runs `caddy:2.11.7-alpine` for rehearsals only. Authenticated origin
-  pulls need 2.11.9, available from 2026-11-19. Change the tag in `docker/edge/compose.yml` and
-  the matching `CADDY_IMAGE` in `docker/host/apps/edge.conf` together (CI compares them), and
-  the `hash-password` commands in the runbooks; then install the file with `sudo app-apply edge compose <file>` and
-  recreate Caddy with `sudo app-compose edge up -d`.
 - **Authenticated origin pulls** are on for the site's zone and tested, and stay on for every zone
   before a second app's containers run on the server
   ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls)).
