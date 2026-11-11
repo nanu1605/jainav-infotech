@@ -442,7 +442,7 @@ Tanishq lifted the two-week rule for one round ("you can update everything now. 
 - **Next 16.4.6 compresses route handler responses** that aren't compressed already. vercel/next.js#100464 is still open, so `optimisticRouting` stays off.
 - **radix-ui 1.8.1 pins `@radix-ui/react-slot` 1.5.0**, so the override from Phase 2 is gone.
 - **Sentry 11.11.0 adds one default integration,** `AwsLambdaWeb`, which acts only on AWS Lambda (Phase 6).
-- **@lhci/cli 0.16.0 brings Lighthouse 13** and needs Node 22.19 or later. `lighthouserc.cjs` asserts only on the four categories, LCP and CLS, which Lighthouse 13 keeps.
+- **@lhci/cli 0.16.0 brings Lighthouse 13** and needs Node 22.19 or later. `lighthouserc.cjs` asserts only on the four categories, LCP and CLS, which Lighthouse 13 keeps. On a build with a database every assertion passes: performance and accessibility 100, best practices 96, SEO 100, CLS 0. LCP reads about 0.91 s on all four pages, the same as FCP, where Lighthouse 12 read 2.8–3.5 s locally ("LCP budget" above). A local run still only warns on LCP; the production URLs stay the judge.
 - **Playwright 1.65.0** waits for an element to stop being inert before acting on it and leaves unrendered text out of accessible names. Its Chromium is 158.
 - **Outside npm:** the image's Node 24.22.2 (V8 backports and a stream fix, already past the rule; Dependabot can't read `NODE_IMAGE`), `docker/login-action` 4.8.0 and `pnpm/action-setup` 6.1.1.
 - **Majors stay out:** TypeScript 7, ESLint 10, GraphQL 17 (outside Payload's `^16.8.1`), `@hookform/resolvers` 7 and `@types/node` 26 (the runtime is Node 24). Each is a change of its own.
