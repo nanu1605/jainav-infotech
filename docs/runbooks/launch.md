@@ -4,9 +4,9 @@ Phase 6 in order (spec §20). Each step names who does it. Details are in the ot
 
 ## Before: inputs from Tanishq (spec §21)
 
-- [ ] Domain (`jainavinfotech.in`) added to Cloudflare, nameservers switched.
-- [ ] Hostinger account with two-factor login; Cloudflare account; Resend account; mailbox
-      provider; Telegram bots (one for the server, one for the site).
+- [x] Domain (`jainavinfotech.in`) added to Cloudflare, nameservers switched (2026-11-11).
+- [ ] Hostinger account with two-factor login; Cloudflare account; Resend account; the mailbox
+      (GoDaddy email, bought with the domain); Telegram bots (one for the server, one for the site).
 - [ ] Final company details:
   - CIN, incorporation date, registered office, GSTIN if any;
   - phone and email addresses, business days;
