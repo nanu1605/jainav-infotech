@@ -68,9 +68,12 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
    A reinstall from hPanel brings them back; `install.sh` warns while any of them is there
    (step 8).
 
-   `jq` and `age` are needed by the host scripts; `install.sh` stops without them:
+   Hold the image's Docker packages before upgrading, so the upgrade doesn't move them past the
+   pinned versions (step 5). `jq` and `age` are needed by the host scripts; `install.sh` stops
+   without them:
 
    ```bash
+   apt-mark hold docker-ce docker-ce-cli containerd.io docker-compose-plugin
    apt-get update && apt-get -y full-upgrade
    apt-get -y install unattended-upgrades jq age curl openssl
    dpkg-reconfigure -f noninteractive unattended-upgrades   # security updates, no automatic reboot
@@ -89,10 +92,11 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
    apt-mark hold docker-ce docker-ce-cli containerd.io docker-compose-plugin
    ```
 
-   Hostinger's image already has Docker from Docker's repository. Compare its versions with the
-   ones above (`dpkg -l | grep -E 'docker|containerd'`), install the pinned ones over it if they
-   differ, hold the four packages, and remove the two extras the image adds (nothing builds
-   images here): `apt-get -y purge docker-buildx-plugin docker-ce-rootless-extras`.
+   Hostinger's image already has Docker from Docker's repository, held since step 4. Compare its
+   versions with the ones above (`dpkg -l | grep -E 'docker|containerd'`). If they differ, run
+   `apt-mark unhold` on the four packages, install the pinned versions as above and hold them
+   again. Then remove the two extras the image adds (nothing builds images here):
+   `apt-get -y purge docker-buildx-plugin docker-ce-rootless-extras`.
 
    Do not add anyone to the `docker` group. `install.sh` warns if one of the four packages is not
    held, either extra is installed or the group has members. Docker's own settings come from the
