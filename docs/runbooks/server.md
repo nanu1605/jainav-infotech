@@ -546,9 +546,9 @@ If the tunnel or SSH does not work:
    serial terminal"), so it does not depend on sshd or the firewall. Log in as `root` with the
    password from the password manager. sshd refuses root, but the console does not use sshd.
    Check `systemctl status cloudflared ssh`, `journalctl -u cloudflared -n 50`,
-   `cf-ranges verify`, and fix it there. If `journalctl -u ssh -n 30` shows `Address already in
-use` or `Missing privilege separation directory`, an old sshd still holds port 22:
-   `ss -tlnp 'sport = :22'` shows its pid. `kill` that pid, then run
+   `cf-ranges verify`, and fix it there. If `journalctl -u ssh -n 30` shows
+   `Address already in use` or `Missing privilege separation directory`, an old sshd still holds
+   port 22: `ss -tlnp 'sport = :22'` shows its pid. `kill` that pid, then run
    `systemctl reset-failed ssh.service; systemctl start ssh.service` (the unit runs `sshd -t`
    itself once it has made `/run/sshd` again; a bare `sshd -t` fails while that directory is
    missing). Afterwards `ss -tlnp 'sport = :22'` must show only `127.0.0.1:22` and `[::1]:22`.
