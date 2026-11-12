@@ -599,7 +599,9 @@ setup_firewall() {
     fi
   else
     DOCKER_DIRTY=1
-    systemctl enable --now cf-ranges-firewall.service ||
+    # Not enable --now: on systemd 255 it exits 0 even when the start fails.
+    systemctl enable cf-ranges-firewall.service
+    systemctl start cf-ranges-firewall.service ||
       die "cf-ranges-firewall failed: journalctl -u cf-ranges-firewall -n 20"
   fi
   if [ "$LISTS_CHANGED" = 1 ] && [ -d /srv/edge/config ]; then
