@@ -660,8 +660,10 @@ harden_tunnel_checks() { # <ops authorized_keys>
       inline) ;; # in the unit itself: it survives a reboot
       *) die "refusing to harden: cloudflared.service names no token (no --token-file, --token, TUNNEL_TOKEN_FILE or TUNNEL_TOKEN): it would not connect after a restart or reboot (docs/runbooks/server.md section 1 step 9)" ;;
     esac
+    # No exit in awk: stopping at the match closes the pipe while curl may still be writing; curl
+    # then exits 23 and pipefail fails the whole substitution, which empties the count.
     conns=$(curl -fsS --max-time 5 http://127.0.0.1:20241/metrics 2>/dev/null |
-      awk '$1 == "cloudflared_tunnel_ha_connections" { printf "%d", $2; exit }') || conns=
+      awk '$1 == "cloudflared_tunnel_ha_connections" && !seen { printf "%d", $2; seen = 1 }') || conns=
     [ "${conns:-0}" -ge 1 ] ||
       die "refusing to harden: cloudflared holds no connection to Cloudflare (cloudflared_tunnel_ha_connections is ${conns:-missing})"
     login=$(journalctl -b -q --no-pager -t sshd -t sshd-session -o cat \
