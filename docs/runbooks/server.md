@@ -245,8 +245,12 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
     It refuses unless `cloudflared` is enabled, running with a connection to Cloudflare, and has
     the token file its unit reads (present, not empty); `ops` has a key and a password; and
     `sshd -t` passes. It warns when `ops` has fewer than two keys or this boot shows no login by
-    `ops` through the tunnel. It turns off root login and passwords, moves sshd to loopback only,
-    and removes the host firewall's allowance for your IP address. Then:
+    `ops` through the tunnel. It turns off root login and passwords and moves sshd from
+    `ssh.socket` to `ssh.service`, on loopback only: it first stops every sshd still listening on
+    port 22, then checks that the new one answers. Only then does it remove the host firewall's
+    allowance for your IP address. If sshd does not come up that way, it puts sshd back as it was,
+    keeps the allowance and says so; keep the root session open and read `journalctl -u ssh -n 30`.
+    Then:
     - `ss -tlnp | grep ':22 '` shows only `127.0.0.1` and `[::1]`;
     - open a fresh `ssh jainav` and run `sudo -v`, and only then close the root session;
     - delete the TCP 22 rule in hPanel; from outside, `nc -vz -w 5 <ip> 22` must time out.
@@ -542,7 +546,13 @@ If the tunnel or SSH does not work:
    serial terminal"), so it does not depend on sshd or the firewall. Log in as `root` with the
    password from the password manager. sshd refuses root, but the console does not use sshd.
    Check `systemctl status cloudflared ssh`, `journalctl -u cloudflared -n 50`,
-   `cf-ranges verify`, and fix it there. To reach SSH from outside for the work in hand:
+   `cf-ranges verify`, and fix it there. If `journalctl -u ssh -n 30` shows `Address already in
+use` or `Missing privilege separation directory`, an old sshd still holds port 22:
+   `ss -tlnp 'sport = :22'` shows its pid. `kill` that pid, then run
+   `systemctl reset-failed ssh.service; systemctl start ssh.service` (the unit runs `sshd -t`
+   itself once it has made `/run/sshd` again; a bare `sshd -t` fails while that directory is
+   missing). Afterwards `ss -tlnp 'sport = :22'` must show only `127.0.0.1:22` and `[::1]:22`.
+   To reach SSH from outside for the work in hand:
    - write your bare IPv4 address into `/etc/cf-ranges/bootstrap-ssh` and run `cf-ranges firewall`,
      which opens port 22 in the host firewall to it;
    - sshd listens on loopback only, so add `/etc/ssh/sshd_config.d/01-breakglass.conf` with
