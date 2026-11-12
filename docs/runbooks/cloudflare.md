@@ -62,42 +62,79 @@ A records in the table above at launch.
   ([edge.md §1](edge.md#1-how-the-edge-works)). When Cloudflare changes its ranges, change them in
   hPanel too ([edge.md §4](edge.md#4-cloudflares-ranges-and-the-origin-firewall)). That is also why the app can trust the
   `CF-Connecting-IP` header for rate limits.
-- **Cloudflare Access** (Zero Trust → Access → Applications → Add → Self-hosted). One
-  application, with these paths:
+- **Cloudflare Access** (Zero Trust → Access controls → Applications → Create new application →
+  Self-hosted and private). One application, with these paths:
   - `jainavinfotech.in/admin` and `jainavinfotech.in/admin/*`
   - `jainavinfotech.in/api/users/*`
   - the same three paths on `staging.jainavinfotech.in`
 
-  Policy: _Allow_, include the emails of the people who run the site; one-time PIN or Google as
-  the login method; session 24 hours. Payload's own login (5 attempts, then a 15-minute lock)
-  still applies behind it. Afterwards set the repository variables `STAGING_SMOKE_ADMIN_ACCESS`
-  and `PRODUCTION_SMOKE_ADMIN_ACCESS` to `1`: the smoke tests then check that `/admin`
-  redirects to `cloudflareaccess.com`.
+  Policy: _Allow_, include the emails of the people who run the site (a policy made as in
+  [SSH tunnel](#ssh-tunnel) step 5; `admins` if they are the same people); login method One-time
+  PIN only (step 3 there); session 24 hours. Payload's own login (5 attempts, then a 15-minute
+  lock) still applies behind it. Afterwards set the repository variables
+  `STAGING_SMOKE_ADMIN_ACCESS` and `PRODUCTION_SMOKE_ADMIN_ACCESS` to `1`: the smoke tests then
+  check that `/admin` redirects to `cloudflareaccess.com`.
 
 ## SSH tunnel
 
 The VPS's SSH port stays closed to the internet. Deploys from GitHub, and your own sessions,
-reach it through a Cloudflare Tunnel.
+reach it through a Cloudflare Tunnel. Order of work: the tunnel, the Access application with its
+policies, the connector on the server, the route, then a check from outside. The application comes
+before the route because until `install.sh --harden` runs, sshd still accepts root and password
+logins: the hostname must never be reachable without Access in front of it.
 
-1. Zero Trust → Networks → Tunnels → Create a tunnel (Cloudflared), named `jainav-vps`. Run
-   the install command it shows on the VPS: the pinned `cloudflared` release the kit names, checked against its published sha256
-   ([server.md §1](server.md#1-provision-the-vps)), then `cloudflared service install` with the
-   token read from a file, not typed in a command line. The connector only makes outbound
-   connections and is never auto-updated; update it by hand within a year of Cloudflare's latest
-   release.
-2. In the tunnel, add a public hostname `ssh.jainavinfotech.in` with service `ssh://localhost:22`.
-3. Zero Trust → Access → Service Auth → Create one service token per app that deploys:
-   `github-deploy-jainav` here, and another for each further app. Each token's client ID and
-   secret go in that app's GitHub environment secrets `CF_ACCESS_CLIENT_ID` and
-   `CF_ACCESS_CLIENT_SECRET` ([server.md §4](server.md#4-github-setup-once)).
-4. Access → Applications → Add → Self-hosted, domain `ssh.jainavinfotech.in`, two policies:
-   - _Service Auth_: include every `github-deploy-<app>` token;
-   - _Allow_: include your own email, for interactive sessions.
-5. On your machine, install `cloudflared` and add the `Host jainav` block from
-   [server.md §1](server.md#1-provision-the-vps). `ssh jainav` opens a browser sign-in the
-   first time.
-6. Once `ssh jainav` works, close port 22 in Hostinger's firewall (hPanel → VPS → Security →
-   Firewall) and run `install.sh --harden` ([server.md §1](server.md#1-provision-the-vps)).
+1. **Zero Trust onboarding.** The first visit asks for a team name, then a plan: choose Zero Trust
+   Free. It still asks for a payment method; the Free plan isn't charged. Below, `<team>` is the
+   team name.
+2. **The tunnel.** Networking → Tunnels → Create a tunnel, type Cloudflared, name `jainav-vps`,
+   then Create Tunnel. The next page shows install commands and an "Install as service" box with
+   `sudo cloudflared service install <token>`, the token masked. Take only the token, with that
+   box's copy button: don't run Cloudflare's install commands (the kit installs its own pinned
+   `cloudflared`, checked against its sha256) and don't click Cancel. The Continue button stays
+   disabled until a connector has connected; that is expected. Connect the server in step 7 and
+   add the route in step 8, from the tunnel's own page.
+3. **One-time PIN.** It isn't enabled in a new organization. Integrations → Identity providers →
+   Add new identity provider → One-time PIN. In each Access application, select One-time PIN as the
+   only login method.
+4. **The service token.** Access controls → Service credentials → Service Tokens → Create Service
+   Token. Name `github-deploy-jainav` (one token per app that deploys), Service Token Duration 1
+   year, then Generate token. The Client ID and Client Secret are shown once: keep both in the
+   password manager. They become that app's GitHub environment secrets `CF_ACCESS_CLIENT_ID` and
+   `CF_ACCESS_CLIENT_SECRET` ([server.md §4](server.md#4-github-setup-once)). Add a notification
+   (Notifications → Expiring Access Service Token) so Cloudflare warns a week before a token
+   expires. Refresh on the token extends it by a year.
+5. **The policies**, made once and reused. Access controls → Policies → Add a policy:
+   - `admins`: Action Allow, Include → Emails → the people who run the server.
+   - `deploy-tokens`: Action Service Auth, Include → Service Token → every `github-deploy-<app>`
+     token. The Service Token selector appears only once the Action is Service Auth. Service
+     tokens go in a Service Auth policy, never in an Allow policy.
+
+   Service Auth and Bypass policies are evaluated before Allow and Block.
+
+6. **The application.** Access controls → Applications → Create new application → Self-hosted and
+   private → Add public hostname: subdomain `ssh`, domain `jainavinfotech.in`. Name it
+   `jainav-ssh`. Attach both policies (`admins`, `deploy-tokens`), login method One-time PIN only,
+   session duration 24 hours.
+7. **The connector, on the server**, as in [server.md §1 step 9](server.md#1-provision-the-vps),
+   with the token from the copy button. The connector only makes outbound connections and is never
+   auto-updated; update it by hand within a year of Cloudflare's latest release.
+8. **The route, last.** The tunnel → Routes → Add route → Published application. Subdomain `ssh`,
+   Domain `jainavinfotech.in`, Path empty, Service URL `ssh://localhost:22`. The Service URL is one
+   field and includes the scheme; Add route stays disabled while it is empty. Cloudflare creates
+   the proxied `ssh` DNS record itself.
+9. **Check from outside**, right after adding the route:
+
+   ```bash
+   curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://ssh.jainavinfotech.in/
+   ```
+
+   It must print `302` and a URL on `<team>.cloudflareaccess.com` (the Access login page). If it
+   doesn't, delete the route at once. A WebSocket upgrade request gets the same 302.
+
+10. **Your machine:** install `cloudflared`, add the `Host jainav` block, pre-trust the host keys
+    and log in as in [server.md §1](server.md#1-provision-the-vps), steps 10 and 11.
+11. Once `ssh jainav` works, close port 22 in Hostinger's firewall (hPanel → VPS → Security →
+    Firewall) and run `install.sh --harden` ([server.md §1](server.md#1-provision-the-vps)).
 
 ## R2
 
