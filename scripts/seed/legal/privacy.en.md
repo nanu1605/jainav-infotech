@@ -56,7 +56,7 @@ For cookies and browser storage, see the [Cookie Policy](/legal/cookies).
 - **Cloudflare:** all site traffic is decrypted there and encrypted again, so it handles your IP address, browser details and everything you send, to deliver and protect the site. It also stores CVs, invoice PDFs and encrypted backups.
 - **Hostinger:** runs the server that holds our database and logs.
 - **Resend:** sends our emails, so it receives their addresses, content and attachments, including staff alerts with everything you typed in a form, sign-in codes, license keys and invoices.
-- **{{MAILBOX_PROVIDER}}:** hosts our mailbox, which receives those alerts and your emails, and sends our replies.
+- **GoDaddy:** hosts our mailbox, which receives those alerts and your emails, and sends our replies.
 - **Razorpay:** only when you pay. It receives the amount, order number, your name, email and phone, and what you enter in its window.
 - **Telegram:** staff alerts such as the form type, job, budget band, or order or ticket number, with no contact details or messages.
 - **Sentry:** when switched on, the error reports described under Technical data.

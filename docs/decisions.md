@@ -13,7 +13,7 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
 | International sales at launch | Off (INR only)                                                                                              |
 | Hosting                       | VPS + Docker (§18.2); one KVM 4 shared with MenuMesh (Phase 6)                                              |
 | Admin protection              | Cloudflare Access + login lockout; TOTP later                                                               |
-| Mailbox provider              | Tanishq's choice                                                                                            |
+| Mailbox provider              | GoDaddy email, bought with the domain (Phase 6)                                                             |
 | Domain                        | `jainavinfotech.in`; `http://localhost:3000` in development                                                 |
 
 ## Phase 0
@@ -456,3 +456,11 @@ The KVM 4 came with more than plain Ubuntu 24.04. What the setup does with each 
 - **The Monarx agent is removed** (Tanishq's choice, 2026-11-11). It is Hostinger's malware scanner for PHP sites: it runs as root, can upload files to its vendor, and came with its own apt source, a signing key trusted for every source and a weekly cron job that reinstalls it. Nothing here runs PHP, and a root scanner that sends files off the server doesn't belong on one that holds the apps' secrets and customer data; it would also be one more party with access to that data. hPanel's Malware Scanner stays off, because it installs the agent again.
 - **The Docker prune jobs are removed.** The nightly `docker image prune -af --filter until=24h` would delete the previous image and the tools images after each deploy; `app-deploy` and hostwatch clean up images themselves and keep those. The weekly build-cache prune has nothing to do on a server that builds nothing.
 - **Docker stays as the image installed it.** It came from Docker's repository at the pinned versions (Docker 29.9.3, Compose 5.7.0), so the packages are only held. buildx and the rootless extras are removed: nothing builds images on the server. `install.sh` replaces the image's `daemon.json` (json-file logs and its own address pools) and keeps it as `daemon.json.bak`.
+
+## GoDaddy mail (2026-11-11)
+
+The company email was bought from GoDaddy with the domain, so the mailbox stays there (Tanishq, 2026-11-11). Only the nameservers moved to Cloudflare; the registration stays at GoDaddy as well.
+
+- **GoDaddy's mail records moved with their values,** all DNS only (the import had proxied the `email` CNAME): two MX records, the SPF record, the autodiscover SRV record and the `email` CNAME (`docs/runbooks/cloudflare.md`, Email). Nothing else of GoDaddy's stays: its parking `A` record on the apex, its `www` CNAME and its `_domainconnect` CNAME go, and the apex and `www` get our A records at launch. The privacy policy and `docs/privacy-data-map.md` name GoDaddy where the mailbox blank was.
+- **Webmail opens at `https://email.secureserver.net`, not `email.jainavinfotech.in`.** GoDaddy has no certificate for our name. Proxied, the shortcut would fail once SSL is Full (strict); DNS only, it works over plain HTTP until a browser has seen the site's HSTS header, which covers subdomains.
+- **GoDaddy's DMARC record stays until launch step 11.** It is already `p=quarantine`, but its reports go to GoDaddy's address, not to us. Step 11 replaces it with the record spec §18.6 asks for: `p=none` with reports to `dmarc@`, then `p=quarantine` after 2–4 clean weeks.

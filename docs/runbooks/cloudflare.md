@@ -20,6 +20,11 @@ Do these in the Cloudflare dashboard for the domain's zone.
 
 All the site names are **A records only**: no AAAA record anywhere, because the origin takes no IPv6 traffic. Nothing that is DNS-only points at the server: a DNS-only record would show its address and let anyone connect around Cloudflare. Mail and `status` records point at the mail provider and the status page, never at the VPS.
 
+The zone moved from GoDaddy on 2026-11-11, nameservers only: the registration and the mailbox stay
+at GoDaddy. Of GoDaddy's records only the mail records stay ([Email](#email)). Its parking `A`
+record on the apex, its `www` CNAME and its `_domainconnect` CNAME go; the apex and `www` get the
+A records in the table above at launch.
+
 ## SSL
 
 - SSL/TLS → Overview: **Full (strict)**.
@@ -132,11 +137,31 @@ Two kinds of mail, kept apart:
   Resend → Domains → Add `send.jainavinfotech.in` (or the name Resend suggests) and create the records
   it lists: its DKIM `TXT`, plus the `MX` and SPF `TXT` (`v=spf1 include:amazonses.com ~all`)
   on its return-path subdomain. `EMAIL_FROM` is an address on that domain.
-- **Mailboxes** (hello@, sales@, support@, careers@, privacy@): the provider Tanishq picks
-  (Zoho Mail, Google Workspace…). Add its `MX` records and its SPF `TXT` on the apex, e.g.
-  `v=spf1 include:zoho.in ~all`. One SPF record per name.
+- **Mailboxes** (hello@, sales@, support@, careers@, privacy@, and dmarc@ for the DMARC reports
+  below): GoDaddy's email, bought with the domain. In GoDaddy's email settings, make each address
+  reach the mailbox, as a mailbox of its own, an alias or a forward.
 
-DMARC, on `_dmarc.jainavinfotech.in`:
+GoDaddy's mail records came over with the zone. Keep their values and set every one to **DNS only**
+(the import had proxied `email`):
+
+| Name                 | Type  | Value                                                           |
+| -------------------- | ----- | --------------------------------------------------------------- |
+| `jainavinfotech.in`  | MX    | `smtp.secureserver.net`, priority 0                             |
+| `jainavinfotech.in`  | MX    | `mailstore1.secureserver.net`, priority 10                      |
+| `jainavinfotech.in`  | TXT   | `v=spf1 include:secureserver.net -all`                          |
+| `_autodiscover._tcp` | SRV   | `autodiscover.secureserver.net`, port 443, priority 0, weight 0 |
+| `email`              | CNAME | `email.secureserver.net`                                        |
+
+One SPF record per name: the apex keeps GoDaddy's, and Resend's goes on its own subdomain. The SRV
+record lets mail apps find their settings. `email` is GoDaddy's webmail shortcut, but GoDaddy has
+no certificate for our name, so it only works over plain HTTP, and browsers that have seen the
+site's HSTS header (`includeSubDomains`) refuse plain HTTP for it. Open webmail at
+<https://email.secureserver.net> instead. If GoDaddy's email settings ever report its records
+missing, compare the zone with this table before changing anything.
+
+DMARC, on `_dmarc.jainavinfotech.in`. Until launch the zone keeps GoDaddy's own record
+(`v=DMARC1; p=quarantine; adkim=r; aspf=r; rua=mailto:dmarc_rua@onsecureserver.net;`), whose
+reports go to GoDaddy. At launch step 11 ([launch.md](launch.md)), replace it with ours:
 
 ```
 v=DMARC1; p=none; rua=mailto:dmarc@jainavinfotech.in; adkim=s; aspf=r; fo=1
