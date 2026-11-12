@@ -231,8 +231,24 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
     With `gha-jainav-production` it answers `pong jainav production`; any other request gets
     `app-deploy: bad request` and exit status 2.
 
-12. **A second admin key.** Protect the first key with a passphrase (`ssh-keygen -p -f <key>`) and
-    add a second key from another device to `ops` (`/home/ops/.ssh/authorized_keys`).
+12. **A second admin key.** With a single key, losing that file or the PC means no SSH until you
+    fix it from the Web Console. Protect the first key with a passphrase (`ssh-keygen -p -f <key>`)
+    and give `ops` a second key:
+    - make it on another device if you have one. Otherwise make it on the same PC with its own
+      passphrase, and keep the private key file and its passphrase in the password manager, so the
+      key outlives the PC:
+
+      ```bash
+      ssh-keygen -t ed25519 -a 100 -C jainav-backup-admin -f "$HOME/.ssh/jainav_vps_backup"
+      ```
+
+    - put its `.pub` in the kit as `keys/ops-<name>.pub` and run step 8's command again with a
+      second `--admin-key-fpr` for it (the SHA256 line of `ssh-keygen -lf` on the `.pub`).
+      `install.sh` only adds keys to `ops`; the keys already there stay, including any added by
+      hand;
+    - log in with it once through the tunnel: copy step 10's `jainav` entry under a new name and
+      change only its `IdentityFile` to the new key. With `IdentitiesOnly yes` it offers that key
+      alone, so the login proves the new key works.
 13. **Web Console login.** In hPanel open the VPS's Web Console and log in as `root` with the
     password. It is a serial console and does not depend on sshd, so it is the way back in if the
     tunnel breaks ([§9](#9-break-glass)). Check it works before hardening.
@@ -507,9 +523,29 @@ compose.prod.yml`. It checks the file (no privileged mode, host paths, ports, de
 redact`; see [edge.md](edge.md).
 - **Env files:** edit and `sudo install` them again, then recreate the service that reads them.
   `images.env` is written by `app-deploy`; never edit it while a deploy runs.
-- **Host scripts and settings:** copy the new kit to `/root/kit` and run `install.sh` again. It
-  rewrites only what differs, and never overwrites `/etc/apps/*.conf`, `edge.env` or
-  `hostwatch.env`.
+- **Host scripts and settings:** bring a new kit with the same `host/`, `edge/` and `keys/` as
+  §1 step 7. Keep every key file in `keys/`: `install.sh` rewrites each deploy user's keys from
+  the kit, so a key file left out revokes that key. After hardening root has no SSH, so copy the
+  kit as `ops` and install it with `sudo`. On the PC, make a new folder named `keys` next to the
+  repository's folder and copy only the `.pub` files into it (never a private key). Then, from the
+  repository root (the relative path works in PowerShell and in Git Bash):
+
+  ```bash
+  ssh jainav 'rm -rf ~/kit && mkdir ~/kit'
+  scp -r docker/host docker/edge ../keys jainav:kit/
+  ```
+
+  Then on the server:
+
+  ```bash
+  sudo rm -rf /root/kit && sudo cp -r ~/kit /root/kit && sudo chown -R root:root /root/kit
+  sudo bash /root/kit/host/install.sh --harden && rm -rf ~/kit
+  ```
+
+  `--harden` keeps the hardening file in step with the kit; sshd restarts only if something
+  changed. `install.sh` rewrites only what differs, and never overwrites `/etc/apps/*.conf`,
+  `edge.env` or `hostwatch.env`.
+
 - `postgres/roles.sh` only runs on an empty volume: add a database later with `psql` instead.
 
 A recreate costs a few seconds of downtime for that service; Postgres is not recreated by a
