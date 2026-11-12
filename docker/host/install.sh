@@ -5,7 +5,8 @@
 # The kit is /root/kit/host (this directory), /root/kit/edge and /root/kit/keys (gha-<app>-<env>.pub).
 # Safe to run again: a file is rewritten only when it differs, and nothing the admin filled in
 # (/etc/apps/*.conf, edge.env, hostwatch.env) is ever overwritten. Hardening runs only on request,
-# last, and refuses unless ops has a key and a password and cloudflared holds a tunnel connection.
+# last, and refuses unless ops has a key and a password, cloudflared is enabled with a token that
+# survives a restart (a token file that exists, or an inline token) and holds a tunnel connection.
 set -euo pipefail
 shopt -s inherit_errexit nullglob
 umask 022
@@ -46,7 +47,8 @@ usage: install.sh [--admin-key-fpr SHA256:...]... [--bootstrap-ssh-from <ipv4>] 
   --bootstrap-ssh-from  your IPv4: SSH to the public address is allowed from it until --harden
   --harden              install 00-hardening.conf, switch ssh.socket to ssh.service and remove the
                         bootstrap allowance; refuses unless ops has a key and a password and
-                        cloudflared holds a tunnel connection
+                        cloudflared is enabled, has its token (a token file must exist and not be
+                        empty) and holds a tunnel connection
   --harden-without-tunnel  --harden without the tunnel check: for a rehearsal VM only
 EOF
   exit 2
@@ -589,14 +591,75 @@ report() {
   if [ "$(passwd -S ops | awk '{ print $2 }')" != P ]; then say "next: run passwd ops (sudo asks for it)"; fi
 }
 
+# Where the unit gets its token: "file PATH" (--token-file, TUNNEL_TOKEN_FILE), "inline" (--token,
+# TUNNEL_TOKEN) or "none". Read from ExecStart, Environment= and EnvironmentFile=; a token file must
+# be an absolute path without spaces. A second "cloudflared service install" deletes the token file
+# while the running connector keeps its connections, so a live tunnel does not prove the next start
+# works.
+cloudflared_token_source() {
+  local argv env envf f l v w last="" inline=0
+  local -a words=()
+  argv=$(systemctl show cloudflared.service -p ExecStart --value 2>/dev/null |
+    sed -n 's/.*argv\[\]=\(.*\) ; ignore_errors=.*/\1/p') || argv=
+  env=$(systemctl show cloudflared.service -p Environment --value 2>/dev/null) || env=
+  envf=$(systemctl show cloudflared.service -p EnvironmentFiles --value 2>/dev/null |
+    sed -n 's/^\([^ ]*\) (ignore_errors=.*/\1/p') || envf=
+  read -ra words <<<"$argv"
+  for w in "${words[@]}"; do
+    case $w in
+      --token-file=?*) say "file ${w#*=}"; return 0 ;;
+      --token=?*) inline=1 ;;
+    esac
+    if [ "$last" = --token-file ] && [ -n "$w" ]; then say "file $w"; return 0; fi
+    if [ "$w" = --token ]; then inline=1; fi
+    last=$w
+  done
+  read -ra words <<<"$env"
+  for w in "${words[@]}"; do
+    case $w in
+      TUNNEL_TOKEN_FILE=?*) say "file ${w#*=}"; return 0 ;;
+      TUNNEL_TOKEN=?*) inline=1 ;;
+    esac
+  done
+  # EnvironmentFile= entries: read line by line, the values are never printed.
+  while IFS= read -r f; do
+    if [ -z "$f" ] || [ ! -r "$f" ]; then continue; fi
+    while IFS= read -r l || [ -n "$l" ]; do
+      v=${l#*=}
+      v=${v#[\"\']}
+      v=${v%[\"\']}
+      case $l in
+        TUNNEL_TOKEN_FILE=?*) [ -z "$v" ] || { say "file $v"; return 0; } ;;
+        TUNNEL_TOKEN=?*) inline=1 ;;
+      esac
+    done <"$f"
+  done <<<"$envf"
+  if [ "$inline" = 1 ]; then say inline; else say none; fi
+}
+
 # After hardening, SSH is reachable only through the tunnel: it must hold a connection first. A
 # login as ops through the tunnel (it arrives from loopback) in this boot's journal, and a second
 # key for ops, are warnings: the admin may be testing for the first time.
 harden_tunnel_checks() { # <ops authorized_keys>
-  local conns n=0 line t k login
+  local conns n=0 line t k login src tfile
   if [ "$TUNNEL_OPTIONAL" = 0 ]; then
     systemctl is-active --quiet cloudflared.service ||
       die "refusing to harden: cloudflared is not running (a rehearsal VM without a tunnel: --harden-without-tunnel)"
+    [ "$(systemctl is-enabled cloudflared.service 2>/dev/null)" = enabled ] ||
+      die "refusing to harden: cloudflared.service is not enabled, so it would not start after a reboot (systemctl enable cloudflared; docs/runbooks/server.md section 1 step 14)"
+    src=$(cloudflared_token_source)
+    case $src in
+      "file "*)
+        tfile=${src#file }
+        if [ ! -f "$tfile" ] || [ ! -s "$tfile" ]; then
+          die "refusing to harden: cloudflared runs now but would not start after a restart or reboot: its token file $tfile is missing, not a file or empty (docs/runbooks/server.md section 1 step 9: restore it)"
+        fi
+        if [ "$(stat -L -c %U "$tfile")" != root ] || [ $((8#$(stat -L -c %a "$tfile") & 8#077)) -ne 0 ]; then
+          warn "$tfile should be owned by root with mode 600 (chown root:root $tfile && chmod 600 $tfile)"
+        fi ;;
+      inline) ;; # in the unit itself: it survives a reboot
+      *) die "refusing to harden: cloudflared.service names no token (no --token-file, --token, TUNNEL_TOKEN_FILE or TUNNEL_TOKEN): it would not connect after a restart or reboot (docs/runbooks/server.md section 1 step 9)" ;;
+    esac
     conns=$(curl -fsS --max-time 5 http://127.0.0.1:20241/metrics 2>/dev/null |
       awk '$1 == "cloudflared_tunnel_ha_connections" { printf "%d", $2; exit }') || conns=
     [ "${conns:-0}" -ge 1 ] ||

@@ -145,20 +145,44 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
    `max 24.0G`. A log line stays 180 to 187 days, which the privacy policy states
    ([decisions.md](../decisions.md)).
 
-9. **cloudflared and the SSH tunnel.** Create the tunnel and its Access application first
-   ([cloudflare.md](cloudflare.md#ssh-tunnel)). Then install `cloudflared` from the same release
-   and checksum that `.github/workflows/deploy.yml` pins, and connect it:
+9. **cloudflared and the SSH tunnel.** Install `cloudflared` from the same release and checksum
+   that `.github/workflows/deploy.yml` pins. The order is: the tunnel and the Access application
+   first, the connector here, the route last, then the outside check
+   ([cloudflare.md](cloudflare.md#ssh-tunnel)). Install the service once, from the root session,
+   with this one line; `read` then waits for the token, so paste it at the prompt. It stays off
+   the screen and out of the shell history, and `${T##* }` keeps only the last word, so the bare
+   token and the whole copied command both work:
 
    ```bash
-   cloudflared service install "$(cat)"    # paste the tunnel token, then Ctrl-D
-   systemctl cat cloudflared               # ExecStart must show --token-file
-   systemctl restart cloudflared
+   read -rsp 'Token or copied command: ' T; echo; cloudflared service install --no-update-service "${T##* }"; unset T
+   ```
+
+   `--no-update-service` goes before the token. Without it, cloudflared also installs an update
+   service and a daily timer that replace the binary with Cloudflare's latest release; the kit
+   pins the release and updates are made by hand. Check the result (never print the token file):
+
+   ```bash
+   systemctl cat cloudflared | grep ExecStart    # … tunnel run --token-file /etc/cloudflared/token
+   stat -c '%a %U %s' /etc/cloudflared/token     # 600 root, and a size above 0
+   systemctl list-unit-files 'cloudflared*'      # cloudflared.service only
+   systemctl restart cloudflared                 # applies the kit's drop-in, proves the file works
    curl -s http://127.0.0.1:20241/metrics | grep '^cloudflared_tunnel_ha_connections'   # 1 or more
    ```
 
-   The kit's drop-in `10-kit.conf` (`install.sh` put it there) limits its memory and opens the
-   metrics on loopback only. Run `install.sh` again afterwards if it was installed before
-   `cloudflared`.
+   If `cloudflared-update.timer` is listed, run `systemctl disable --now cloudflared-update.timer`.
+   Never run `service install` a second time: it fails and its cleanup deletes the token file. The
+   running connector keeps its connections, so nothing looks wrong, but the next restart or reboot
+   fails, and after hardening that means no SSH. To restore the file, run this one line and paste
+   the token at its prompt:
+
+   ```bash
+   read -rsp 'Token or copied command: ' T; echo; T=${T##* }; (umask 077; printf '%s' "$T" > /etc/cloudflared/token); unset T; systemctl restart cloudflared && echo restarted
+   ```
+
+   The kit's drop-in `10-kit.conf` limits its memory and opens the metrics on loopback only;
+   `install.sh` puts it in place whether or not `cloudflared` is installed yet, and the restart
+   above applies it. Once the route exists, `journalctl -u cloudflared` shows "Updated to new
+   configuration" with the ssh hostname and `ssh://localhost:22`.
 
 10. **Your SSH config** (`~/.ssh/config`), for the commands below:
 
@@ -166,18 +190,46 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
     Host jainav
       HostName ssh.jainavinfotech.in
       User ops
+      IdentityFile ~/.ssh/<your admin key>
+      IdentitiesOnly yes
       ProxyCommand cloudflared access ssh --hostname %h
     ```
 
-11. **Log in through the tunnel**, from a new terminal on your machine: `ssh jainav`, then
-    `sudo -v`. Check the deploy key too (it needs no shell and must refuse anything but its
-    request):
+    `IdentityFile` is needed when the admin key's file has a non-default name. On Windows,
+    `winget install --id Cloudflare.cloudflared --exact --version <the release deploy.yml pins>`
+    installs `cloudflared` machine-wide and adds it to the PATH: open a new terminal afterwards, or
+    give the full path in double quotes,
+    `ProxyCommand "C:\Program Files (x86)\cloudflared\cloudflared.exe" access ssh --hostname %h`.
+    Both forms work with Windows' own ssh and with Git Bash's; an unquoted 8.3 short path does not
+    (Git Bash drops its backslashes).
+
+    Trust the server's host keys before the first login instead of answering a prompt. In the root
+    session, print known_hosts lines and append them to `~/.ssh/known_hosts` on your machine:
 
     ```bash
-    printf 'v1 ping\n' | ssh -i gha-jainav-staging -o ProxyCommand='cloudflared access ssh --hostname %h' \
-      deploy-jainav@ssh.jainavinfotech.in
+    awk '{ print "ssh.jainavinfotech.in", $1, $2 }' /etc/ssh/ssh_host_*_key.pub
+    ```
+
+    Then the first `ssh jainav` asks nothing. A trust prompt or a changed-key warning means: stop.
+
+11. **Log in through the tunnel**, from a new terminal on your machine: `ssh jainav`. The first
+    login opens the browser on the Access login (a one-time PIN sent to your email); `cloudflared`
+    keeps the token in `~/.cloudflared/`, so later logins within the session don't ask. sshd logs
+    the login as `Accepted publickey for ops from ::1` (or `127.0.0.1`), which
+    `install.sh --harden` looks for. Then run `sudo -v`: it asks for the password of `ops` and
+    prints nothing on success.
+
+    Check the deploy keys too. They need no shell and must refuse anything but their request; from
+    your machine they go through Access with your own login (CI uses the service token):
+
+    ```bash
+    printf 'v1 ping\n' | ssh -T -o IdentitiesOnly=yes -i gha-jainav-staging \
+      -o ProxyCommand='cloudflared access ssh --hostname %h' deploy-jainav@ssh.jainavinfotech.in
     # expect: pong jainav staging
     ```
+
+    With `gha-jainav-production` it answers `pong jainav production`; any other request gets
+    `app-deploy: bad request` and exit status 2.
 
 12. **A second admin key.** Protect the first key with a passphrase (`ssh-keygen -p -f <key>`) and
     add a second key from another device to `ops` (`/home/ops/.ssh/authorized_keys`).
@@ -190,10 +242,11 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
     bash /root/kit/host/install.sh --harden
     ```
 
-    It refuses unless `cloudflared` is active with a connection to Cloudflare, `ops` has a key and
-    a password, and `sshd -t` passes. It warns when `ops` has fewer than two keys or this boot
-    shows no login by `ops` through the tunnel. It turns off root login and passwords, moves sshd
-    to loopback only, and removes the host firewall's allowance for your IP address. Then:
+    It refuses unless `cloudflared` is enabled, running with a connection to Cloudflare, and has
+    the token file its unit reads (present, not empty); `ops` has a key and a password; and
+    `sshd -t` passes. It warns when `ops` has fewer than two keys or this boot shows no login by
+    `ops` through the tunnel. It turns off root login and passwords, moves sshd to loopback only,
+    and removes the host firewall's allowance for your IP address. Then:
     - `ss -tlnp | grep ':22 '` shows only `127.0.0.1` and `[::1]`;
     - open a fresh `ssh jainav` and run `sudo -v`, and only then close the root session;
     - delete the TCP 22 rule in hPanel; from outside, `nc -vz -w 5 <ip> 22` must time out.

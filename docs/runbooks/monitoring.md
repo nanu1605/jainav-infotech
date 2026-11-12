@@ -54,6 +54,9 @@ Every 5 minutes:
 - **unhealthy, restarts:** a container is `unhealthy`, or restarted since the last run.
 - **tunnel:** `cloudflared` is not active, or holds no connection to Cloudflare: no SSH and no
   deploys, though the sites keep working.
+- **tunnel token:** `cloudflared` would not start after a restart or reboot: its unit is not
+  enabled, or the token file it reads is missing or empty. It may run now, but after a reboot the
+  server has no SSH. Restore the file as in [server.md §1](server.md#1-provision-the-vps) step 9.
 - **limits, limitsum:** a running container has no memory or CPU limit, or the sum of the limits
   plus 1.5 GiB for the host no longer fits in RAM. App-apply's throwaway check containers are
   skipped.
