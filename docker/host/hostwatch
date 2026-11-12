@@ -644,7 +644,7 @@ cloudflared_token_source() {
   done
   # EnvironmentFile= entries: read line by line, the values are never printed.
   while IFS= read -r f; do
-    [ -n "$f" ] && [ -r "$f" ] || continue
+    if [ -z "$f" ] || [ ! -r "$f" ]; then continue; fi
     while IFS= read -r l || [ -n "$l" ]; do
       v=${l#*=}
       v=${v#[\"\']}

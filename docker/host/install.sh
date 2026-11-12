@@ -623,7 +623,7 @@ cloudflared_token_source() {
   done
   # EnvironmentFile= entries: read line by line, the values are never printed.
   while IFS= read -r f; do
-    [ -n "$f" ] && [ -r "$f" ] || continue
+    if [ -z "$f" ] || [ ! -r "$f" ]; then continue; fi
     while IFS= read -r l || [ -n "$l" ]; do
       v=${l#*=}
       v=${v#[\"\']}
@@ -651,8 +651,9 @@ harden_tunnel_checks() { # <ops authorized_keys>
     case $src in
       "file "*)
         tfile=${src#file }
-        [ -f "$tfile" ] && [ -s "$tfile" ] ||
+        if [ ! -f "$tfile" ] || [ ! -s "$tfile" ]; then
           die "refusing to harden: cloudflared runs now but would not start after a restart or reboot: its token file $tfile is missing, not a file or empty (docs/runbooks/server.md section 1 step 9: restore it)"
+        fi
         if [ "$(stat -L -c %U "$tfile")" != root ] || [ $((8#$(stat -L -c %a "$tfile") & 8#077)) -ne 0 ]; then
           warn "$tfile should be owned by root with mode 600 (chown root:root $tfile && chmod 600 $tfile)"
         fi ;;
