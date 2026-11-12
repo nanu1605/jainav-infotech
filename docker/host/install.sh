@@ -147,6 +147,88 @@ public_ssh_listener() {
   return 1
 }
 
+# PIDs of the sshd processes that listen on port 22, one per line.
+sshd_listener_pids() {
+  ss -H -tlnp 'sport = :22' |
+    awk '{ s = $0; while (match(s, /"sshd",pid=[0-9]+/)) { print substr(s, RSTART + 11, RLENGTH - 11); s = substr(s, RSTART + RLENGTH) } }' |
+    sort -u
+}
+
+# Does sshd answer on this address with its host keys? Listening is not enough: a listener whose
+# /run/sshd is gone accepts every connection and then drops it.
+ssh_answers() { # <address>
+  local out
+  out=$(ssh-keyscan -T 5 "$1" 2>/dev/null) || out=
+  [ -n "$out" ]
+}
+
+# sshd answers on loopback only, and its listener is ssh.service's main process, so that
+# systemctl stop and restart reach it.
+sshd_on_loopback() {
+  local listeners main pids
+  listeners=$(ss -H -tln 'sport = :22' | awk '{ print $4 }')
+  grep -Eq '^(127\.0\.0\.1|\[::1\]):22$' <<<"$listeners" || return 1
+  if public_ssh_listener; then return 1; fi
+  main=$(systemctl show -p MainPID --value ssh.service) || return 1
+  pids=$(sshd_listener_pids)
+  if [ -z "$main" ] || [ "$main" = 0 ] || ! grep -qx -- "$main" <<<"$pids"; then return 1; fi
+  ssh_answers 127.0.0.1 || ssh_answers ::1
+}
+
+# Stops sshd however it was started, and waits until nothing listens on port 22. An sshd that
+# systemd no longer tracks survives systemctl stop and keeps the port, so a new sshd cannot bind
+# (docs/decisions.md, "The sshd switch").
+stop_sshd() {
+  local n=0 pid
+  systemctl stop ssh.socket ssh.service || true
+  while [ -n "$(ss -H -tln 'sport = :22')" ]; do
+    n=$((n + 1))
+    [ "$n" -le 20 ] || return 1
+    for pid in $(sshd_listener_pids); do
+      if [ "$n" -le 10 ]; then kill -TERM "$pid" 2>/dev/null || true; else kill -KILL "$pid" 2>/dev/null || true; fi
+    done
+    sleep 0.5
+  done
+}
+
+# Moves sshd from ssh.socket to ssh.service on loopback only. Returns non-zero instead of exiting
+# when sshd does not come up that way; the caller then puts it back. sshd stops before ssh.service
+# is enabled: enabling adds the alias sshd.service, and on systemd 255 the reload that follows can
+# mark a running ssh.service as stopped (systemd#14141), after which systemctl stop misses its sshd.
+# Nor is enable --now used: on systemd 255 it exits 0 even when the start fails.
+switch_sshd() {
+  local n=0
+  systemctl disable ssh.socket || return 1
+  stop_sshd || return 1
+  systemctl enable ssh.service || return 1
+  systemctl reset-failed ssh.service 2>/dev/null || true
+  systemctl start ssh.service || return 1
+  until sshd_on_loopback; do
+    n=$((n + 1))
+    [ "$n" -le 10 ] || return 1
+    sleep 0.5
+  done
+}
+
+# Puts sshd back as it was before the switch: the previous hardening file (or none), and ssh.socket
+# or ssh.service. Succeeds if sshd answers afterwards; never exits on its own.
+rollback_sshd() { # <hardening file> <its saved copy, or empty> <socket was on: 0|1> <service was enabled: 0|1>
+  if [ -n "$2" ]; then cp -p "$2" "$1" || true; else rm -f "$1" || true; fi
+  stop_sshd || true
+  # The socket generator reads ListenAddress again, so ssh.socket listens where it did before.
+  systemctl daemon-reload || true
+  # Failed starts count towards the start limit, which would also refuse socket activation.
+  systemctl reset-failed ssh.service ssh.socket 2>/dev/null || true
+  if [ "$4" = 0 ]; then systemctl disable ssh.service || true; fi
+  if [ "$3" = 1 ]; then
+    systemctl enable ssh.socket || true
+    systemctl start ssh.socket || true
+  else
+    systemctl start ssh.service || true
+  fi
+  ssh_answers 127.0.0.1 || ssh_answers ::1
+}
+
 collect_admin_keys() {
   local fpr src line t k c fp found
   for fpr in "${ADMIN_FPRS[@]}"; do
@@ -694,9 +776,10 @@ print_timer_commands() {
   for t in "${off[@]}"; do say "systemctl enable --now $t"; done
 }
 
-# Last, and only on request. Every step before the switch can be undone by removing the file.
+# Last, and only on request. If sshd does not come up on loopback only, sshd goes back to how it
+# was, and the firewall keeps the bootstrap allowance.
 do_harden() {
-  local f=$SSHD_D/00-hardening.conf keys=/home/ops/.ssh/authorized_keys listeners mode
+  local f=$SSHD_D/00-hardening.conf keys=/home/ops/.ssh/authorized_keys mode saved='' sock=0 svc=0
   id -u ops >/dev/null 2>&1 || die "refusing to harden: there is no ops account"
   [ -s "$keys" ] || die "refusing to harden: ops has no authorized key"
   ssh-keygen -lf "$keys" >/dev/null || die "refusing to harden: $keys holds no valid key"
@@ -709,22 +792,27 @@ do_harden() {
   [ -f "$SSHD_D/10-users.conf" ] || die "refusing to harden: 10-users.conf is not installed"
   sshd -t || die "refusing to harden: sshd -t fails"
   harden_tunnel_checks "$keys"
+  if [ -f "$f" ]; then
+    saved=$WORK/00-hardening.conf.prev
+    cp -p "$f" "$saved"
+  fi
   put_sshd "$HOST_DIR/ssh/00-hardening.conf" "$f"
   sshd -t || die "refusing to harden: sshd -t fails with $f"
-  if systemctl is-enabled --quiet ssh.socket 2>/dev/null || systemctl is-active --quiet ssh.socket; then
-    systemctl disable --now ssh.socket
-    SSH_CHANGED=1
-  fi
-  systemctl enable --now ssh.service
-  if [ "$SSH_CHANGED" = 1 ]; then systemctl restart ssh.service; fi
-  sleep 1
-  listeners=$(ss -H -tln 'sport = :22' | awk '{ print $4 }')
-  if ! grep -Eq '^(127\.0\.0\.1|\[::1\]):22$' <<<"$listeners" || public_ssh_listener; then
-    # Back to how it was: the socket listens, and the hardening file is gone.
-    rm -f "$f"
-    systemctl stop ssh.service || true
-    systemctl enable --now ssh.socket || true
-    die "sshd is not listening on loopback only; the hardening is undone and ssh.socket is back"
+  if systemctl is-enabled --quiet ssh.socket 2>/dev/null || systemctl is-active --quiet ssh.socket; then sock=1; fi
+  if [ "$(systemctl is-enabled ssh.service 2>/dev/null)" = enabled ]; then svc=1; fi
+  # Run again on a hardened server, sshd restarts only if something changed.
+  if [ "$sock" = 1 ] || [ "$svc" = 0 ] || [ "$SSH_CHANGED" = 1 ] || ! sshd_on_loopback; then
+    # Nothing listens on port 22 for a moment: a dropped session or a Ctrl-C then must not stop
+    # the script before the switch is done or undone.
+    say "switching sshd to loopback only; interrupts are ignored until that is done or undone"
+    trap '' HUP INT TERM QUIT
+    if ! switch_sshd; then
+      if rollback_sshd "$f" "$saved" "$sock" "$svc"; then
+        die "sshd did not come up on loopback only (journalctl -u ssh -n 30), so the hardening is undone and sshd is back as it was"
+      fi
+      die "sshd did not come up on loopback only, and putting it back failed too: nothing answers on port 22. Keep this session open and fix it here or from the Web Console (docs/runbooks/server.md section 9; journalctl -u ssh -n 30)"
+    fi
+    trap - HUP INT TERM QUIT
   fi
   rm -f "$CF_DIR/bootstrap-ssh"
   "$SBIN/cf-ranges" firewall || die "cf-ranges firewall failed: journalctl -t cf-ranges -n 20"
