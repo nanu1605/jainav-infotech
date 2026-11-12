@@ -614,6 +614,77 @@ check_containers() {
   fi
 }
 
+# Where cloudflared's unit gets its token: "file PATH" (--token-file, TUNNEL_TOKEN_FILE), "inline"
+# (--token, TUNNEL_TOKEN) or "none". Read from ExecStart, Environment= and EnvironmentFile=; a token
+# file must be an absolute path without spaces. Same logic as install.sh.
+cloudflared_token_source() {
+  local argv env envf f l v w last="" inline=0
+  local -a words=()
+  argv=$(systemctl show cloudflared.service -p ExecStart --value 2>/dev/null |
+    sed -n 's/.*argv\[\]=\(.*\) ; ignore_errors=.*/\1/p') || argv=
+  env=$(systemctl show cloudflared.service -p Environment --value 2>/dev/null) || env=
+  envf=$(systemctl show cloudflared.service -p EnvironmentFiles --value 2>/dev/null |
+    sed -n 's/^\([^ ]*\) (ignore_errors=.*/\1/p') || envf=
+  read -ra words <<<"$argv"
+  for w in "${words[@]}"; do
+    case $w in
+      --token-file=?*) printf '%s\n' "file ${w#*=}"; return 0 ;;
+      --token=?*) inline=1 ;;
+    esac
+    if [ "$last" = --token-file ] && [ -n "$w" ]; then printf '%s\n' "file $w"; return 0; fi
+    if [ "$w" = --token ]; then inline=1; fi
+    last=$w
+  done
+  read -ra words <<<"$env"
+  for w in "${words[@]}"; do
+    case $w in
+      TUNNEL_TOKEN_FILE=?*) printf '%s\n' "file ${w#*=}"; return 0 ;;
+      TUNNEL_TOKEN=?*) inline=1 ;;
+    esac
+  done
+  # EnvironmentFile= entries: read line by line, the values are never printed.
+  while IFS= read -r f; do
+    [ -n "$f" ] && [ -r "$f" ] || continue
+    while IFS= read -r l || [ -n "$l" ]; do
+      v=${l#*=}
+      v=${v#[\"\']}
+      v=${v%[\"\']}
+      case $l in
+        TUNNEL_TOKEN_FILE=?*) [ -z "$v" ] || { printf '%s\n' "file $v"; return 0; } ;;
+        TUNNEL_TOKEN=?*) inline=1 ;;
+      esac
+    done <"$f"
+  done <<<"$envf"
+  if [ "$inline" = 1 ]; then echo inline; else echo none; fi
+}
+
+# A second "cloudflared service install" deletes the token file while the connector keeps its
+# connections: the tunnel check passes until the next restart or reboot. Only [ -f ] and [ -s ],
+# which need search permission on the directory, never a read of the token. Also judged: the unit
+# must be enabled, or a reboot leaves it stopped.
+check_tunnel_token() {
+  local src tfile
+  if ! systemctl cat cloudflared.service >/dev/null 2>&1; then
+    judge tunneltoken 0 "tunnel token: no cloudflared unit"
+    return 0
+  fi
+  if [ "$(systemctl is-enabled cloudflared.service 2>/dev/null)" != enabled ]; then
+    judge tunneltoken 2 "tunnel token: cloudflared.service is not enabled, so it would not start after a reboot (systemctl enable cloudflared)"
+    return 0
+  fi
+  src=$(cloudflared_token_source)
+  case $src in
+    "file "*)
+      tfile=${src#file }
+      if [ -f "$tfile" ] && [ -s "$tfile" ]; then
+        judge tunneltoken 0 "tunnel token: cloudflared's token file is in place"
+      else
+        judge tunneltoken 2 "tunnel token: cloudflared would not start after a restart or reboot: its token file $tfile is missing, not a file or empty (docs/runbooks/server.md section 1 step 9)"
+      fi ;;
+    inline) judge tunneltoken 0 "tunnel token: cloudflared's token is inline in its unit" ;;
+  esac
+}
+
 check_tunnel() {
   local state conns bad=0 level=0
   state=$(systemctl is-active cloudflared 2>/dev/null) || true
@@ -840,6 +911,7 @@ run_checks() {
   check_oom || failed check_oom
   check_cpu || failed check_cpu
   check_tunnel || failed check_tunnel
+  check_tunnel_token || failed check_tunnel_token
   check_ntp || failed check_ntp
   check_breakglass || failed check_breakglass
   check_listeners || failed check_listeners
