@@ -13,8 +13,10 @@ alert() {
   msg="[jainav] $1"
   echo "$msg" >&2
   if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
-    curl -fsS -o /dev/null "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-      --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=$msg" || true
+    # curl reads the URL, which holds the token, from stdin so it never shows in the process list.
+    printf 'url = "https://api.telegram.org/bot%s/sendMessage"\n' "$TELEGRAM_BOT_TOKEN" |
+      curl -fsS -o /dev/null --config - \
+        --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=$msg" || true
   fi
 }
 finish() {

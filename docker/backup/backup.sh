@@ -16,8 +16,10 @@ alert() {
   msg="[jainav] $1"
   echo "$msg" >&2
   if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
-    curl -fsS -o /dev/null "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-      --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=$msg" || true
+    # curl reads the URL, which holds the token, from stdin so it never shows in the process list.
+    printf 'url = "https://api.telegram.org/bot%s/sendMessage"\n' "$TELEGRAM_BOT_TOKEN" |
+      curl -fsS -o /dev/null --config - \
+        --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=$msg" || true
   fi
 }
 fail() { reason=$1; exit 1; }
@@ -32,8 +34,9 @@ for db in $BACKUP_DATABASES; do
   file="$tmp/$db-$stamp.dump.age"
   pg_dump --format=custom --no-owner --no-privileges --dbname="$db" |
     age --encrypt --recipient "$BACKUP_AGE_RECIPIENT" >"$file"
-  # A custom-format dump of even an empty database is a few KB; anything tiny is broken.
-  [ "$(wc -c <"$file")" -gt 1024 ] || fail "dump of $db is too small"
+  # age writes about 200 bytes even when pg_dump writes nothing, and an empty database is about
+  # 1 KB once encrypted, so 256 bytes or less means the dump is empty.
+  [ "$(wc -c <"$file")" -gt 256 ] || fail "dump of $db is too small"
 done
 
 # The settings archive: the host's timer (app-config-archive) encrypts the server's settings files
@@ -71,5 +74,6 @@ echo "backup $stamp done:$uploaded"
 # Last, so that a ping means every step above worked. A failed ping is only reported: the monitor
 # notices the missing one.
 if [ -n "${HEARTBEAT_URL:-}" ]; then
-  curl -fsS -m 10 --retry 3 -o /dev/null "$HEARTBEAT_URL" || echo "heartbeat ping failed" >&2
+  printf 'url = "%s"\n' "$HEARTBEAT_URL" |
+    curl -fsS -m 10 --retry 3 -o /dev/null --config - || echo "heartbeat ping failed" >&2
 fi

@@ -157,6 +157,10 @@ API tokens (R2 → Manage API tokens), each _Object Read & Write_ on the named b
 - the app (staging): the two staging buckets;
 - backups: `jainav-backups`.
 
+The env files need each token's S3 credentials, its Access Key ID and Secret Access Key, not the
+token value. Cloudflare shows them only once, when the token is created; if they weren't saved,
+roll the token to get new ones.
+
 `S3_ENDPOINT` / `BACKUP_S3_ENDPOINT` is `https://<account-id>.r2.cloudflarestorage.com`,
 `S3_REGION=auto`.
 
@@ -172,8 +176,15 @@ Two kinds of mail, kept apart:
 
 - **The site's mail** (auto-replies, alerts, newsletter): sent by Resend from a subdomain.
   Resend → Domains → Add `send.jainavinfotech.in` (or the name Resend suggests) and create the records
-  it lists: its DKIM `TXT`, plus the `MX` and SPF `TXT` (`v=spf1 include:amazonses.com ~all`)
-  on its return-path subdomain. `EMAIL_FROM` is an address on that domain.
+  it lists, copied exactly: their values depend on Resend's sending engine, so this page doesn't
+  repeat them. On 2026-11-15 they were a DKIM `TXT` at `resend._domainkey.send`, and on the
+  return-path subdomain `send.send` an `MX` (to `feedback.forge.rmta.net`) and an SPF `TXT`
+  (`ip4:` ranges, ending `~all`). Leave open and click tracking off (the domain's settings in
+  Resend): the site's emails carry no tracking pixels or rewritten links.
+  `EMAIL_FROM=hello@send.jainavinfotech.in`, a bare address (`src/payload.config.ts` sets the
+  display name "Jainav Infotech"). The sending domain receives no mail, so replies follow the
+  `Reply-To` that `src/lib/notify.ts` sets on every message (the routed inbox from site
+  settings, else `EMAIL_REPLY_TO`); `EMAIL_REPLY_TO` must be a real inbox.
 - **Mailboxes** (hello@, sales@, support@, careers@, privacy@, and dmarc@ for the DMARC reports
   below): GoDaddy's email, bought with the domain. In GoDaddy's email settings, make each address
   reach the mailbox, as a mailbox of its own, an alias or a forward.
