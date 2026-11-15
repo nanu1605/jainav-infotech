@@ -52,7 +52,7 @@ ten minutes before it (`sudo systemctl edit app-config-archive@<app>.timer`; the
 ```bash
 systemctl list-timers 'app-config-archive@*'
 sudo journalctl -t app-config-archive --since yesterday
-ls -l /srv/jainav/backup-out
+sudo ls -l /srv/jainav/backup-out
 ```
 
 ## The heartbeat
