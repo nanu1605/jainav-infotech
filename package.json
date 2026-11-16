@@ -36,7 +36,7 @@
     "lhci": "lhci autorun"
   },
   "dependencies": {
-    "@hookform/resolvers": "5.9.1",
+    "@hookform/resolvers": "7.0.1",
     "@marsidev/react-turnstile": "1.6.3",
     "@payloadcms/db-postgres": "3.93.0",
     "@payloadcms/email-resend": "3.93.0",
