@@ -17,7 +17,7 @@ const RAZORPAY = {
   img: ['https://cdn.razorpay.com'],
 }
 
-/** The origin of a URL (a Sentry DSN's ingest host included), or nothing when unset or invalid. */
+/** The origin of a URL, or nothing when unset or invalid. */
 const origin = (url: string | undefined) => {
   try {
     return url ? new URL(url).origin : undefined
@@ -26,20 +26,19 @@ const origin = (url: string | undefined) => {
   }
 }
 
-export type CspEnv = { cdnUrl?: string; umamiUrl?: string; sentryDsn?: string }
+export type CspEnv = { cdnUrl?: string; umamiUrl?: string }
 
 /**
  * Static CSP for every route (spec §16): pages are static, so no nonces; 'unsafe-inline' covers
  * Next's inline scripts. The admin adds Payload's Monaco editor.
  */
 export function contentSecurityPolicy(
-  { cdnUrl, umamiUrl, sentryDsn }: CspEnv,
+  { cdnUrl, umamiUrl }: CspEnv,
   { admin = false }: { admin?: boolean } = {},
 ): string {
   const monaco = admin ? MONACO : undefined
   const cdn = origin(cdnUrl)
   const umami = origin(umamiUrl)
-  const sentry = origin(sentryDsn)
   const sources = (...values: (string | undefined)[]) => values.filter(Boolean).join(' ')
   return [
     "default-src 'self'",
@@ -48,7 +47,8 @@ export function contentSecurityPolicy(
     `img-src ${sources("'self'", 'data:', 'blob:', cdn, GRAVATAR, ...RAZORPAY.img)}`,
     `media-src ${sources("'self'", 'blob:', cdn)}`,
     `font-src ${sources("'self'", 'data:', monaco)}`,
-    `connect-src ${sources("'self'", umami, sentry, ...RAZORPAY.connect)}`,
+    // Browsers send Sentry reports to the site's own /api/v1/relay, which 'self' covers.
+    `connect-src ${sources("'self'", umami, ...RAZORPAY.connect)}`,
     `frame-src ${sources("'self'", TURNSTILE, GOOGLE_MAPS, ...RAZORPAY.frame, ...EMBED_ALLOWED_HOSTS.map((h) => `https://${h}`))}`,
     // Monaco starts its web workers from data: URLs when it is loaded from another origin.
     `worker-src ${sources("'self'", 'blob:', admin ? 'data:' : undefined)}`,
