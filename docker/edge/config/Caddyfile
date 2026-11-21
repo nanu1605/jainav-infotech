@@ -25,6 +25,11 @@ import /etc/caddy/snippets.caddy
 		format filter {
 			import log_fields
 		}
+		# Without the admin API, which logs every request at info: the healthcheck reads it every
+		# 30 seconds (2,880 lines a day, a third of the server's journal). It logs to this log
+		# only, so its errors go too; they also reach the caller, and app-apply prints a failed
+		# reload (docs/decisions.md).
+		exclude admin.api
 	}
 }
 
