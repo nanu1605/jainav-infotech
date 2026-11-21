@@ -1410,9 +1410,10 @@ lock() {  # name: one run at a time; a second one gives up
   flock -n 9 || { say "hostwatch $1 is still running; skipped"; exit 0; }
 }
 
-# While Telegram refuses messages: probe it, and once it answers, send what was kept.
+# While Telegram refuses messages: probe it, and once it answers, send what was kept. Not after a
+# send failed in this run: getChat still answers for a bot that may not post or is rate limited.
 tg_recover() {
-  if [ -e "$TG_FAILED" ] && tg_probe; then rm -f "$TG_FAILED"; fi
+  if [ -e "$TG_FAILED" ] && [ "$TG_FAILS" -eq 0 ] && tg_probe; then rm -f "$TG_FAILED"; fi
   if [ ! -e "$TG_FAILED" ]; then outbox_flush; fi
 }
 
