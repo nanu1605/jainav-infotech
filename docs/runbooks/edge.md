@@ -139,9 +139,10 @@ generated on the server, so the private key never leaves it.
    They land in `/srv/edge/certs/jainav/` (`origin.pem` 0644, `origin-key.pem` 0600). On a new
    server it says that Caddy isn't running yet, then prints
    "installed the jainav certificates in /srv/edge/certs/jainav/". If the command is interrupted
-   (a closed session, Ctrl-C), run it again: an interrupted swap can leave a certificate and a key
-   that don't match, and running it again replaces both. Put the expiry on a calendar; hostwatch's
-   daily run also warns before it.
+   (a closed session, Ctrl-C), run it again. Neither stops it halfway: before the swap nothing has
+   changed, and once the swap has started `app-apply` finishes it, so the certificate and the key
+   in place still match. The second run replaces both and reloads Caddy. Put the expiry on a
+   calendar; hostwatch's daily run also warns before it.
 
 ### Authenticated origin pulls (a launch gate)
 
@@ -257,16 +258,21 @@ A `verify` alert means a rule is missing or out of place. Run `sudo cf-ranges fi
 `compose.yml` (`app-apply edge compose <file>` first) or to Caddy's image. Everything else, site
 files, snippets, ranges and certificates, is a reload that `app-apply` does itself.
 
-**A new Caddy version.** In the repository, change the tag in `docker/edge/compose.yml` and
-`CADDY_IMAGE` in `docker/host/apps/edge.conf` together; CI fails while they differ. On the server:
+**A new Caddy image.** The image is pinned by tag and digest (`caddy:<tag>@sha256:<digest>`), and
+`CADDY_IMAGE` carries both. Dependabot's pull request changes them in `docker/edge/compose.yml`,
+also when only the digest is new (the same tag, rebuilt). Copy the whole reference into
+`CADDY_IMAGE` in `docker/host/apps/edge.conf` in the same pull request; CI fails while the two
+differ. On the server:
 
-1. Set the same `CADDY_IMAGE` in `/etc/apps/edge.conf` (`sudoedit`). `install.sh` never
-   overwrites a conf, so a new kit leaves the server's copy as it was, and `app-apply` reads
-   `CADDY_IMAGE` from it for every check.
-2. `sudo app-apply edge compose ~/incoming/compose.yml`. It refuses a file whose image differs from
+1. Set the same `CADDY_IMAGE`, tag and digest, in `/etc/apps/edge.conf` (`sudoedit`).
+   `install.sh` never overwrites a conf, so a new kit leaves the server's copy as it was, and
+   `app-apply` reads `CADDY_IMAGE` from it for every check.
+2. Pull the image: `sudo docker pull "$(sed -n 's/^CADDY_IMAGE=//p' /etc/apps/edge.conf)"`.
+   Without it the next step pulls it, and a failed pull shows up as "caddy validate failed".
+3. `sudo app-apply edge compose ~/incoming/compose.yml`. It refuses a file whose image differs from
    `CADDY_IMAGE`, and validates the live config with the new image.
-3. `sudo app-compose edge up -d` to recreate Caddy, then run the leak test
-   ([§6](#6-the-leak-test)).
+4. Between 01:00 and 07:00 IST, `sudo app-compose edge up -d` to recreate Caddy (a few seconds of
+   downtime), then run the leak test ([§6](#6-the-leak-test)).
 
 ## 6. The leak test
 

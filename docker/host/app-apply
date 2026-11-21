@@ -760,6 +760,63 @@ edge_env_parse() { # edge_env_parse <edge.env> <prefix>: writes <prefix>.docker 
     }' "$1"
 }
 
+# For app-apply edge env: every *_AUTH_HASH holds a bcrypt hash (the one algorithm a site file's
+# basic_auth may name), the 60 characters of caddy hash-password. The parse above passes any text in
+# single quotes, so the example's placeholder would go in, and staging would then refuse every
+# login. The other edge commands leave this out: at bootstrap cf-ranges apply validates the tree
+# while edge.env is still the example (docs/runbooks/server.md §2). Only names are printed.
+check_auth_hashes() { # check_auth_hashes <prefix>: reads the <prefix>.docker of edge_env_parse
+  local line re='^\$2[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$'
+  while IFS= read -r line; do
+    case ${line%%=*} in *_AUTH_HASH) ;; *) continue ;; esac
+    [[ ${line#*=} =~ $re ]] ||
+      problem "${line%%=*} holds no bcrypt hash: make one as in docs/runbooks/server.md §2 and put its 60 characters between the single quotes"
+  done <"$1.docker"
+}
+
+# For app-apply edge validate, after its finish: the same check, as warnings, since a placeholder
+# leaves the tree valid. A hash typed in with sudoedit (docs/runbooks/server.md §2) never met
+# app-apply edge env.
+warn_auth_hashes() { # warn_auth_hashes <prefix>: the problems file is empty when it starts
+  local line
+  check_auth_hashes "$1"
+  while IFS= read -r line; do say "warning: $line"; done <"$work/problems"
+  : >"$work/problems"
+}
+
+# For other apps' kit checks, which source this file with APP_APPLY_SOURCE_ONLY=1: the two checks
+# app-apply edge env runs before its first finish (edge_env_parse, then check_auth_hashes), on any
+# edge.env file. Prints each problem on a line of its own and returns 1 if there was one, 0 if
+# none (2 for a usage error); it installs nothing and runs no Caddy. problem and edge_env_parse
+# write to $work/problems: here work is a local, a temporary directory removed at the end, so the
+# caller's is left alone. edge_env_parse needs env_prefixes, which reads ENV_PREFIX from every
+# /etc/apps/*.conf (a conf that load_conf refuses adds none: its die stays in a subshell). Off the
+# server there are none and every name is refused, so define env_prefixes after sourcing, for
+# example env_prefixes() { echo 'MENUMESH_ '; }. Sourcing also runs the lines at the top of this
+# file: set -euo pipefail, umask 022, PATH, LC_ALL and trap '' HUP PIPE.
+# shellcheck disable=SC2317,SC2329 # nothing here calls it: the scripts that source this file do
+edge_env_hash_check() { # edge_env_hash_check <edge.env file>
+  local work rc=0
+  if [ $# -ne 1 ]; then
+    printf 'usage: edge_env_hash_check <edge.env file>\n' >&2
+    return 2
+  fi
+  work=$(mktemp -d) || {
+    printf 'no temporary directory for the check of %s\n' "$1"
+    return 1
+  }
+  : >"$work/problems"
+  if ! { edge_env_parse "$1" "$work/edge" && check_auth_hashes "$work/edge"; }; then
+    problem "$1 could not be checked"
+  fi
+  if [ -s "$work/problems" ]; then
+    cat -- "$work/problems"
+    rc=1
+  fi
+  rm -rf -- "$work"
+  return "$rc"
+}
+
 # A throwaway Caddy from the pinned image: no network, a read-only root with small tmpfs mounts, the
 # capabilities of edge-caddy-1, and no log driver, because the daemon's journald default would copy
 # what Caddy prints (the adapted JSON, secrets included) into the journal. The limits are those of
@@ -796,12 +853,12 @@ tree_validate() { # tree_validate <config dir> <certs dir> <docker env file>
   redact "$3" <"$work/validate.out" | grep -v '"level":"info"' | sed 's/^/    /' >>"$work/problems" || true
 }
 
-caddy_running() { [ "$(clean docker inspect -f '{{.State.Running}}' "$CADDY_CONTAINER" 2>/dev/null)" = true ]; }
+caddy_running() { [ "$(clean timeout 30 docker inspect -f '{{.State.Running}}' "$CADDY_CONTAINER" 2>/dev/null)" = true ]; }
 
 # The running container's own variables (the image's left out), in $work/running.env: a reload
 # adapts the files with these, and they differ from edge.env while a recreate is pending.
 running_env() {
-  clean docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$CADDY_CONTAINER" 2>/dev/null |
+  clean timeout 30 docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$CADDY_CONTAINER" 2>/dev/null |
     grep -Ev '^(PATH|HOME|HOSTNAME|CADDY_VERSION|XDG_CONFIG_HOME|XDG_DATA_HOME)=' >"$work/running.env" || true
 }
 
@@ -822,15 +879,16 @@ check_edge_env_applied() {
 
 # A reload swaps Caddy's config without dropping connections. --force, because a certificate change
 # leaves the config text as it was and Caddy would skip an unchanged config. A Caddy that isn't
-# running reads the files when it starts.
+# running reads the files when it starts. swap_in ignores INT and TERM around a reload, so each
+# docker call in it has a time limit (those of caddy_running and running_env too).
 reload_caddy() {
   if ! caddy_running; then
     say "$CADDY_CONTAINER is not running: the change applies when it starts"
     return 0
   fi
   running_env
-  if clean docker exec "$CADDY_CONTAINER" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile --force \
-    >"$work/reload.out" 2>&1; then
+  if clean timeout 120 docker exec "$CADDY_CONTAINER" \
+    caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile --force >"$work/reload.out" 2>&1; then
     redact "$work/edge.docker" "$work/running.env" <"$work/reload.out" | journal
     say "reloaded $CADDY_CONTAINER"
     return 0
@@ -841,10 +899,25 @@ reload_caddy() {
   return 1
 }
 
+# INT and TERM end app-apply, and cleanup then removes the work directory. swap_in holds them while
+# it swaps.
+exit_on_signals() {
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+}
+
 # Puts each staged file in place, keeping the one it replaces, then reloads Caddy. If the reload
-# fails, every old file goes back (a new one goes away) and Caddy reloads again.
+# fails, every old file goes back (a new one goes away) and Caddy reloads again. Once started it
+# runs to the end, or a new certificate could stay next to the old key and stop Caddy at its next
+# start: INT and TERM are ignored until then, as HUP and PIPE are throughout. Ignored, not trapped:
+# Ctrl-C reaches every process in the terminal's group, and only an ignored signal stays ignored in
+# the cp and mv of the swap. A terminal that is gone can't stop it either: say, die and the cat of a
+# failed reload's output end in || true, so a failed write never trips set -e. A hung docker can't
+# hold it open for good: each docker call of the reload has a time limit (timeout gives it a process
+# group of its own, out of Ctrl-C's reach), and a reload that runs out of time has failed.
 swap_in() { # swap_in <staged> <live> <mode> [<staged> <live> <mode>]...
   local live=() mode=() prev=() copy i
+  trap '' INT TERM
   while [ $# -ge 3 ]; do
     copy=$(keep_previous "$2")
     live+=("$2")
@@ -853,7 +926,10 @@ swap_in() { # swap_in <staged> <live> <mode> [<staged> <live> <mode>]...
     put "$1" "$2" "$3"
     shift 3
   done
-  if reload_caddy; then return 0; fi
+  if reload_caddy; then
+    exit_on_signals
+    return 0
+  fi
   for i in "${!live[@]}"; do
     if [ -n "${prev[$i]}" ]; then put "${prev[$i]}" "${live[$i]}" "${mode[$i]}"; else rm -f -- "${live[$i]}"; fi
   done
@@ -1244,12 +1320,14 @@ cmd_edge_config() { # cmd_edge_config <file> [<name to install it as>]
   say "installed $EDGE_DIR/config/$name"
 }
 
-# app-apply edge env <file>: the values behind {$NAME} in site files. Every site and the whole tree
-# must pass with the new values; Caddy gets them only when it is recreated.
+# app-apply edge env <file>: the values behind {$NAME} in site files. Every hash must be a bcrypt
+# hash, and every site and the whole tree must pass with the new values; Caddy gets them only when
+# it is recreated.
 cmd_edge_env() { # cmd_edge_env <file>
   load_conf edge
   take_in "$1" "$work/edge.env"
   edge_env_parse "$work/edge.env" "$work/edge"
+  check_auth_hashes "$work/edge"
   finish "the edge.env file"
   recheck_sites "$EDGE_DIR/config/snippets.caddy" "$work/edge"
   tree_validate "$EDGE_DIR/config" "$EDGE_DIR/certs" "$work/edge.docker"
@@ -1357,6 +1435,7 @@ check_live_edge() {
 cmd_edge_validate() {
   check_live_edge
   say "the live edge tree is valid"
+  warn_auth_hashes "$work/edge"
 }
 # For a file already written in place (prefer app-apply edge config|ranges, which can put the old
 # file back): Caddy reloads only a tree that passes.
@@ -1367,7 +1446,8 @@ cmd_edge_reload() {
   reload_caddy || die "Caddy's reload failed (above): it keeps running its previous config"
 }
 
-# tests/host/app-apply.sh sources everything above and runs the checks on files of its own.
+# tests/host/app-apply.sh sources everything above and runs the checks on files of its own; other
+# apps' kit checks source it for edge_env_hash_check.
 # shellcheck disable=SC2317 # return fails when the file is run, not sourced, and exit 0 follows
 if [ "${APP_APPLY_SOURCE_ONLY-}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
 
@@ -1410,8 +1490,7 @@ cleanup() {
   if [ "${#tmpfiles[@]}" -gt 0 ]; then rm -f -- "${tmpfiles[@]}"; fi
 }
 trap cleanup EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
+exit_on_signals
 : >"$work/problems"
 mkdir -- "$work/empty"
 

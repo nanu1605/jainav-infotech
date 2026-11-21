@@ -6,9 +6,13 @@
 #   - the text checks on docker/compose.prod.yml and docker/edge/compose.yml, and on small files
 #   - Compose's JSON of both files with dummy env files, through every jq rule that needs no root
 #     (needs docker compose and jq), and the rules on hand-written JSON (needs jq)
-#   - edge.env and log-redact files
-#   - docker/edge/config and the Jainav site file through the pinned Caddy: validate, the site
-#     file's checks, and a log-redact file (needs docker, the pinned image and openssl)
+#   - edge.env (the parse of every edge command, app-apply edge env's hash check, and
+#     edge_env_hash_check, which other apps' kit checks call) and log-redact files
+#   - swap_in under INT, TERM and a terminal that takes no writes, with a time limit on every docker
+#     call (docker is a stand-in)
+#   - docker/edge/config and the Jainav site file through the pinned Caddy: validate (also of the
+#     tree at bootstrap, with edge.env.example), the site file's checks, and a log-redact file
+#     (needs docker, the pinned image and openssl)
 # A part whose tool is missing prints a "skip -" line. CI runs it on ubuntu-24.04; Git Bash runs it
 # too (without jq).
 #   bash tests/host/app-apply.sh
@@ -51,7 +55,7 @@ skip() { printf 'skip - %s\n' "$1"; }
 
 # In a subshell: app-apply's functions, with what sourcing changes put back and the commands that
 # need a server stubbed. work is a fresh directory with an empty problems file.
-# shellcheck disable=SC2317 # clean, journal, logger and env_prefixes are called by app-apply's functions
+# shellcheck disable=SC2317,SC2329 # clean, journal, logger and env_prefixes are called by app-apply's functions
 setup_lib() {
   local path=$PATH
   # shellcheck source=/dev/null
@@ -118,7 +122,7 @@ expect_refused 'text: a top-level key' "$(text_case jainav "$(yml top "$head" 'c
 
 # --- env files and log-redact files ---
 
-env_case() { # env_case <content>: what edge_env_parse refuses
+env_case() { # env_case <content>: what edge_env_parse, the parse of every edge command, refuses
   (
     setup_lib
     printf '%s\n' "$1" >"$work/e.env"
@@ -126,12 +130,97 @@ env_case() { # env_case <content>: what edge_env_parse refuses
     cat "$work/problems"
   )
 }
+# A bcrypt hash as caddy hash-password prints it ($2a$, the cost, $ and 53 characters), of nothing.
+fake_hash="\$2a\$14\$./0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNO"
+example=$(cat "$root/docker/edge/edge.env.example")
 expect_clean 'edge.env: an app variable' "$(env_case 'JAINAV_DOMAIN=example.test')"
-expect_clean 'edge.env: a quoted hash' "$(env_case "JAINAV_STAGING_AUTH_HASH='\$2a\$14\$abcdef'")"
+expect_clean 'edge.env: a quoted hash' "$(env_case "JAINAV_STAGING_AUTH_HASH='$fake_hash'")"
+# At bootstrap cf-ranges apply validates the tree while edge.env is still the example.
+expect_clean 'edge.env: edge.env.example, placeholder hash and all' "$(env_case "$example")"
 expect_refused 'edge.env: CADDY_ADMIN' "$(env_case 'CADDY_ADMIN=0.0.0.0:2019')" 'starts with no app'
 expect_refused 'edge.env: HTTP_PROXY' "$(env_case 'HTTP_PROXY=http://jainav-app:3000')" 'starts with no app'
 expect_refused 'edge.env: COMPOSE_PROJECT_NAME' "$(env_case 'COMPOSE_PROJECT_NAME=jainav')" 'starts with no app'
 expect_refused 'edge.env: a value with a space' "$(env_case 'JAINAV_DOMAIN=a b')" 'plain'
+
+# app-apply edge env adds the hash check to the parse; app-apply edge validate only warns.
+install_case() { # install_case <content>: what app-apply edge env refuses before the site and Caddy checks
+  (
+    setup_lib
+    printf '%s\n' "$1" >"$work/e.env"
+    edge_env_parse "$work/e.env" "$work/edge"
+    check_auth_hashes "$work/edge"
+    cat "$work/problems"
+  )
+}
+warn_case() { # warn_case <content>: what app-apply edge validate prints after "the live edge tree is valid"
+  (
+    setup_lib
+    printf '%s\n' "$1" >"$work/e.env"
+    edge_env_parse "$work/e.env" "$work/edge"
+    warn_auth_hashes "$work/edge"
+    if [ -s "$work/problems" ]; then echo 'a problem is left behind, so validate would fail'; fi
+  )
+}
+with_hash() { # with_hash <value>: edge.env.example with that value for JAINAV_STAGING_AUTH_HASH
+  grep -v '^JAINAV_STAGING_AUTH_HASH=' <<<"$example"
+  printf 'JAINAV_STAGING_AUTH_HASH=%s\n' "$1"
+}
+nohash='JAINAV_STAGING_AUTH_HASH holds no bcrypt hash'
+expect_clean 'edge env: edge.env.example with a hash in place' "$(install_case "$(with_hash "'$fake_hash'")")"
+expect_refused 'edge env: the placeholder of edge.env.example' "$(install_case "$example")" "$nohash"
+expect_refused 'edge env: a hash one character short' "$(install_case "$(with_hash "'${fake_hash%?}'")")" "$nohash"
+expect_refused 'edge env: no hash between the quotes' "$(install_case "$(with_hash "''")")" "$nohash"
+expect_refused 'edge env: an empty hash' "$(install_case "$(with_hash '')")" "$nohash"
+out=$(warn_case "$example")
+if [[ $out == "warning: $nohash"* && $out != *$'\n'* ]]; then
+  ok 'edge validate: warns of the placeholder, and passes'
+else
+  bad 'edge validate: warns of the placeholder, and passes' 'no warning, or more than one line' "$out"
+fi
+expect_clean 'edge validate: no warning with a hash in place' "$(warn_case "$(with_hash "'$fake_hash'")")"
+
+# edge_env_hash_check, for other apps' kit checks: the same two checks in a work directory of its
+# own, which it removes; the caller's stays as it was.
+hash_check() { # hash_check <content>: its problems, its status, and what it left behind
+  (
+    setup_lib
+    printf '%s\n' "$1" >"$work/e.env"
+    mine=$work
+    TMPDIR=$work/tmp
+    export TMPDIR
+    mkdir "$TMPDIR"
+    # Not in $(...): a work it set without local would then stay set here.
+    edge_env_hash_check "$work/e.env" >"$mine/out"
+    st=$?
+    cat "$mine/out"
+    echo "status $st"
+    if [ "$work" != "$mine" ]; then echo "work is no longer the caller's"; fi
+    if [ -s "$work/problems" ]; then echo "the caller's problems file is not empty"; fi
+    if [ -n "$(ls -A "$TMPDIR")" ]; then echo 'its work directory is left behind'; fi
+  )
+}
+expect_hash_check() { # expect_hash_check <name> <content> [<text its refusal must hold>]
+  local out
+  out=$(hash_check "$2")
+  if [ -z "${3-}" ]; then
+    if [ "$out" = 'status 0' ]; then ok "$1"; else bad "$1" 'refused, or left something behind' "$out"; fi
+  elif [[ $out == *"$3"* && $out == *$'\n''status 1' ]]; then
+    ok "$1"
+  else
+    bad "$1" "not refused for: $3, or left something behind" "$out"
+  fi
+}
+expect_hash_check 'kit check: the placeholder of edge.env.example' "$example" "$nohash"
+expect_hash_check 'kit check: a bcrypt hash of version 2a' "$(with_hash "'$fake_hash'")"
+expect_hash_check 'kit check: a bcrypt hash of version 2b' "$(with_hash "'\$2b${fake_hash#\$2a}'")"
+expect_hash_check 'kit check: a bcrypt hash of version 2y' "$(with_hash "'\$2y${fake_hash#\$2a}'")"
+expect_hash_check 'kit check: a name without an app prefix' 'CADDY_ADMIN=0.0.0.0:2019' 'starts with no app'
+st=0
+(
+  setup_lib
+  edge_env_hash_check 2>/dev/null
+) || st=$?
+if [ "$st" = 2 ]; then ok 'kit check: no file named is a usage error'; else bad 'kit check: no file named is a usage error' "exit $st"; fi
 
 redact_case() { # redact_case <content>: what check_redact_text refuses
   (
@@ -163,6 +252,77 @@ out=$(bash "$root/docker/host/app-apply" edge redact nosuchapp /dev/null 2>&1)
 st=$?
 set -e
 if [ "$st" = 2 ] && [[ $out == *'unknown app nosuchapp'* ]]; then ok 'edge redact needs a configured app'; else bad 'edge redact needs a configured app' "exit $st" "$out"; fi
+
+# --- the swap ---
+
+# swap_in as app-apply edge cert runs it, on a certificate and its key: under app-apply's traps and
+# set -euo pipefail, with INT and TERM sent after every file it moves, and a terminal that takes no
+# writes (/dev/full, like an SSH session that is gone). docker stands in for edge-caddy-1, whose
+# first <n> reloads fail, and each call to it must come with a time limit: nothing else ends a hung
+# one while INT and TERM are ignored. Prints what went wrong.
+# shellcheck disable=SC2317,SC2329 # clean and mv are called by app-apply's functions
+swap_case() { # swap_case <reloads that fail: 0 or 1>
+  (
+    setup_lib
+    fails=$1
+    # The path in the shell's own form: keep_previous puts the live path under KEEP_DIR.
+    s=$(cd "$T" && pwd)/swap$fails
+    # shellcheck disable=SC2034 # read by keep_previous in app-apply, sourced in setup_lib
+    KEEP_DIR=$s/keep
+    live=$s/edge/certs/x
+    mkdir -p "$live"
+    echo old-cert >"$live/origin.pem"
+    echo old-key >"$live/origin-key.pem"
+    echo new-cert >"$work/origin.pem"
+    echo new-key >"$work/origin-key.pem"
+    : >"$work/edge.docker"
+    : >"$s/reloads"
+    : >"$s/untimed"
+    clean() {
+      if [ "$1" = timeout ]; then
+        shift 2
+      elif [ "$1" = docker ]; then
+        echo "docker $2 runs without a time limit" >>"$s/untimed"
+      fi
+      case "$1 $2" in
+        'docker inspect') if [[ $4 == *Running* ]]; then echo true; fi ;;
+        'docker exec')
+          echo reload >>"$s/reloads"
+          [ "$(grep -c . "$s/reloads")" -gt "$fails" ]
+          ;;
+        *) "$@" ;;
+      esac
+    }
+    mv() {
+      command mv "$@"
+      kill -INT "$BASHPID"
+      kill -TERM "$BASHPID"
+    }
+    (
+      set -euo pipefail
+      exit_on_signals
+      swap_in "$work/origin.pem" "$live/origin.pem" 0644 \
+        "$work/origin-key.pem" "$live/origin-key.pem" 0600 >/dev/full 2>&1
+      if [ "$(trap -p INT TERM)" != "$(exit_on_signals; trap -p INT TERM)" ]; then
+        echo "INT and TERM are not app-apply's traps again"
+      fi
+    )
+    st=$?
+    want=new want_st=0 want_reloads=1
+    if [ "$fails" = 1 ]; then want=old want_st=1 want_reloads=2; fi
+    if [ "$st" != "$want_st" ]; then echo "swap_in ended with exit $st, not $want_st"; fi
+    if [ "$(cat "$live/origin.pem")" != "$want-cert" ]; then echo "origin.pem is not the $want one"; fi
+    if [ "$(cat "$live/origin-key.pem")" != "$want-key" ]; then echo "origin-key.pem is not the $want one"; fi
+    reloads=$(grep -c . "$s/reloads")
+    if [ "$reloads" != "$want_reloads" ]; then echo "Caddy reloaded $reloads times, not $want_reloads"; fi
+    if [ -s "$s/untimed" ]; then sort -u "$s/untimed"; fi
+  )
+}
+expect_swap() { # expect_swap <name> <what swap_case printed>
+  if [ -z "$2" ]; then ok "$1"; else bad "$1" 'the swap went wrong' "$2"; fi
+}
+expect_swap 'swap: a certificate and its key go in together' "$(swap_case 0)"
+expect_swap 'swap: a failed reload puts both back' "$(swap_case 1)"
 
 # --- Compose's JSON of the repo's files, through the jq rules ---
 
@@ -314,23 +474,34 @@ if [ "$caddy_ready" = 1 ]; then
   # Caddy runs as root without DAC_OVERRIDE. On the server root owns the real key; here the
   # runner's user owns this throwaway one, so it must be readable by everyone.
   chmod 0644 "$certs/jainav/origin-key.pem"
-  hash=$(docker run --rm "$image" caddy hash-password --plaintext 'test-only')
+  # bcrypt, as docs/runbooks/server.md §2 makes it: app-apply edge env takes no other hash.
+  hash=$(docker run --rm "$image" caddy hash-password --algorithm bcrypt --plaintext 'test-only')
   {
     echo 'JAINAV_DOMAIN=example.test'
     echo 'JAINAV_STAGING_AUTH_USER=jainav'
     printf "JAINAV_STAGING_AUTH_HASH='%s'\n" "$hash"
   } >"$T/caddy/edge.env"
+  expect_clean 'edge env: the hash the pinned caddy hash-password prints' "$(install_case "$(cat "$T/caddy/edge.env")")"
+  expect_hash_check 'kit check: the hash the pinned caddy hash-password prints' "$(cat "$T/caddy/edge.env")"
 
   # edge.env as app-apply parses it, then the whole tree through its own tree_validate.
-  tree_case() { # tree_case <config dir>: what tree_validate refuses
+  tree_case() { # tree_case <config dir> [<edge.env> <certs dir>]: what tree_validate refuses
     (
       setup_lib
       CADDY_IMAGE=$image
-      edge_env_parse "$T/caddy/edge.env" "$work/edge"
-      tree_validate "$1" "$certs" "$work/edge.docker"
+      edge_env_parse "${2:-$T/caddy/edge.env}" "$work/edge"
+      tree_validate "$1" "${3:-$certs}" "$work/edge.docker"
       cat "$work/problems"
     )
   }
+  # The tree as cf-ranges apply validates it at bootstrap: install.sh's Caddyfile and snippets, the
+  # ranges file, no site file and no certificate yet, and edge.env still the example.
+  boot=$T/caddy/boot
+  mkdir -p "$boot/config/sites" "$boot/config/log-redact.d" "$boot/certs"
+  cp "$root/docker/edge/config/Caddyfile" "$root/docker/edge/config/snippets.caddy" \
+    "$root/docker/edge/config/cloudflare-ranges.caddy" "$boot/config/"
+  expect_clean 'caddy: the tree at bootstrap validates with edge.env.example' \
+    "$(tree_case "$boot/config" "$root/docker/edge/edge.env.example" "$boot/certs")"
   expect_clean 'caddy: docker/edge/config validates (no log-redact.d)' "$(tree_case "$cfg")"
   mkdir -p "$cfg/log-redact.d"
   echo 'request>uri regexp ^/k/[A-Za-z0-9]+ /k/_' >"$cfg/log-redact.d/test.caddy"

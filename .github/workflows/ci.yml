@@ -111,8 +111,8 @@ jobs:
           docker/backup/backup.sh docker/backup/prune-umami.sh docker/backup/restore-test.sh
           docker/postgres/roles.sh
           $(grep -rlE '^#!.*sh' tests/host)
-      # Dependabot bumps the tag in compose.yml only, and app-apply refuses that file once it
-      # differs from CADDY_IMAGE in edge.conf (the image its validation runs with).
+      # Dependabot bumps the tag and digest in compose.yml only, and app-apply refuses that file
+      # once it differs from CADDY_IMAGE in edge.conf (the image its validation runs with).
       - name: The edge's Caddy image is the same in compose.yml and edge.conf
         run: |
           in_compose=$(sed -nE "s/^[[:space:]]+image:[[:space:]]*[\"']?(caddy:[^\"'[:space:]]+).*/\1/p" docker/edge/compose.yml)
