@@ -1,11 +1,12 @@
 // Sentry's browser SDK loads once the page is idle, so it stays out of the initial JS (spec §15).
-// Errors thrown before it arrives are not reported.
+// Errors thrown before it arrives are not reported. Reports go to the site's own relay
+// (BROWSER_TUNNEL), which ad blockers leave alone.
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN
 
 if (dsn) {
   const load = () => {
     import('@/lib/sentry').then(
-      ({ initSentry }) => initSentry(dsn),
+      ({ BROWSER_TUNNEL, initSentry }) => initSentry(dsn, { tunnel: BROWSER_TUNNEL }),
       () => {}, // A blocked or failed download leaves the page as it is.
     )
   }

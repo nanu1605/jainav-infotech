@@ -166,7 +166,7 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
 - **Security headers come from `next.config.ts`** (`src/lib/csp.ts`), production builds only: Next's dev tooling needs `eval`. The CSP is static as spec §16 asks. It is built from:
   - the embed allow-list (`src/lib/embedHosts.ts`, dependency-free so `next.config` can import it);
   - Turnstile, the Google Maps iframe and Gravatar (admin avatars);
-  - the CDN, Umami and Sentry-ingest origins from the build's `NEXT_PUBLIC_*` values.
+  - the CDN and Umami origins from the build's `NEXT_PUBLIC_*` values. Sentry's ingest host is not among them: browsers report through the site's own relay ("Sentry relay" below).
 
   **The admin gets a wider policy** (a later `/admin/:path*` header entry, which Next lets win). Payload's JSON field (a lead's `details`) loads the Monaco editor from `cdn.jsdelivr.net` through `@monaco-editor/loader`, which needs script, style, font and `data:` worker sources there. Public pages never allow jsdelivr. Bundling Monaco instead would need a new dependency.
 
@@ -231,7 +231,7 @@ Non-obvious choices and deviations from `JAINAV_WEBSITE_SPEC.md`. Newest at the 
   - after: page loads sent nothing, a thrown error arrived filtered, and a request carrying a trace header sent no spans;
   - the server's error went through the same filter, with the Telegram breadcrumb cut to its host.
 
-  With a release set, the server's SDK also sends counts of requests and a record of its own process, which say nothing about a visitor. Sentry still sees the IP address an event comes from, so its project setting ([monitoring](runbooks/monitoring.md#sentry-errors)) still matters.
+  With a release set, the server's SDK also sends counts of requests and a record of its own process, which say nothing about a visitor. Browsers now report through the site's own relay, so Sentry sees our server's address, not a visitor's ("Sentry relay" below); its project setting ([monitoring](runbooks/monitoring.md#sentry-errors)) stays on as a second layer.
 
 - **Every SDK bump gets its release notes read for new default integrations,** because `src/lib/sentry.ts` removes the unwanted ones by name and a new one would slip past it. Up to 11.11.0 the only new one is the server's `AwsLambdaWeb`, which acts only on AWS Lambda.
 
@@ -477,3 +477,26 @@ The company email was bought from GoDaddy with the domain, so the mailbox stays 
 ## The From address (2026-11-15)
 
 The site's mail is sent from `hello@send.jainavinfotech.in`, not a no-reply address: Resend's deliverability insights flag no-reply senders. The subdomain receives no mail, so every message carries a `Reply-To` to a real inbox (the routed inbox from site settings, else `EMAIL_REPLY_TO`). `EMAIL_FROM` is the bare address; `src/payload.config.ts` adds the display name.
+
+## Sentry relay (2026-11-17)
+
+Browsers send their error reports to the site's own `/api/v1/relay`, which passes them on to Sentry (Tanishq's choice, 2026-11-17). On staging a browser with an ad blocker sent nothing: its POST to Sentry's ingest host failed with `net::ERR_BLOCKED_BY_CLIENT`. EasyPrivacy blocks `sentry.io` as a third party and any URL with `?sentry_key=`, so every visitor with a blocker would report nothing. The server keeps sending to Sentry directly.
+
+- **The browser SDK's own `tunnel` option,** set to `/api/v1/relay` for the browser only (`BROWSER_TUNNEL` in `src/lib/sentry.ts`, passed by `src/instrumentation-client.ts`). Given a path, the server's transport would drop every event. `withSentryConfig`'s tunnel route isn't used: we don't use `withSentryConfig`, and EasyPrivacy already blocks its default `/monitoring?o=…` form. With a tunnel the SDK names the DSN in each envelope's first line, which the relay checks.
+- **The relay** (`src/lib/sentryRelay.ts`), in this order:
+  1. 404 while the build carries no `NEXT_PUBLIC_SENTRY_DSN`. The route reads the same build-time value as the browser bundle; the server's env files don't have it.
+  2. 403 when a browser names another origin (`Origin`, the check checkout uses). Every browser sends `Origin` on a POST, so `Sec-Fetch-Site` would add nothing; a request without it passes, because anything that isn't a browser can send any header.
+  3. 413 when Content-Length says more than 256 KiB.
+  4. 429 with Retry-After past 30 requests per IP in 10 minutes (`relayIp`). The SDK then sends nothing until that time passes; it never retries.
+  5. The body is read with the same cap as it arrives (413 past it).
+  6. 400 unless the first line is a JSON object naming a DSN; 403 unless that DSN is ours (protocol, host, path, project and public key, as the URL parser writes them).
+  7. The exact bytes go to the envelope endpoint built from the configured DSN alone, never from the request, with `Content-Type: application/x-sentry-envelope`, no other header and a 5-second timeout.
+  8. The answer is Sentry's status with an empty body and only `X-Sentry-Rate-Limits` and `Retry-After`, the parts the SDK acts on; 504 after the timeout, 502 when Sentry can't be reached, 500 when anything else fails (the rate limit's database, say). Only an error code is logged.
+
+  The cheap checks come before the rate limit, so a refused request costs no database write, and the limit comes before the body is read.
+
+- **The limits.** An errors-only browser sends one event per envelope, and Sentry refuses an event over 1 MiB. Ours carry no bodies, cookies, `extra` or headers other than user-agent: a few KB, tens of KB with 100 breadcrumbs. 256 KiB keeps every event we can foresee and caps what one request makes the server hold. The SDK's Dedupe drops a repeat of the last error, so a visitor rarely sends more than a handful in 10 minutes; 30 leaves room for offices and mobile carriers that share an IPv4 address (IPv6 counts the /64).
+- **The path.** On 2026-11-17 none of 14 candidates was blocked by EasyList, EasyPrivacy, uBlock filters, uBlock filters – Privacy or AdGuard Tracking Protection. "relay" is a word no list targets in a path, unlike "sentry", "monitoring", "telemetry", "ingest", "envelope", "error" and "report", which they already block in nearby forms. No query string, no trailing slash. The lists change daily: if browser reports stop arriving, check the path against them again.
+- **What Sentry sees.** Browsers no longer connect to Sentry, so Sentry gets our server's address instead of a visitor's; the server's own events never carried one. The SDK still asks Sentry not to infer an address, and Prevent Storing of IP Addresses stays on. The relay uses the visitor's address only for its rate limit, as a keyed hash like every other limit, and logs nothing about the request. Cookies and staging's basic auth reach our own server as on every request; the relay never reads or forwards them.
+- **CSP:** `connect-src` no longer lists Sentry's host; `'self'` covers the relay.
+- **Staging keeps basic auth on the relay.** The page's fetch is same-origin, so the browser adds the login it already gave. If staging's reports get 401s, add `/api/v1/relay` to the exceptions in `docker/edge/config/sites/jainav.caddy`: it accepts only our DSN and is size-capped and rate-limited.

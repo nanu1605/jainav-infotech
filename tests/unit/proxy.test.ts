@@ -1,8 +1,8 @@
-import { getRewrittenUrl } from 'next/experimental/testing/server'
+import { getRewrittenUrl, unstable_doesMiddlewareMatch } from 'next/experimental/testing/server'
 import { NextRequest } from 'next/server'
 import { describe, expect, it } from 'vitest'
 
-import proxy from '@/proxy'
+import proxy, { config } from '@/proxy'
 
 const run = (path: string) => proxy(new NextRequest(`http://localhost${path}`))
 
@@ -37,5 +37,13 @@ describe('proxy', () => {
     ['/hi/%E0%A4%85', null],
   ])('leaves %s to next-intl', (path, target) => {
     expect(getRewrittenUrl(run(path))).toBe(target)
+  })
+
+  it.each([
+    ['/api/v1/relay', false],
+    ['/api/v1/forms/contact', false],
+    ['/products/vyro', true],
+  ])('runs on %s: %s', (url, runs) => {
+    expect(unstable_doesMiddlewareMatch({ config, url })).toBe(runs)
   })
 })

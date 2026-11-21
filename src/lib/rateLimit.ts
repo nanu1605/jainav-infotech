@@ -50,6 +50,9 @@ const RULES = {
    * handful of times a week per device, offices share an IP. */
   licensingIp: { points: 60, duration: 10 * 60, key: ipKey },
   licensingKey: { points: 20, duration: 60 * 60, key: (id: string) => id },
+  /** Browser error reports from one IP (src/lib/sentryRelay.ts): the SDK drops only a repeat of
+   * the last error, and a 429 makes it send nothing until Retry-After passes. */
+  relayIp: { points: 30, duration: 10 * 60, key: ipKey },
 } as const
 export type Rule = keyof typeof RULES
 

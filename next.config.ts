@@ -45,7 +45,6 @@ const nextConfig: NextConfig = {
     const env = {
       cdnUrl: process.env.NEXT_PUBLIC_CDN_URL,
       umamiUrl: process.env.NEXT_PUBLIC_UMAMI_URL,
-      sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
     }
     return [
       { source: '/:path*', headers: securityHeaders(env) },

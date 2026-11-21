@@ -29,21 +29,20 @@ describe('content security policy', () => {
     )
   })
 
-  it('adds the CDN, Umami and the Sentry ingest host from the environment', () => {
+  it('adds the CDN and Umami from the environment, and no Sentry host', () => {
     const d = directives(
       contentSecurityPolicy({
         cdnUrl: 'https://cdn.example.in/media/',
         umamiUrl: 'https://analytics.example.in',
-        sentryDsn: 'https://abc123@o42.ingest.sentry.io/7',
       }),
     )
     expect(d['img-src']).toContain('https://cdn.example.in')
     expect(d['media-src']).toContain('https://cdn.example.in')
     expect(d['script-src']).toContain('https://analytics.example.in')
+    // Browsers report errors to the site's own /api/v1/relay, which 'self' covers.
     expect(d['connect-src']).toEqual([
       "'self'",
       'https://analytics.example.in',
-      'https://o42.ingest.sentry.io',
       'https://api.razorpay.com',
       'https://lumberjack.razorpay.com',
     ])
@@ -70,7 +69,7 @@ describe('content security policy', () => {
   })
 
   it('ignores values that are not URLs', () => {
-    const csp = contentSecurityPolicy({ cdnUrl: 'not a url', umamiUrl: '', sentryDsn: undefined })
+    const csp = contentSecurityPolicy({ cdnUrl: 'not a url', umamiUrl: '' })
     expect(csp).not.toMatch(/not a url|undefined/)
   })
 

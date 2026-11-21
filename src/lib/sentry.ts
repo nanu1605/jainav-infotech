@@ -12,6 +12,14 @@ const environment = host.startsWith('staging.') ? 'staging' : 'production'
 const NOT_WANTED = ['BrowserSession', 'BrowserTracing', 'ContextLines', 'CultureContext']
 
 /**
+ * Where browsers send their reports: the site's own route (src/app/api/v1/relay/route.ts), which
+ * passes them on to Sentry. Ad blockers block Sentry's host, not the site's own paths, and Sentry
+ * then never sees a visitor's IP address. Browser only: given a path, the server's transport drops
+ * every event.
+ */
+export const BROWSER_TUNNEL = '/api/v1/relay'
+
+/**
  * Error tracking (spec §18.4), shared by the server and the browser. Errors only: no session replay
  * and no tracing. Leave `tracesSampleRate` unset: spans skip scrub.ts, and any rate, even 0, can
  * still record them. Browsers send nothing about a page load where nothing failed.
@@ -20,12 +28,14 @@ const NOT_WANTED = ['BrowserSession', 'BrowserTracing', 'ContextLines', 'Culture
  * message, the page path, the pages and requests before it, and the user agent. SDK 11 replaced
  * `sendDefaultPii` with `dataCollection`, whose defaults collect everything; scrub.ts backs it up
  * and filters text by pattern, so a name in an unforeseen message or a record number in a path can
- * still get through. Sentry sees the connection's IP address, so its project setting must not store
- * it (runbooks/monitoring.md).
+ * still get through. Browsers report through BROWSER_TUNNEL and the server from its own address,
+ * so Sentry never sees a visitor's IP address; its project setting not to store one stays on
+ * (runbooks/monitoring.md).
  */
-export function initSentry(dsn: string) {
+export function initSentry(dsn: string, { tunnel }: { tunnel?: string } = {}) {
   Sentry.init({
     dsn,
+    ...(tunnel && { tunnel }), // the browser's only (src/instrumentation-client.ts)
     environment,
     integrations: (defaults) => defaults.filter(({ name }) => !NOT_WANTED.includes(name)),
     tracePropagationTargets: [], // or every outgoing call gets trace headers with our public key

@@ -81,7 +81,8 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
 12. **Monitoring** ([monitoring.md](monitoring.md)):
     - HetrixTools monitors, heartbeats, status page and Telegram alerts, with one test alert of
       each kind;
-    - Sentry DSN;
+    - Sentry DSN, and the relay test with an ad blocker on
+      ([monitoring.md](monitoring.md#sentry-errors));
     - Umami: password changed, website ID set.
 13. **Backups** ([backups.md](backups.md)): run one backup and one restore test on the server, then
     set the bucket locks ([backups.md](backups.md#bucket-locks)).

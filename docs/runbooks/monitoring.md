@@ -128,6 +128,28 @@ Every request gets a ticket number, a due date one month away (Answer by) and, f
   turns on spans, which skip these filters.
 
 - Events say `staging` or `production`, from the site URL.
+- Browsers send their reports to the site's own `/api/v1/relay`, which passes them on to Sentry,
+  so ad blockers don't stop them ([decisions](../decisions.md), "Sentry relay"). The relay accepts
+  only the DSN the build carries: after changing `STAGING_SENTRY_DSN` or `PRODUCTION_SENTRY_DSN`,
+  redeploy. Server errors go to Sentry directly.
+- Test after the first deploy and after any change to Sentry or the relay, with an ad blocker
+  **on** (uBlock Origin, or the browser's own tracker blocking):
+  1. Open the site; on staging, sign in to its basic auth first. Wait about 10 seconds: the SDK
+     loads once the page is idle.
+  2. In the console, run `setTimeout(() => { throw new Error('relay test') })`.
+  3. The Network tab shows `POST /api/v1/relay` answered 200, and no request to `sentry.io`.
+     Within a minute the error is an issue in Sentry, with the right environment.
+
+  Do it on staging, then on production after its deploy. On staging, a 401 means the browser
+  didn't send its login with the request: add `/api/v1/relay` to the basic-auth exceptions in
+  `docker/edge/config/sites/jainav.caddy` and apply it (`sudo app-apply jainav site …`,
+  [edge.md §2](edge.md#2-site-files-and-their-checks)). 403: the page's origin isn't the site URL,
+  or the SDK's DSN isn't the build's. 404: the build carries no DSN. 429: the relay's limit of 30
+  requests per IP in 10 minutes. 502 or 504: the server couldn't reach Sentry, or Sentry took over
+  5 seconds (the app logs `relay: forward failed:` with the error code). 500: the relay itself
+  failed, e.g. the rate limit's database (logged as `relay: failed:`). 400: the report's first
+  line names no DSN. 413: the report is over 256 KiB.
+
 - Browser stack traces stay minified until source maps are uploaded. That needs
   `withSentryConfig` and a `SENTRY_AUTH_TOKEN`, which aren't set up yet.
 - The browser SDK loads after the page is idle, so errors thrown before that are not reported.

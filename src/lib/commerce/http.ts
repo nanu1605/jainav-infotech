@@ -19,14 +19,16 @@ export const tooMany = (retryAfter: number, error: StoreError = 'rateLimited') =
   json(429, { error, retryAfter }, { 'Retry-After': String(retryAfter) })
 
 /**
- * The body as text, or undefined when it is larger than `max` bytes or can't be read. Read in
+ * The body's bytes, or undefined when it is larger than `max` bytes or can't be read. Read in
  * chunks and abandoned past the limit, so a body without Content-Length is never buffered whole.
- * Decoded like `Request.text()` (UTF-8, a leading BOM dropped).
  */
-export async function readText(req: Request, max: number): Promise<string | undefined> {
+export async function readBytes(
+  req: Request,
+  max: number,
+): Promise<Buffer<ArrayBuffer> | undefined> {
   if (Number(req.headers.get('content-length')) > max) return undefined
   const reader = req.body?.getReader()
-  if (!reader) return ''
+  if (!reader) return Buffer.alloc(0)
   try {
     const chunks: Uint8Array[] = []
     let size = 0
@@ -40,10 +42,19 @@ export async function readText(req: Request, max: number): Promise<string | unde
       }
       chunks.push(value)
     }
-    return new TextDecoder().decode(Buffer.concat(chunks))
+    return Buffer.concat(chunks)
   } catch {
     return undefined
   }
+}
+
+/**
+ * The body as text, decoded like `Request.text()` (UTF-8, a leading BOM dropped), or undefined
+ * as `readBytes` gives it.
+ */
+export async function readText(req: Request, max: number): Promise<string | undefined> {
+  const bytes = await readBytes(req, max)
+  return bytes && new TextDecoder().decode(bytes)
 }
 
 /** The body as JSON, or undefined when it isn't JSON or is larger than `max` bytes. */

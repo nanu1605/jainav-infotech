@@ -3,7 +3,7 @@ import type { ErrorEvent } from '@sentry/nextjs'
 import { describe, expect, it, vi } from 'vitest'
 
 import { scrubBreadcrumb, scrubEvent } from '@/lib/scrub'
-import { initSentry } from '@/lib/sentry'
+import { BROWSER_TUNNEL, initSentry } from '@/lib/sentry'
 
 vi.mock('@sentry/nextjs', () => ({ init: vi.fn() }))
 
@@ -29,6 +29,8 @@ describe('Sentry setup', () => {
     expect(options.tracePropagationTargets).toEqual([])
     expect(options.sendClientReports).toBe(false)
     expect(options.dataCollection.urlQueryParams).toBe(false)
+    // The server sends directly: given a path, its transport drops every event.
+    expect(options).not.toHaveProperty('tunnel')
     const defaults = [
       'BrowserSession',
       'BrowserTracing',
@@ -39,6 +41,17 @@ describe('Sentry setup', () => {
     expect(options.integrations(defaults.map((name) => ({ name })))).toEqual([
       { name: 'LinkedErrors' },
     ])
+  })
+
+  it('sends browser reports through the same-origin relay', () => {
+    expect(BROWSER_TUNNEL).toBe('/api/v1/relay')
+    initSentry('https://key@example.test/1', { tunnel: BROWSER_TUNNEL })
+    const options = vi.mocked(Sentry.init).mock.calls.at(-1)![0] as unknown as {
+      tunnel: unknown
+      beforeSend: unknown
+    }
+    expect(options.tunnel).toBe('/api/v1/relay')
+    expect(options.beforeSend).toBe(scrubEvent)
   })
 })
 
