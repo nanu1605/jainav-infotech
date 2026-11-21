@@ -153,8 +153,8 @@ rehearse this once from R2 alone and time it.
 4. Decrypt the settings archive into `/srv/jainav` (files 0600) with the private key.
 5. Rebuild the edge ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls) and
    [§5](edge.md#5-adding-an-app)): `edge.env` from the password manager, new Origin CA
-   certificates from fresh CSRs for each zone, `aop-ca.pem` from the password manager, and the
-   site files through `app-apply`.
+   certificates from fresh CSRs for each zone, each zone's `aop-ca.pem` (Jainav's from the
+   password manager, another app's from its owner), and the site files through `app-apply`.
 6. `sudo app-apply jainav compose`, then `sudo app-compose jainav up -d postgres`. The database
    roles come from `.env` through `postgres/roles.sh`.
 7. Restore each dump, streamed as above, into a fresh database owned by its role: `jainav` with

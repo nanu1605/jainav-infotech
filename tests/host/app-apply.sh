@@ -11,8 +11,9 @@
 #   - swap_in under INT, TERM and a terminal that takes no writes, with a time limit on every docker
 #     call (docker is a stand-in)
 #   - docker/edge/config and the Jainav site file through the pinned Caddy: validate (also of the
-#     tree at bootstrap, with edge.env.example), the site file's checks, and a log-redact file
-#     (needs docker, the pinned image and openssl)
+#     tree at bootstrap, with edge.env.example), the site file's checks, a log-redact file, and a
+#     second app's site whose tls_menumesh has client_auth on (needs docker, the pinned image and
+#     openssl)
 # A part whose tool is missing prints a "skip -" line. CI runs it on ubuntu-24.04; Git Bash runs it
 # too (without jq).
 #   bash tests/host/app-apply.sh
@@ -528,6 +529,40 @@ if [ "$caddy_ready" = 1 ]; then
   }
   expect_clean 'caddy: sites/jainav.caddy passes the site checks' "$(site_case)"
   if [ "$have_jq" != 1 ]; then skip 'the site file check of the adapted JSON (jq is not installed)'; fi
+
+  # A second app's site that imports tls_menumesh, whose client_auth is on from the start: the
+  # server's tree once that site goes in, beside Jainav's without client_auth, both on :443. Its
+  # files are throwaways: a CA for origin pulls, and an origin pair for the test zone.
+  mm=$certs/menumesh
+  mkdir -p "$mm"
+  openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj '/CN=test origin pulls CA' \
+    -keyout "$T/caddy/aop-ca-key.pem" -out "$mm/aop-ca.pem" 2>/dev/null
+  openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj '/CN=example.net' \
+    -keyout "$mm/origin-key.pem" -out "$mm/origin.pem" 2>/dev/null
+  chmod 0644 "$mm/origin-key.pem"
+  mm_site=$T/caddy/menumesh.caddy
+  printf '%b\n' 'https://example.net {' '\timport site_common' '\timport tls_menumesh' \
+    '\treverse_proxy menumesh-example:8080 {' '\t\timport upstream' '\t}' '}' >"$mm_site"
+  # Its checks with the values another app's conf sets, as other_apps='menumesh ' fakes one above.
+  second_site_case() { # second_site_case: what the menumesh site file's checks refuse
+    (
+      setup_lib
+      # shellcheck disable=SC2034 # read by caddy_run in app-apply, sourced in setup_lib
+      CADDY_IMAGE=$image
+      # shellcheck disable=SC2034 # read by the site checks in app-apply, sourced in setup_lib
+      ZONE=example.net UPSTREAMS=menumesh-example:8080 ENV_PREFIX=MENUMESH_
+      edge_env_parse "$T/caddy/edge.env" "$work/edge"
+      site_text_check menumesh "$mm_site" "$work/edge.keys"
+      if [ "$have_jq" = 1 ]; then site_json_check menumesh "$mm_site" "$cfg/snippets.caddy" "$work/edge.docker"; fi
+      cat "$work/problems"
+    )
+  }
+  expect_clean 'caddy: a menumesh site with tls_menumesh passes the site checks' "$(second_site_case)"
+  cp "$mm_site" "$cfg/sites/menumesh.caddy"
+  expect_clean 'caddy: docker/edge/config validates with the menumesh site and its aop-ca.pem' "$(tree_case "$cfg")"
+  rm "$mm/aop-ca.pem"
+  expect_refused 'caddy: the menumesh site fails validate without its aop-ca.pem' "$(tree_case "$cfg")" 'caddy validate failed'
+  rm -rf "$cfg/sites/menumesh.caddy" "$mm"
 else
   :
 fi
