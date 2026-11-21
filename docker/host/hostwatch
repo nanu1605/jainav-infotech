@@ -240,6 +240,15 @@ tg_send() {  # text [silent] -> 0 sent, 1 failed, 3 Telegram not set up
   rm -f "$TG_FAILED"
 }
 
+# Without a bot the journal line is all there is, and that counts as delivered.
+notify() {  # text [silent]
+  local rc=0
+  say "alert: $1"
+  tg_send "$1" "${2-}" || rc=$?
+  if [ "$rc" -eq 3 ]; then rc=0; fi
+  return "$rc"
+}
+
 # Does the bot still reach the chat? getChat sends nothing. Not set up counts as fine.
 tg_probe() {
   local rc=0
