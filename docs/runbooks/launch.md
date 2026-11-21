@@ -25,7 +25,11 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
 
 1. **Cloudflare** ([cloudflare.md](cloudflare.md)):
    - SSL Full (strict), the Origin CA certificate, the tunnel for SSH and its Access application;
-   - Bot Fight Mode off, the WAF skip rule;
+   - Bot Fight Mode off, the WAF skip rule, Cloudflare's analytics beacon off;
+   - the Access application for `/admin`, `/admin/*`, `/api/users` and `/api/users/*`, on the apex
+     and on staging, with its eager redirect cookie off
+     ([cloudflare.md](cloudflare.md#security)). It exists before any DNS record of the site, and
+     so before the staging Owner account;
    - R2 buckets, custom domains and tokens; a Turnstile widget;
    - the site's DNS records wait for step 4: the server's IP goes into Cloudflare and hPanel only.
 2. **Backup key** ([backups.md](backups.md#the-key)): make it now. The server's `.env` needs its
@@ -43,23 +47,42 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
      ([server.md §1](server.md#1-provision-the-vps));
    - check that a Web Console login works, then harden, as the last step of the provisioning
      ([server.md §9](server.md#9-break-glass));
-   - put the files and env files in place ([server.md §2](server.md#2-put-the-files-in-place));
-   - the edge, then the first start: certificate, `edge.env`, ranges, site file, postgres, umami,
-     the backup image and the timers ([server.md §3](server.md#3-first-start));
-   - the site's DNS records now, proxied;
-   - the leak test ([edge.md §6](edge.md#6-the-leak-test)).
+   - the edge, then the files and env files: ranges, `edge.env`, certificate, site file, then
+     Jainav's env files and `/etc/hostwatch.env`
+     ([server.md §2](server.md#2-put-the-files-in-place));
+   - the first start: postgres, umami and its new password, the backup image, the settings
+     archive, the checks and the timers ([server.md §3](server.md#3-first-start));
+   - the DNS records for `staging` and `analytics` now, proxied, and only once Umami's default
+     password is changed: the `analytics` record makes Umami's login page public. The apex and
+     `www` wait for step 8;
+   - from outside: the Access check on staging ([cloudflare.md](cloudflare.md#security)), and the
+     leak test's log line ([edge.md §6](edge.md#6-the-leak-test), step 2). Its step 3 is part of
+     [server.md §3](server.md#3-first-start); steps 1 and 4 come with authenticated origin pulls
+     ([Gates](#gates-before-the-first-production-deploy)).
 5. **GitHub** ([server.md §4](server.md#4-github-setup-once)):
    - repository variables and secrets, and the environments' secrets (`DEPLOY_USER` is
      `deploy-jainav`, with a separate key for each environment);
    - staging limited to `main`; the production reviewer and tag rule;
+   - `STAGING_SMOKE_ADMIN_ACCESS=1`: Access is in place since step 1;
    - `DEPLOY_ENABLED=true`.
-6. **Staging:**
-   - merge to `main` and confirm the deploy and smoke tests pass;
-   - seed staging, publish its content in the admin, then click through it.
-7. **Cloudflare Access** on `/admin*` and `/api/users/*`, then set `STAGING_SMOKE_ADMIN_ACCESS`
-   and `PRODUCTION_SMOKE_ADMIN_ACCESS` to `1`. Access is in place before the first production
-   deploy.
+6. **Staging deploy:** merge to `main`, or run the Deploy workflow on `main`, and confirm that the
+   deploy and the smoke tests pass. The smoke tests need no content, so they pass on the first
+   deploy's empty database.
+7. **Staging content:**
+   - seed it: `sudo app-compose jainav tools staging - pnpm seed`
+     ([server.md §8](server.md#8-one-off-commands)). It ends with
+     "Seed complete: … created, … already present." and creates no user;
+   - create the Owner account at `https://staging.jainavinfotech.in/admin`, past Access and
+     staging's basic auth: the first user becomes the Owner;
+   - publish what the seed saved as drafts: Products (sidebar group Products), Services and Pages
+     (group Content). Per collection, tick the header checkbox, click Publish, then
+     "Confirm publish" in the drawer; it publishes English and Hindi together. Team, FAQs and
+     plans are seeded published, and posts, jobs and docs stay empty. Legal Pages stay drafts
+     until step 9, so their footer links answer 404 on staging;
+   - click through it.
 8. **Production:**
+   - the apex and `www` DNS records, proxied; the Access check on the apex
+     ([cloudflare.md](cloudflare.md#security)); then `PRODUCTION_SMOKE_ADMIN_ACCESS=1`;
    - tag `v1.0.0`, approve the deploy, seed;
    - create the Owner account in the admin;
    - in Settings → Site settings, enter the CIN and the Grievance Officer's name and title, in
@@ -77,26 +100,32 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
 10. **VYRO download** (if it goes live): `sudo app-compose jainav tools production - pnpm import:release <tag>`
     ([server.md §8](server.md#8-one-off-commands)), then the Owner publishes the release.
 11. **Email** ([cloudflare.md](cloudflare.md#email)): Resend domain verified, the mailbox
-    addresses, SPF, DKIM, and our DMARC record (`p=none`) in place of GoDaddy's.
+    addresses, SPF, DKIM, and our DMARC record (`p=none`) in place of GoDaddy's. The emails'
+    header icon shows in the first production mail (staging's basic auth blocks it there).
 12. **Monitoring** ([monitoring.md](monitoring.md)):
     - HetrixTools monitors, heartbeats, status page and Telegram alerts, with one test alert of
       each kind;
     - Sentry DSN, and the relay test with an ad blocker on
       ([monitoring.md](monitoring.md#sentry-errors));
-    - Umami: password changed, website ID set.
+    - Umami: the default login is refused, the website is added and its ID is set
+      ([monitoring.md](monitoring.md#umami-analytics)).
 13. **Backups** ([backups.md](backups.md)): run one backup and one restore test on the server, then
     set the bucket locks ([backups.md](backups.md#bucket-locks)).
 
 ## Gates before the first production deploy
 
-- **Authenticated origin pulls** are on for the site's zone and tested, and stay on for every zone
-  before a second app's containers run on the server
-  ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls)).
+- **Cloudflare Access** on `/admin`, `/admin/*`, `/api/users` and `/api/users/*`, on the apex and
+  on staging, is in place before the site's DNS records (step 1). Its outside check passes on each
+  hostname before that environment's first deploy (steps 4 and 8).
+- **Authenticated origin pulls** are on for the site's zone, and tested, before the first
+  production deploy, and on for every zone before the first container of a second app runs on the
+  server ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls)).
 
 ## Done when (spec §20)
 
 - [ ] Production runs on HTTPS with A-grade security headers (<https://securityheaders.com>).
-- [ ] `/admin` requires Cloudflare Access (the smoke test checks it).
+- [ ] `/admin`, `/admin/*`, `/api/users` and `/api/users/*` require Cloudflare Access, on the apex
+      and on staging (the smoke test checks `/admin`).
 - [ ] The leak test passes: the origin answers nothing to a direct connection
       ([edge.md §6](edge.md#6-the-leak-test)).
 - [ ] A restore test succeeds on the server.
@@ -107,7 +136,8 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
       on `/` and `/hi`.
 - [ ] An uptime alert reaches Telegram (pause a monitor's target, or use the provider's test
       alert).
-- [ ] mail-tester scores at least 9/10.
+- [ ] mail-tester scores at least 9/10, and the emails' header icon shows in the first production
+      mail.
 - [ ] The pages Razorpay checks are live (step 9).
 - [ ] Lighthouse on the production URLs: `LHCI_BASE_URL=https://jainavinfotech.in pnpm lhci` (spec
       §15; Phase 5 measured locally only).
