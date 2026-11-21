@@ -1,7 +1,8 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1.28.0@sha256:bb22d9815c728170f72750f4e5b0d672e06176142e1d602c7e66c050100b7e5b
 # Production image (spec §18). Built in CI without a database (SKIP_DB_AT_BUILD=1): pages render
 # on first request and are then cached. NEXT_PUBLIC_* values are baked in at build time, so each
-# environment gets its own image; never promote a staging image to production.
+# environment gets its own image; never promote a staging image to production. The BuildKit
+# frontend on the first line is pinned by hand: Dependabot doesn't update it (docs/decisions.md).
 #
 #   docker build -f docker/Dockerfile --target runner -t jainav-app .
 #   docker build -f docker/Dockerfile --target tools -t jainav-tools .
