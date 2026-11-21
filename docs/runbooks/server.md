@@ -354,10 +354,13 @@ repository root on your machine:
 scp docker/edge/compose.yml docker/edge/config/sites/jainav.caddy docker/edge/edge.env.example jainav:incoming/
 ```
 
-1. Pull the pinned Caddy image, the `CADDY_IMAGE` of `docker/host/apps/edge.conf`:
-   `sudo docker pull caddy:2.11.9-alpine`. After a Caddy upgrade
-   ([edge.md §5](edge.md#5-adding-an-app)), use the new tag here and in step 3. Without the pull,
-   `app-apply` pulls the image on its own, and a failed pull shows up as "caddy validate failed".
+1. Pull the pinned Caddy image, the `CADDY_IMAGE` of `/etc/apps/edge.conf` (tag and digest, as in
+   `docker/host/apps/edge.conf`):
+   `sudo docker pull "$(sed -n 's/^CADDY_IMAGE=//p' /etc/apps/edge.conf)"`. This command and the
+   ones in step 3 read the image from the conf, so they follow a Caddy upgrade
+   ([edge.md §5](edge.md#5-adding-an-app)). Pulled by digest, the image gets no tag; Compose and
+   `app-apply` find it by the digest. Without the pull, `app-apply` pulls the image on its own,
+   and a failed pull shows up as "caddy validate failed".
 2. The ranges file, **before any other `app-apply edge` command**. `install.sh` put the first
    `Caddyfile` and `snippets.caddy` into `/srv/edge/config/`, because every `app-apply edge`
    command validates the whole tree, and the `Caddyfile` imports `cloudflare-ranges.caddy`, which
@@ -378,15 +381,15 @@ scp docker/edge/compose.yml docker/edge/config/sites/jainav.caddy docker/edge/ed
    first colon. Paste this line alone:
 
    ```bash
-   IFS= read -rsp 'Staging basic-auth password: ' P; echo; H=$(printf '%s\n' "$P" | sudo docker run --rm -i --network none caddy:2.11.9-alpine caddy hash-password --algorithm bcrypt); unset P; printf '%s\n' "$H" | awk 'NR==FNR {h=$0; next} /^JAINAV_STAGING_AUTH_HASH=/ {$0="JAINAV_STAGING_AUTH_HASH=\047" h "\047"} {print}' - ~/incoming/edge.env.example > ~/incoming/edge.env; unset H; awk -F= '$1=="JAINAV_STAGING_AUTH_HASH" {print length($2)}' ~/incoming/edge.env
+   IFS= read -rsp 'Staging basic-auth password: ' P; echo; H=$(printf '%s\n' "$P" | sudo docker run --rm -i --network none "$(sed -n 's/^CADDY_IMAGE=//p' /etc/apps/edge.conf)" caddy hash-password --algorithm bcrypt); unset P; printf '%s\n' "$H" | awk 'NR==FNR {h=$0; next} /^JAINAV_STAGING_AUTH_HASH=/ {$0="JAINAV_STAGING_AUTH_HASH=\047" h "\047"} {print}' - ~/incoming/edge.env.example > ~/incoming/edge.env; unset H; awk -F= '$1=="JAINAV_STAGING_AUTH_HASH" {print length($2)}' ~/incoming/edge.env
    ```
 
    The last command must print `62`: a 60-character bcrypt hash and its two single quotes. `2`
    means no hash and `19` the example's placeholder: then don't install, and run the line again.
    The password goes to Caddy on stdin, so it is on no command line. If the second run prints `2`
    too (the line relies on Caddy reading the password from stdin when it has no terminal), run
-   `sudo docker run --rm -it caddy:2.11.9-alpine caddy hash-password --algorithm bcrypt`, type the
-   password at its prompts, and paste the hash between the single quotes of
+   `sudo docker run --rm -it "$(sed -n 's/^CADDY_IMAGE=//p' /etc/apps/edge.conf)" caddy hash-password --algorithm bcrypt`,
+   type the password at its prompts, and paste the hash between the single quotes of
    `JAINAV_STAGING_AUTH_HASH` in `sudoedit /srv/edge/edge.env`, in place of the placeholder. Keep
    the single quotes (the hash holds `$` signs); the user stays `jainav` and `JAINAV_DOMAIN` stays
    `jainavinfotech.in`. In that case skip the install line below: run `rm ~/incoming/edge.env` and
@@ -398,13 +401,15 @@ scp docker/edge/compose.yml docker/edge/config/sites/jainav.caddy docker/edge/ed
    ```
 
    The install prints "installed /srv/edge/edge.env" and advice to recreate Caddy, which you can
-   ignore: no container exists yet. The check prints `root:root 600` and `0`. `app-apply` checks
-   only the file's shape: the example's placeholder hash (`$2a$14$replace-me`) passes it, so a
-   forgotten hash is not caught there, and staging would refuse every login. The login test in
-   step 7 proves that the hash belongs to the password. Keep the password in the password manager:
-   the edge has no settings archive ([backups.md](backups.md)), and GitHub never shows a secret
-   again. If it is lost, choose a new one and set `SMOKE_BASIC_AUTH` to `jainav:<new>`. Later
-   changes go through the same `app-apply edge env` and a recreate.
+   ignore: no container exists yet. The check prints `root:root 600` and `0`. `app-apply edge env`
+   refuses a `JAINAV_STAGING_AUTH_HASH` that is not a bcrypt hash (the example's placeholder
+   `$2a$14$replace-me`, a hash cut short) and names it. It can't tell whether the hash belongs to
+   the password: the login test in step 7 proves that. The `sudoedit` route skips that check;
+   there `sudo app-apply edge validate` (step 7's last line) warns while the file holds no bcrypt
+   hash. Keep the password in the password manager: the edge has no settings archive
+   ([backups.md](backups.md)), and GitHub never shows a secret again. If it is lost, choose a new
+   one and set `SMOKE_BASIC_AUTH` to `jainav:<new>`. Later changes go through the same
+   `app-apply edge env` and a recreate.
 
 4. The Origin CA certificate for `jainavinfotech.in` and `*.jainavinfotech.in`: make it and
    install it with `sudo app-apply edge cert jainav ~/csr/origin.pem ~/csr/origin-key.pem` as in
@@ -450,7 +455,9 @@ scp docker/edge/compose.yml docker/edge/config/sites/jainav.caddy docker/edge/ed
    `502` after about 30 s means the login was accepted (no staging app runs behind it yet), and
    `401` that the hash and the password differ. A password with `"` or `\` needs escaping in
    curl's config syntax. Last, `sudo app-apply edge validate` prints
-   "the live edge tree is valid".
+   "the live edge tree is valid" and nothing after it. A line
+   `warning: JAINAV_STAGING_AUTH_HASH holds no bcrypt hash` means `/srv/edge/edge.env` still has
+   the placeholder or a hash cut short: make the hash again (step 3).
 
 **Jainav**, as `ops`. What its files hold:
 
@@ -461,7 +468,7 @@ scp docker/edge/compose.yml docker/edge/config/sites/jainav.caddy docker/edge/ed
     starts without it.
 - `production.env` and `staging.env`: the apps' settings.
   - `NODE_ENV=production`, `NEXT_PUBLIC_SITE_URL` (`https://jainavinfotech.in` /
-    `https://staging.jainavinfotech.in`), `PAYLOAD_SECRET`, `CRON_SECRET`.
+    `https://staging.jainavinfotech.in`), `PAYLOAD_SECRET`.
   - `DATABASE_URL=postgres://jainav:<APP_DB_PASSWORD>@postgres:5432/jainav`; staging uses
     `jainav_staging` with `STAGING_DB_PASSWORD`.
   - R2 (`S3_*`, `NEXT_PUBLIC_CDN_URL`, `DOWNLOADS_BASE_URL`), Turnstile, Telegram, Sentry.
