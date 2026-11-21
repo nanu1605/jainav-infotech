@@ -240,6 +240,15 @@ tg_send() {  # text [silent] -> 0 sent, 1 failed, 3 Telegram not set up
   rm -f "$TG_FAILED"
 }
 
+# Without a bot the journal line is all there is, and that counts as delivered.
+notify() {  # text [silent]
+  local rc=0
+  say "alert: $1"
+  tg_send "$1" "${2-}" || rc=$?
+  if [ "$rc" -eq 3 ]; then rc=0; fi
+  return "$rc"
+}
+
 # Does the bot still reach the chat? getChat sends nothing. Not set up counts as fine.
 tg_probe() {
   local rc=0
@@ -1401,9 +1410,10 @@ lock() {  # name: one run at a time; a second one gives up
   flock -n 9 || { say "hostwatch $1 is still running; skipped"; exit 0; }
 }
 
-# While Telegram refuses messages: probe it, and once it answers, send what was kept.
+# While Telegram refuses messages: probe it, and once it answers, send what was kept. Not after a
+# send failed in this run: getChat still answers for a bot that may not post or is rate limited.
 tg_recover() {
-  if [ -e "$TG_FAILED" ] && tg_probe; then rm -f "$TG_FAILED"; fi
+  if [ -e "$TG_FAILED" ] && [ "$TG_FAILS" -eq 0 ] && tg_probe; then rm -f "$TG_FAILED"; fi
   if [ ! -e "$TG_FAILED" ]; then outbox_flush; fi
 }
 

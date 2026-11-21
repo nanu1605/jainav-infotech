@@ -88,10 +88,10 @@ jobs:
 
   # The server's root scripts (docker/host), the backup scripts and the Postgres role script:
   # shellcheck, which the runner image ships, then app-deploy against stubs of docker and the host
-  # tools, and app-apply against this repository's own compose and site files (it needs docker and
-  # jq, both on the runner, and pulls the pinned Caddy image). The docker lists are explicit, so
-  # each new script joins one on purpose; every shell file under tests/host, stubs included, is found
-  # by its shebang.
+  # tools, app-apply against this repository's own compose and site files (it needs docker and jq,
+  # both on the runner, and pulls the pinned Caddy image), and hostwatch's alerts against stubs of
+  # curl and journalctl. The docker lists are explicit, so each new script joins one on purpose;
+  # every shell file under tests/host, stubs included, is found by its shebang.
   host-scripts:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -127,3 +127,5 @@ jobs:
         run: bash tests/host/app-deploy.sh
       - name: app-apply accepts the repository's own files and refuses bad ones
         run: bash tests/host/app-apply.sh
+      - name: hostwatch sends, repeats and resolves its alerts, and retries failed sends
+        run: bash tests/host/hostwatch.sh

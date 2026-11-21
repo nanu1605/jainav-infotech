@@ -979,7 +979,8 @@ journald, sudo or sshd, so it can only rehearse the apps). In the VM:
   for a bad verb, extra words, a missing digest, a wrong tag pattern and an image of another app;
 - `app-apply` with hostile files: `tests/host/app-apply.sh` runs these checks, and
   `tests/host/app-deploy.sh` covers `app-deploy`;
-- `sudo hostwatch check`, and the leak test ([edge.md §6](edge.md#6-the-leak-test)).
+- `sudo hostwatch check` (`tests/host/hostwatch.sh` covers how it sends, repeats and resolves
+  alerts), and the leak test ([edge.md §6](edge.md#6-the-leak-test)).
 
 For a rehearsal of the apps on Docker Desktop (port 8443, self-signed certificates, a local
 folder for the backup bucket), add `docker/compose.local.yml` as a second `-f` file: it switches

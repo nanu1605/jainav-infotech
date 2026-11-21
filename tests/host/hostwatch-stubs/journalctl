@@ -1,0 +1,11 @@
+#!/bin/bash
+# Stand-in for journalctl as hostwatch's check_oom calls it, through timeout, so it has to be a file
+# on PATH (tests/host/hostwatch.sh). Each call's arguments are a line in
+# $STUB_STATE/journalctl.log. It prints the kernel lines in $STUB_STATE/kernel and, with
+# --show-cursor, then "-- cursor: " and the value in $STUB_STATE/cursor, the way the real one ends
+# its output.
+printf '%s\n' "$*" >>"$STUB_STATE/journalctl.log"
+if [ -e "$STUB_STATE/kernel" ]; then cat "$STUB_STATE/kernel"; fi
+for arg in "$@"; do
+  if [ "$arg" = --show-cursor ]; then printf -- '-- cursor: %s\n' "$(cat "$STUB_STATE/cursor")"; fi
+done

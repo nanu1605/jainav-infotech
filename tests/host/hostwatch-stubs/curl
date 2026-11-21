@@ -1,0 +1,60 @@
+#!/bin/bash
+# Stand-in for curl as hostwatch's tg_send and tg_probe call it (tests/host/hostwatch.sh). The URL,
+# which holds the token, comes on stdin as a config line. Each call is a line in
+# $STUB_STATE/curl.log: the Bot API method and, for sendMessage, silent or loud and the text (a
+# newline in it as \n). The token and the URL are never written down. A call unlike hostwatch's
+# adds a line that says how: the token in an argument, no -f (a refusal would count as sent), no
+# --config -, or another token or chat than the test's ($STUB_TOKEN, $STUB_CHAT). It exits with
+# the code in $STUB_STATE/curl-exit-<method>, else $STUB_STATE/curl-exit, else 0.
+api='url = "https://api.telegram.org/bot'
+config=''
+IFS= read -r config || true
+case $config in
+  "$api"*'/sendMessage"') method=sendMessage ;;
+  "$api"*'/getChat"') method=getChat ;;
+  *) method=other ;;
+esac
+token=''
+if [ "$method" != other ]; then
+  token=${config#"$api"}
+  token=${token%%/*}
+fi
+mode=loud text='' chat='' fail=0 stdin=0 leak=0 prev=''
+for arg in "$@"; do
+  case $arg in
+    text=*) text=${arg#text=} ;;
+    chat_id=*) chat=${arg#chat_id=} ;;
+    disable_notification=true) mode=silent ;;
+    --fail | --fail-with-body) fail=1 ;;
+    --*) ;;
+    -*f*) fail=1 ;;
+  esac
+  if [ "$prev" = --config ] && [ "$arg" = - ]; then stdin=1; fi
+  prev=$arg
+  if [ -n "$token" ]; then
+    case $arg in *"$token"*) leak=1 ;; esac
+  fi
+done
+log=$STUB_STATE/curl.log
+if [ "$method" = sendMessage ]; then
+  nl=$'\n'
+  esc='\n'
+  printf '%s %s %s\n' "$method" "$mode" "${text//"$nl"/"$esc"}" >>"$log"
+else
+  printf '%s\n' "$method" >>"$log"
+fi
+note() { echo "$1" >>"$log"; }
+if [ "$method" != other ]; then
+  if [ "$leak" -eq 1 ]; then note 'the token was in an argument'; fi
+  if [ "$fail" -eq 0 ]; then note 'curl ran without -f: a refused message would count as sent'; fi
+  if [ "$stdin" -eq 0 ]; then note 'curl ran without --config -: it would have no URL'; fi
+  if [ "$token" != "$STUB_TOKEN" ]; then note "the URL held another token than the test's"; fi
+  if [ "$chat" != "$STUB_CHAT" ]; then note "chat_id was not the test's chat"; fi
+fi
+code=0
+if [ -s "$STUB_STATE/curl-exit-$method" ]; then
+  code=$(cat "$STUB_STATE/curl-exit-$method")
+elif [ -s "$STUB_STATE/curl-exit" ]; then
+  code=$(cat "$STUB_STATE/curl-exit")
+fi
+exit "$code"
