@@ -19,7 +19,8 @@ and is installed with `sudo app-deploy jainav backup <tag>` ([server.md §5](ser
 ## The key
 
 The server only has the **public** key, so a leaked bucket or server can't decrypt old dumps.
-The private key stays with the Owner, offline (a password manager plus a printed copy).
+The private key stays with the Owner, offline (a password manager plus a printed copy). Make it
+on your own machine, never on the server:
 
 ```bash
 docker run --rm -v "$PWD:/k" postgres:17-alpine sh -c 'apk add -q age && age-keygen -o /k/jainav-backup-key.txt'
@@ -43,8 +44,10 @@ minutes before the dump), encrypts them as they are at that moment:
   and fails, with an alert, when that archive is missing or more than 2 hours old. The secrets
   never enter the long-running container.
 
-The timer is enabled by hand ([server.md §3](server.md#3-first-start)), and `hostwatch` alerts
-when it isn't ([monitoring.md](monitoring.md#hostwatch)). Another app gets its own timer,
+The timer is enabled by hand ([server.md §3](server.md#3-first-start)), after
+`/etc/hostwatch.env` is filled and the backup image is deployed, so that its alerts reach the chat
+and `deploys.log` exists. `hostwatch` alerts when it isn't enabled
+([monitoring.md](monitoring.md#hostwatch)). Another app gets its own timer,
 `app-config-archive@<app>.timer`. If its backup runs at another time, a drop-in moves the timer to
 ten minutes before it (`sudo systemctl edit app-config-archive@<app>.timer`; the comment in
 `docker/host/systemd/app-config-archive@.timer` has the lines). Check it:

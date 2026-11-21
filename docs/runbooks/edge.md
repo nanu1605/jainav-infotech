@@ -80,9 +80,14 @@ sudo app-apply edge validate                           # checks the live tree (h
 sudo app-apply edge reload                             # validate, then reload
 ```
 
-Every one of them validates the whole tree, so on a new server `install.sh` puts the first
-`Caddyfile` and `snippets.caddy` in place, the admin fills in `edge.env` by hand, and then
-`sudo cf-ranges apply` writes the ranges file ([server.md §2](server.md#2-put-the-files-in-place)).
+Every one of them validates the whole tree. So on a new server `install.sh` puts the first
+`Caddyfile` and `snippets.caddy` in place, `sudo cf-ranges apply` writes the ranges file before
+any other `app-apply edge` command (the `Caddyfile` imports it), and then the admin installs
+`edge.env` with `app-apply edge env` ([server.md §2](server.md#2-put-the-files-in-place)).
+
+Caddy logs "Unnecessary header_up X-Forwarded-Host" each time it loads the config: in its own
+journal (`journalctl CONTAINER_NAME=edge-caddy-1`), and in `journalctl -t app-apply` for every
+validate. It is expected: `snippets.caddy` sets that header on purpose (its comment says why).
 
 `edge.env` is read when the container is **created**, not on a reload. After
 `app-apply edge env`, recreate Caddy: `sudo app-compose edge up -d`. Until then every other
@@ -97,32 +102,53 @@ this site), and every value must be set.
 Each zone has one Cloudflare Origin CA certificate for the zone and `*.<zone>`, made from a CSR
 generated on the server, so the private key never leaves it.
 
-1. On the server, in a directory only you can read:
+1. On the server, in a directory only you can read. The subshell keeps the strict umask out of
+   your session:
 
    ```bash
-   umask 077 && mkdir ~/csr && cd ~/csr
-   openssl req -new -newkey rsa:2048 -nodes -keyout origin-key.pem -out origin.csr \
-     -subj '/CN=jainavinfotech.in' -addext 'subjectAltName=DNS:jainavinfotech.in,DNS:*.jainavinfotech.in'
-   cat origin.csr
+   (umask 077 && mkdir ~/csr && cd ~/csr && openssl req -new -newkey rsa:2048 -nodes \
+     -keyout origin-key.pem -out origin.csr -subj '/CN=jainavinfotech.in' \
+     -addext 'subjectAltName=DNS:jainavinfotech.in,DNS:*.jainavinfotech.in') && cat ~/csr/origin.csr
    ```
 
 2. Cloudflare → the zone → SSL/TLS → Origin Server → Create Certificate → _Use my private key
-   and CSR_. Paste `origin.csr`, 15 years. Save the result as `~/csr/origin.pem`.
-3. Install the pair (checked, then Caddy reloads):
+   and CSR_. Never choose _Generate private key and CSR with Cloudflare_: that key would be made
+   outside the server. Paste the whole CSR, from its `-----BEGIN CERTIFICATE REQUEST-----` line to
+   its `-----END CERTIFICATE REQUEST-----` line: without the END line Cloudflare says
+   "CSR parsed as empty". Hostnames `jainavinfotech.in` and `*.jainavinfotech.in`, 15 years. Copy
+   the certificate with the copy button Cloudflare shows beside it.
+3. On the server, run `cat > ~/csr/origin.pem`, paste the certificate, press Enter, then Ctrl-D.
+   `cat >` overwrites the file, so another try starts clean. Check it, and that it belongs to the
+   key:
 
    ```bash
-   sudo app-apply edge cert jainav ~/csr/origin.pem ~/csr/origin-key.pem
-   shred -u ~/csr/origin-key.pem && rm -r ~/csr
+   openssl x509 -in ~/csr/origin.pem -noout -subject -enddate -ext subjectAltName; grep -c $'\r' ~/csr/origin.pem
+   [ "$(openssl x509 -in ~/csr/origin.pem -noout -pubkey | sha256sum)" = "$(openssl pkey -in ~/csr/origin-key.pem -pubout | sha256sum)" ] && echo 'pair matches' || echo 'MISMATCH'
    ```
 
-   They land in `/srv/edge/certs/jainav/` (`origin.pem` 0644, `origin-key.pem` 0600). Put the
-   expiry on a calendar; hostwatch's daily run also warns before it.
+   Expect both hostnames, an end date about 15 years away, `0` and `pair matches`. This is the
+   only early check that the two belong together: `app-apply` checks the files' text only, and
+   Caddy loads the pair once a site uses it.
+
+4. Install the pair (checked, then Caddy reloads). The key copy goes only if that worked:
+
+   ```bash
+   sudo app-apply edge cert jainav ~/csr/origin.pem ~/csr/origin-key.pem && shred -u ~/csr/origin-key.pem && rm -r ~/csr
+   ```
+
+   They land in `/srv/edge/certs/jainav/` (`origin.pem` 0644, `origin-key.pem` 0600). On a new
+   server it says that Caddy isn't running yet, then prints
+   "installed the jainav certificates in /srv/edge/certs/jainav/". If the command is interrupted
+   (a closed session, Ctrl-C), run it again: an interrupted swap can leave a certificate and a key
+   that don't match, and running it again replaces both. Put the expiry on a calendar; hostwatch's
+   daily run also warns before it.
 
 ### Authenticated origin pulls (a launch gate)
 
 Cloudflare's shared client certificate proves only that a request came from Cloudflare's
 network, which every Cloudflare customer shares. So each zone uses a certificate from our own
-CA. **It must be on for every zone before a second app's containers run on the server**
+CA. **It must be on for the site's zone, and tested, before the first production deploy, and on
+for every zone before the first container of a second app runs on the server**
 ([launch.md](launch.md#gates-before-the-first-production-deploy)). It relies on Caddy 2.11.9 or
 later, which treats conflicting `client_auth` policies as an error instead of dropping the
 stricter one, so the edge never goes below that version.
@@ -138,6 +164,8 @@ stricter one, so the edge never goes below that version.
    sudo app-apply edge cert jainav /srv/edge/certs/jainav/origin.pem \
      /srv/edge/certs/jainav/origin-key.pem ~/incoming/aop-ca.pem
    ```
+
+   If the command is interrupted, run it again: it replaces every file it names.
 
    The client certificate itself (never its key) may be stored as
    `/srv/edge/certs/jainav/aop-client.pem`
@@ -232,8 +260,10 @@ files, snippets, ranges and certificates, is a reload that `app-apply` does itse
 **A new Caddy version.** In the repository, change the tag in `docker/edge/compose.yml` and
 `CADDY_IMAGE` in `docker/host/apps/edge.conf` together; CI fails while they differ. On the server:
 
-1. Set the same `CADDY_IMAGE` in `/etc/apps/edge.conf` (`sudoedit`).
-2. `sudo app-apply edge compose compose.yml`. It refuses a file whose image differs from
+1. Set the same `CADDY_IMAGE` in `/etc/apps/edge.conf` (`sudoedit`). `install.sh` never
+   overwrites a conf, so a new kit leaves the server's copy as it was, and `app-apply` reads
+   `CADDY_IMAGE` from it for every check.
+2. `sudo app-apply edge compose ~/incoming/compose.yml`. It refuses a file whose image differs from
    `CADDY_IMAGE`, and validates the live config with the new image.
 3. `sudo app-compose edge up -d` to recreate Caddy, then run the leak test
    ([§6](#6-the-leak-test)).

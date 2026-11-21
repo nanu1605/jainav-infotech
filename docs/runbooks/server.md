@@ -14,7 +14,8 @@ Monitoring: [monitoring.md](monitoring.md). The order of everything for Launch 1
 Who does what on the server:
 
 - `ops`: the admin account. Key login, sudo asks for its password. Everything below is run as `ops`
-  with `sudo`, through the SSH tunnel.
+  with `sudo`, through the SSH tunnel, in an interactive `ssh jainav` session
+  ([§2](#2-put-the-files-in-place)): `ssh jainav sudo …` has no terminal for sudo to ask on.
 - `deploy-jainav`: the account of Jainav's GitHub deploys. Its keys can run one command,
   `app-deploy`, and nothing else. No account is in the `docker` group, because that group is
   root.
@@ -276,69 +277,189 @@ default` (the public interface), `ls /etc/ssh/sshd_config.d/`, `timedatectl` (cl
     `sshd -t && systemctl reload ssh`.
 
 15. **Timers, by hand.** They stay off until `/etc/hostwatch.env` and the backup settings are
-    filled in ([monitoring.md](monitoring.md), [backups.md](backups.md)). `install.sh` prints the
-    exact commands; they are of this form:
+    filled in ([monitoring.md](monitoring.md), [backups.md](backups.md)); §3 says when each goes
+    on. `install.sh` prints the exact commands; they are of this form:
 
     ```bash
     sudo systemctl enable --now hostwatch.timer hostwatch-daily.timer cf-ranges-check.timer
     sudo systemctl enable --now app-config-archive@jainav.timer
     ```
 
-    `hostwatch daily` alerts when one of them is not enabled.
+    `hostwatch daily` alerts when one of them is not enabled. Check them:
+
+    ```bash
+    systemctl is-enabled hostwatch.timer hostwatch-daily.timer cf-ranges-check.timer app-config-archive@jainav.timer
+    ```
+
+    It prints `enabled` four times. After the next 5-minute mark,
+    `journalctl -u hostwatch.service -n 30 -o cat --no-pager` must not show
+    "heartbeat not delivered", and the hostwatch monitor shows its first ping. The backup monitor
+    gets its first one after the first backup ([monitoring.md](monitoring.md)).
 
 ## 2. Put the files in place
 
 Everything root runs lives in `/usr/local/sbin` (installed by `install.sh`) and reads its settings
 from `/etc/apps/<name>.conf` (`root:root 0644`). Every file that root or a container reads goes
 through `app-apply`, which checks it first, copies it (never moves it) and keeps the file it
-replaces. Copy files to `/home/ops/incoming` and name them in the command.
+replaces. Copy files to `/home/ops/incoming` with `scp` from the repository root on your machine
+(`jainav:incoming/`), and name each one by its full path, `~/incoming/<file>`: the scripts take the
+path exactly as given. `/srv/jainav` and `/srv/edge` are root's alone (0750), so `ops` can't `cd`
+there, and a pattern such as `/srv/jainav/*.env` doesn't expand: name every file.
 
-| Path                                                | Owner and mode | Put there by                                                                                   |
-| --------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------- |
-| `/etc/apps/jainav.conf`, `edge.conf`                | root, 0644     | `install.sh` once; fill `BACKUP_RECIPIENT`                                                     |
-| `/srv/jainav`                                       | root, 0750     | `install.sh`                                                                                   |
-| `/srv/jainav/compose.prod.yml`                      | root, 0644     | `app-apply jainav compose <file>`                                                              |
-| `/srv/jainav/postgres/roles.sh`                     | root, 0755     | `sudo install` by hand, from `docker/postgres/`                                                |
-| `/srv/jainav/.env`, `production.env`, `staging.env` | root, 0600     | `sudo install -m 600` by hand (below)                                                          |
-| `/srv/jainav/images.env`                            | root, 0644     | by hand once (below); then only `app-deploy` writes it                                         |
-| `/srv/jainav/backup-out`                            | root, 0755     | `app-apply jainav compose` creates it                                                          |
-| `/srv/edge/edge.env`                                | root, 0600     | `install.sh` copies the example once, filled with `sudoedit`; then `app-apply edge env <file>` |
-| `/srv/edge/config/Caddyfile`, `snippets.caddy`      | root, 0644     | the first ones from `install.sh`; then `app-apply edge config <file>`                          |
-| `/srv/edge/config/sites/jainav.caddy`               | root, 0644     | `app-apply jainav site <file>`                                                                 |
-| `/srv/edge/config/log-redact.d/<app>.caddy`         | root, 0644     | `app-apply edge redact <app> <file>` ([edge.md §7](edge.md#7-log-redaction-for-other-apps))    |
-| `/srv/edge/certs/<app>/`                            | root, key 0600 | `app-apply edge cert <app> <origin.pem> <origin-key.pem> [<aop-ca.pem>]`                       |
-| `/srv/edge/config/cloudflare-ranges.caddy`          | root, 0644     | `cf-ranges apply`, which goes through `app-apply edge ranges`                                  |
-| `/srv/edge/compose.yml`                             | root, 0644     | `app-apply edge compose <file>`                                                                |
+| Path                                                | Owner and mode | Put there by                                                                                |
+| --------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------- |
+| `/etc/apps/jainav.conf`, `edge.conf`                | root, 0644     | `install.sh` once; fill `BACKUP_RECIPIENT`                                                  |
+| `/etc/hostwatch.env`                                | root, 0600     | `install.sh` copies the example once; filled on the server (below)                          |
+| `/srv/jainav`                                       | root, 0750     | `install.sh`                                                                                |
+| `/srv/jainav/compose.prod.yml`                      | root, 0644     | `app-apply jainav compose <file>`                                                           |
+| `/srv/jainav/postgres/roles.sh`                     | root, 0755     | `sudo install` by hand, from `docker/postgres/`                                             |
+| `/srv/jainav/.env`, `production.env`, `staging.env` | root, 0600     | `sudo install -m 600` by hand, then filled on the server (below)                            |
+| `/srv/jainav/images.env`                            | root, 0644     | by hand once (below); then only `app-deploy` writes it                                      |
+| `/srv/jainav/backup-out`                            | root, 0755     | `app-apply jainav compose` creates it                                                       |
+| `/srv/edge/edge.env`                                | root, 0600     | `install.sh` copies the example once; then `app-apply edge env <file>` (below)              |
+| `/srv/edge/config/Caddyfile`, `snippets.caddy`      | root, 0644     | the first ones from `install.sh`; then `app-apply edge config <file>`                       |
+| `/srv/edge/config/sites/jainav.caddy`               | root, 0644     | `app-apply jainav site <file>`                                                              |
+| `/srv/edge/config/log-redact.d/<app>.caddy`         | root, 0644     | `app-apply edge redact <app> <file>` ([edge.md §7](edge.md#7-log-redaction-for-other-apps)) |
+| `/srv/edge/certs/<app>/`                            | root, key 0600 | `app-apply edge cert <app> <origin.pem> <origin-key.pem> [<aop-ca.pem>]`                    |
+| `/srv/edge/config/cloudflare-ranges.caddy`          | root, 0644     | `cf-ranges apply`, which goes through `app-apply edge ranges`                               |
+| `/srv/edge/compose.yml`                             | root, 0644     | `app-apply edge compose <file>`                                                             |
 
 Locks are in `/run/app-locks` (root, 0700). The scripts create it and refuse to run if it has
 another owner or can be written by others.
 
-**The edge** (details: [edge.md](edge.md)). Order matters:
+**One session.** Run the server's steps below, and those of §3, in an interactive `ssh jainav`
+session (the prompt starts `ops@`). Start it with `sudo -v`, and run that again after a long pause,
+so that sudo never asks for its password in the middle of a pasted block. Keep the session open
+until you are done, and close it afterwards if anything printed a secret. Paste every line that
+reads a value (`read`, `addenv`) on its own: in a pasted block, the next line would be taken as
+the value.
 
-1. `edge.env`: `install.sh` put a copy of `docker/edge/edge.env.example` at `/srv/edge/edge.env`
-   (0600). Fill it in place, once, with `sudoedit /srv/edge/edge.env` (the staging basic-auth hash
-   comes from `sudo docker run --rm -it caddy:<tag in docker/edge/compose.yml> caddy hash-password`):
-   every `app-apply edge` command reads it, and the example's placeholders don't pass. Later
-   changes go through `sudo app-apply edge env <file>` and a recreate.
-2. `install.sh` also put the first `Caddyfile` and `snippets.caddy` into `/srv/edge/config/`,
-   because every `app-apply edge` command validates the whole tree and a tree without them can't
-   pass. Then `sudo cf-ranges apply` writes `cloudflare-ranges.caddy` and validates the tree. Later
-   changes to either file go through `sudo app-apply edge config <file>`.
-3. Create the Origin CA certificate for `jainavinfotech.in` and `*.jainavinfotech.in`
-   ([cloudflare.md](cloudflare.md#ssl)), then
-   `sudo app-apply edge cert jainav origin.pem origin-key.pem`.
-4. `sudo app-apply jainav site jainav.caddy` and `sudo app-apply edge compose compose.yml`.
-5. `sudo app-compose edge up -d`. `app-apply` creates the four internal edge networks.
+Secrets are typed at hidden prompts on the server and never go through a file made elsewhere.
+Define this helper once per session; pasting a function definition runs no prompt:
 
-**Jainav**, in `/srv/jainav`:
+```bash
+set +o history; addenv() { local k=$1 v f re='^[A-Za-z0-9_.~:/?&=+%@-]+$'; shift; [ $# -gt 0 ] || { echo "usage: addenv NAME FILE..."; return 2; }; sudo -v || return 1; for f in "$@"; do sudo test -f "$f" || { echo "refused $k: $f does not exist (nothing asked, nothing written)"; return 1; }; if sudo grep -q "^$k=" "$f"; then echo "refused $k: already in $f (nothing asked, nothing written)"; return 1; fi; done; read -rsp "$k: " v; echo; if [[ $v =~ $re ]]; then printf '%s=%s\n' "$k" "$v" | sudo tee -a "$@" >/dev/null && echo "added $k (${#v} characters) to $*"; else echo "refused $k: empty, or a character other than letters, digits and _.~:/?&=+%@-"; fi; unset v; }
+```
 
-- `.env`: `cp env.example .env` (`docker/env.example`) and fill it in. Generate passwords with
-  `openssl rand -base64 32 | tr -d '/+='`.
+`addenv NAME FILE...` appends `NAME=value` to each file. The value goes from the shell to
+`sudo tee` on stdin, so it never shows on screen, in a command line or in the history
+(`set +o history` keeps the session's commands out of it). It refuses a name that a file already
+has, and a value that Compose or `app-compose` would read differently: one with `$`, quotes,
+spaces, `#` or a backslash.
+
+**The edge** (details: [edge.md](edge.md)). Order matters. Copy its files first, from the
+repository root on your machine:
+
+```bash
+scp docker/edge/compose.yml docker/edge/config/sites/jainav.caddy docker/edge/edge.env.example jainav:incoming/
+```
+
+1. Pull the pinned Caddy image, the `CADDY_IMAGE` of `docker/host/apps/edge.conf`:
+   `sudo docker pull caddy:2.11.9-alpine`. After a Caddy upgrade
+   ([edge.md §5](edge.md#5-adding-an-app)), use the new tag here and in step 3. Without the pull,
+   `app-apply` pulls the image on its own, and a failed pull shows up as "caddy validate failed".
+2. The ranges file, **before any other `app-apply edge` command**. `install.sh` put the first
+   `Caddyfile` and `snippets.caddy` into `/srv/edge/config/`, because every `app-apply edge`
+   command validates the whole tree, and the `Caddyfile` imports `cloudflare-ranges.caddy`, which
+   only `cf-ranges apply` writes:
+
+   ```bash
+   sudo cf-ranges apply
+   sudo cf-ranges verify && echo ok
+   ```
+
+   It says that `edge-caddy-1` is not running yet, prints
+   "installed /srv/edge/config/cloudflare-ranges.caddy" and the number of ranges, and `verify`
+   ends with `ok`. Later changes to the `Caddyfile` or `snippets.caddy` go through
+   `sudo app-apply edge config <file>`.
+
+3. `edge.env`, with the staging basic-auth hash. The password is the part after `jainav:` in the
+   GitHub secret `SMOKE_BASIC_AUTH` ([§4](#4-github-setup-once)): the smoke tests split it at the
+   first colon. Paste this line alone:
+
+   ```bash
+   IFS= read -rsp 'Staging basic-auth password: ' P; echo; H=$(printf '%s\n' "$P" | sudo docker run --rm -i --network none caddy:2.11.9-alpine caddy hash-password --algorithm bcrypt); unset P; printf '%s\n' "$H" | awk 'NR==FNR {h=$0; next} /^JAINAV_STAGING_AUTH_HASH=/ {$0="JAINAV_STAGING_AUTH_HASH=\047" h "\047"} {print}' - ~/incoming/edge.env.example > ~/incoming/edge.env; unset H; awk -F= '$1=="JAINAV_STAGING_AUTH_HASH" {print length($2)}' ~/incoming/edge.env
+   ```
+
+   The last command must print `62`: a 60-character bcrypt hash and its two single quotes. `2`
+   means no hash and `19` the example's placeholder: then don't install, and run the line again.
+   The password goes to Caddy on stdin, so it is on no command line. If the second run prints `2`
+   too (the line relies on Caddy reading the password from stdin when it has no terminal), run
+   `sudo docker run --rm -it caddy:2.11.9-alpine caddy hash-password --algorithm bcrypt`, type the
+   password at its prompts, and paste the hash between the single quotes of
+   `JAINAV_STAGING_AUTH_HASH` in `sudoedit /srv/edge/edge.env`, in place of the placeholder. Keep
+   the single quotes (the hash holds `$` signs); the user stays `jainav` and `JAINAV_DOMAIN` stays
+   `jainavinfotech.in`. In that case skip the install line below: run `rm ~/incoming/edge.env` and
+   the check line only. Otherwise install the file and check it:
+
+   ```bash
+   sudo app-apply edge env ~/incoming/edge.env && rm ~/incoming/edge.env
+   sudo stat -c '%U:%G %a' /srv/edge/edge.env; sudo grep -c replace-me /srv/edge/edge.env
+   ```
+
+   The install prints "installed /srv/edge/edge.env" and advice to recreate Caddy, which you can
+   ignore: no container exists yet. The check prints `root:root 600` and `0`. `app-apply` checks
+   only the file's shape: the example's placeholder hash (`$2a$14$replace-me`) passes it, so a
+   forgotten hash is not caught there, and staging would refuse every login. The login test in
+   step 7 proves that the hash belongs to the password. Keep the password in the password manager:
+   the edge has no settings archive ([backups.md](backups.md)), and GitHub never shows a secret
+   again. If it is lost, choose a new one and set `SMOKE_BASIC_AUTH` to `jainav:<new>`. Later
+   changes go through the same `app-apply edge env` and a recreate.
+
+4. The Origin CA certificate for `jainavinfotech.in` and `*.jainavinfotech.in`: make it and
+   install it with `sudo app-apply edge cert jainav ~/csr/origin.pem ~/csr/origin-key.pem` as in
+   [edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls).
+5. The site file, then the compose file:
+
+   ```bash
+   sudo app-apply jainav site ~/incoming/jainav.caddy
+   sudo app-apply edge compose ~/incoming/compose.yml
+   ```
+
+   The site file's check loads the certificate, so it needs step 4. The compose step prints the
+   steady memory limits, creates the four internal edge networks and pins the file's sha256.
+   Ignore its "between 01:00 and 07:00 IST" line: nothing is served yet.
+
+6. Start Caddy:
+
+   ```bash
+   sudo app-compose edge up -d
+   sudo app-compose edge ps
+   ```
+
+   `edge-caddy-1` is Up and turns (healthy) within about a minute. `ss` shows no 443 listener:
+   published ports are iptables rules on this host. Caddy's journal
+   (`journalctl CONTAINER_NAME=edge-caddy-1 -n 20 -o cat --no-pager`) shows no errors; its
+   "Unnecessary header_up X-Forwarded-Host" warning is expected
+   ([edge.md §2](edge.md#2-site-files-and-their-checks)).
+
+7. Checks that need no DNS, on the server:
+
+   ```bash
+   curl -sk -o /dev/null -w '%{http_code} %{redirect_url}\n' --resolve www.jainavinfotech.in:443:127.0.0.1 https://www.jainavinfotech.in/x
+   curl -sk -o /dev/null -w '%{http_code}\n' --resolve staging.jainavinfotech.in:443:127.0.0.1 https://staging.jainavinfotech.in/
+   ```
+
+   They print `308 https://jainavinfotech.in/x` and `401`; the apex answers `502` after about
+   30 s until its app runs. Then the login test, pasted alone:
+
+   ```bash
+   IFS= read -rsp 'Staging password: ' P; echo; printf 'user = "jainav:%s"\n' "$P" | curl -sk -o /dev/null -w '%{http_code}\n' --max-time 40 --config - --resolve staging.jainavinfotech.in:443:127.0.0.1 https://staging.jainavinfotech.in/; unset P
+   ```
+
+   `502` after about 30 s means the login was accepted (no staging app runs behind it yet), and
+   `401` that the hash and the password differ. A password with `"` or `\` needs escaping in
+   curl's config syntax. Last, `sudo app-apply edge validate` prints
+   "the live edge tree is valid".
+
+**Jainav**, as `ops`. What its files hold:
+
+- `.env`: the values `docker/compose.prod.yml` reads; `docker/env.example` lists them.
   - `BACKUP_AGE_RECIPIENT` comes from the backup key: make it first
     ([backups.md](backups.md#the-key)). It is the same key as `BACKUP_RECIPIENT` in
     `/etc/apps/jainav.conf`. Compose checks every required value on every command, so nothing
     starts without it.
-- `production.env` and `staging.env`: the apps' settings, keys from `/.env.example`.
+- `production.env` and `staging.env`: the apps' settings.
   - `NODE_ENV=production`, `NEXT_PUBLIC_SITE_URL` (`https://jainavinfotech.in` /
     `https://staging.jainavinfotech.in`), `PAYLOAD_SECRET`, `CRON_SECRET`.
   - `DATABASE_URL=postgres://jainav:<APP_DB_PASSWORD>@postgres:5432/jainav`; staging uses
@@ -358,60 +479,278 @@ another owner or can be written by others.
   - Staging only: `STAGING_BASIC_AUTH=1`, Razorpay test keys and webhook secret
     ([store.md](store.md)), its own R2 buckets and `https://cdn-staging.jainavinfotech.in`
     ([cloudflare.md](cloudflare.md#r2)).
-- Install each env file as root: `sudo install -m 600 -o root -g root .env /srv/jainav/.env`.
-  Env-file lines may not start with `COMPOSE_`.
-- `images.env`: copy `docker/images.env.example` to `/srv/jainav/images.env`
-  (`sudo install -m 644 -o root -g root images.env.example /srv/jainav/images.env`). It names the
-  image each service runs, including the tools image of each environment (`TOOLS_IMAGE`,
-  `TOOLS_STAGING_IMAGE`); `app-deploy` rewrites a line after each deploy. On a server that
-  already has the file, add the two `TOOLS_*` lines.
-- `postgres/roles.sh`:
-  `sudo install -d -m 755 /srv/jainav/postgres && sudo install -m 755 roles.sh /srv/jainav/postgres/roles.sh`
-  (from `docker/postgres/roles.sh`).
-- Then `sudo app-apply jainav compose compose.prod.yml`. It refuses a file that could reach the
-  host or another app; it also needs the env files and `roles.sh` to exist. It creates
-  `backup-out`. The backup service gets its image from `app-deploy` (§3).
+- Env-file lines may not start with `COMPOSE_`.
+
+The steps below write them on the server. Copy the files first, from the repository root on your
+machine (`docker/env.example` only documents names and is not copied):
+
+```bash
+scp docker/compose.prod.yml docker/images.env.example docker/postgres/roles.sh jainav:incoming/
+```
+
+1. The backup key's public half goes into the conf first. It is public, so the prompt shows it:
+
+   ```bash
+   read -rp 'Backup age public key (age1...): ' K; [[ $K =~ ^age1[0-9a-z]+$ ]] && sudo sed -i "s|^BACKUP_RECIPIENT=.*|BACKUP_RECIPIENT=$K|" /etc/apps/jainav.conf; unset K
+   grep '^BACKUP_RECIPIENT=' /etc/apps/jainav.conf; stat -c '%U:%G %a' /etc/apps/jainav.conf
+   ```
+
+   The second line shows the key and `root:root 644`.
+
+2. The files and directories. These lines read nothing, so they may be pasted together:
+
+   ```bash
+   sudo test -e /srv/jainav/.env || sudo install -m 600 -o root -g root /dev/null /srv/jainav/.env
+   sudo test -e /srv/jainav/production.env || sudo install -m 600 -o root -g root /dev/null /srv/jainav/production.env
+   sudo test -e /srv/jainav/staging.env || sudo install -m 600 -o root -g root /dev/null /srv/jainav/staging.env
+   sudo test -e /srv/jainav/images.env || sudo install -m 644 -o root -g root ~/incoming/images.env.example /srv/jainav/images.env
+   sudo install -d -m 755 -o root -g root /srv/jainav/postgres
+   sudo install -m 755 -o root -g root ~/incoming/roles.sh /srv/jainav/postgres/roles.sh
+   ```
+
+   `images.env` names the image each service runs, including the tools image of each environment
+   (`TOOLS_IMAGE`, `TOOLS_STAGING_IMAGE`); `app-deploy` rewrites a line after each deploy. On a
+   server that already has the file, add the two `TOOLS_*` lines.
+
+3. Generated values: nothing is shown or typed. The block checks first, so a second paste writes
+   nothing:
+
+   ```bash
+   if sudo grep -q '^POSTGRES_PASSWORD=' /srv/jainav/.env; then echo 'already ran: nothing written'; else
+   for k in POSTGRES_PASSWORD UMAMI_DB_PASSWORD UMAMI_APP_SECRET; do printf '%s=%s\n' "$k" "$(openssl rand -base64 32 | tr -d '/+=')"; done | sudo tee -a /srv/jainav/.env >/dev/null
+   P=$(openssl rand -base64 32 | tr -d '/+='); printf 'APP_DB_PASSWORD=%s\n' "$P" | sudo tee -a /srv/jainav/.env >/dev/null; printf 'DATABASE_URL=postgres://jainav:%s@postgres:5432/jainav\n' "$P" | sudo tee -a /srv/jainav/production.env >/dev/null; unset P
+   P=$(openssl rand -base64 32 | tr -d '/+='); printf 'STAGING_DB_PASSWORD=%s\n' "$P" | sudo tee -a /srv/jainav/.env >/dev/null; printf 'DATABASE_URL=postgres://jainav_staging:%s@postgres:5432/jainav_staging\n' "$P" | sudo tee -a /srv/jainav/staging.env >/dev/null; unset P
+   for f in production staging; do { printf 'PAYLOAD_SECRET=%s\n' "$(openssl rand -base64 32 | tr -d '/+=')"; printf 'OTP_PEPPER=%s\n' "$(openssl rand -hex 32)"; } | sudo tee -a "/srv/jainav/$f.env" >/dev/null; done
+   echo ok; fi
+   ```
+
+   The generator, `openssl rand -base64 32 | tr -d '/+='`, gives letters and digits only, safe
+   unquoted and inside the database URLs. Role and database names are those of
+   `postgres/roles.sh`.
+
+4. Public values. Paste each `read` line alone. The account ID builds the R2 endpoint, and the chat
+   ID is the Telegram group's (a negative number):
+
+   ```bash
+   if sudo grep -q '^BACKUP_S3_ENDPOINT=' /srv/jainav/.env; then echo 'already set: nothing written'; else read -rp 'Cloudflare account ID (32 hex): ' A; if [[ $A =~ ^[0-9a-f]{32}$ ]]; then printf 'BACKUP_S3_ENDPOINT=https://%s.r2.cloudflarestorage.com\n' "$A" | sudo tee -a /srv/jainav/.env >/dev/null && printf 'S3_ENDPOINT=https://%s.r2.cloudflarestorage.com\n' "$A" | sudo tee -a /srv/jainav/production.env /srv/jainav/staging.env >/dev/null && echo ok; else echo 'not 32 hex: nothing written'; fi; unset A; fi
+   ```
+
+   ```bash
+   if sudo grep -q '^TELEGRAM_CHAT_ID=' /srv/jainav/.env; then echo 'already set: nothing written'; else read -rp 'Telegram group chat id (negative): ' C; if [[ $C =~ ^-[0-9]+$ ]]; then printf 'TELEGRAM_CHAT_ID=%s\n' "$C" | sudo tee -a /srv/jainav/.env /srv/jainav/production.env /srv/jainav/staging.env >/dev/null && echo ok; else echo 'not a negative number: nothing written'; fi; unset C; fi
+   ```
+
+   Then the fixed values, which read nothing. Buckets and hostnames are those of
+   [cloudflare.md](cloudflare.md#r2); URLs take no trailing slash, `DOWNLOADS_BASE_URL` is an
+   origin only, and `EMAIL_REPLY_TO` must be a real inbox ([cloudflare.md](cloudflare.md#email)):
+
+   ```bash
+   K=$(sed -n 's/^BACKUP_RECIPIENT=//p' /etc/apps/jainav.conf); if sudo grep -q '^BACKUP_AGE_RECIPIENT=' /srv/jainav/.env; then echo '.env already has the backup values: nothing written'; elif [[ $K =~ ^age1[0-9a-z]+$ ]]; then printf 'BACKUP_AGE_RECIPIENT=%s\nBACKUP_BUCKET=jainav-backups\n' "$K" | sudo tee -a /srv/jainav/.env >/dev/null && echo ok; else echo 'BACKUP_RECIPIENT is not set: do step 1 first'; fi; unset K
+   if sudo grep -q '^NODE_ENV=' /srv/jainav/production.env; then echo 'production.env already has the fixed values: nothing written'; else printf '%s\n' NODE_ENV=production NEXT_PUBLIC_SITE_URL=https://jainavinfotech.in S3_REGION=auto S3_BUCKET=jainav-public S3_PRIVATE_BUCKET=jainav-private NEXT_PUBLIC_CDN_URL=https://cdn.jainavinfotech.in DOWNLOADS_BASE_URL=https://downloads.jainavinfotech.in EMAIL_FROM=hello@send.jainavinfotech.in EMAIL_REPLY_TO=support@jainavinfotech.in | sudo tee -a /srv/jainav/production.env >/dev/null && echo ok; fi
+   if sudo grep -q '^NODE_ENV=' /srv/jainav/staging.env; then echo 'staging.env already has the fixed values: nothing written'; else printf '%s\n' NODE_ENV=production NEXT_PUBLIC_SITE_URL=https://staging.jainavinfotech.in STAGING_BASIC_AUTH=1 ENABLE_STYLEGUIDE=1 S3_REGION=auto S3_BUCKET=jainav-staging-public S3_PRIVATE_BUCKET=jainav-staging-private NEXT_PUBLIC_CDN_URL=https://cdn-staging.jainavinfotech.in DOWNLOADS_BASE_URL=https://cdn-staging.jainavinfotech.in EMAIL_FROM=hello@send.jainavinfotech.in EMAIL_REPLY_TO=support@jainavinfotech.in | sudo tee -a /srv/jainav/staging.env >/dev/null && echo ok; fi
+   ```
+
+5. Secrets, at hidden prompts, one line at a time:
+
+   ```bash
+   addenv BACKUP_S3_ACCESS_KEY_ID /srv/jainav/.env
+   addenv BACKUP_S3_SECRET_ACCESS_KEY /srv/jainav/.env
+   addenv BACKUP_HEARTBEAT_URL /srv/jainav/.env
+   addenv TELEGRAM_BOT_TOKEN /srv/jainav/.env /srv/jainav/production.env /srv/jainav/staging.env
+   addenv S3_ACCESS_KEY_ID /srv/jainav/production.env
+   addenv S3_SECRET_ACCESS_KEY /srv/jainav/production.env
+   addenv S3_ACCESS_KEY_ID /srv/jainav/staging.env
+   addenv S3_SECRET_ACCESS_KEY /srv/jainav/staging.env
+   addenv TURNSTILE_SECRET_KEY /srv/jainav/production.env /srv/jainav/staging.env
+   addenv SENTRY_DSN /srv/jainav/production.env /srv/jainav/staging.env
+   addenv RESEND_API_KEY /srv/jainav/production.env /srv/jainav/staging.env
+   ```
+
+   `BACKUP_S3_*` are the Access Key ID and Secret Access Key of the backups R2 token, and `S3_*`
+   those of the app token of that environment ([cloudflare.md](cloudflare.md#r2)).
+   `TELEGRAM_BOT_TOKEN` is the site's bot, `BACKUP_HEARTBEAT_URL` the backup monitor's ping URL
+   ([monitoring.md](monitoring.md)) and `SENTRY_DSN` the Sentry project's DSN. One Turnstile
+   widget serves both hostnames, so both files get its secret. `RESEND_API_KEY` can wait (above).
+   The licensing sets and the Razorpay test keys come later; no recreate is needed until the apps
+   run.
+
+6. `/etc/hostwatch.env`, for the server's own alerts: the server bot's token, the chat ID and the
+   hostwatch monitor's ping URL ([monitoring.md](monitoring.md#hostwatch)). `app-deploy` and the
+   settings archive alert only through `hostwatch`, which without a token writes to the journal
+   alone, so fill it before §3. `install.sh` left the example there, with empty `BOT_TOKEN=`,
+   `CHAT_ID=` and `HEARTBEAT_URL=` lines, and `addenv` refuses a name that is already there: the
+   first line starts the file empty while it holds no value, and the second copies the chat ID
+   from `.env` (the same group) without showing it.
+
+   ```bash
+   sudo grep -qE '^[A-Z_]+=.' /etc/hostwatch.env || sudo install -m 600 -o root -g root /dev/null /etc/hostwatch.env
+   C=$(sudo sed -n 's/^TELEGRAM_CHAT_ID=//p' /srv/jainav/.env); if sudo grep -q '^CHAT_ID=.' /etc/hostwatch.env; then echo 'CHAT_ID already set'; elif [[ $C =~ ^-[0-9]+$ ]]; then printf 'CHAT_ID=%s\n' "$C" | sudo tee -a /etc/hostwatch.env >/dev/null && echo ok; else echo 'no single TELEGRAM_CHAT_ID in .env: nothing written'; fi; unset C
+   addenv BOT_TOKEN /etc/hostwatch.env
+   addenv HEARTBEAT_URL /etc/hostwatch.env
+   ```
+
+   Paste each `addenv` line alone. Then test the alerts:
+   `sudo hostwatch alert 'test from the new server'` prints "hostwatch: sent", and the group gets
+   "[server] test from the new server". If it isn't sent,
+   `journalctl -t hostwatch -n 5 -o cat --no-pager` says why. Both bots must be members of the
+   group.
+
+7. Check the files without showing a value:
+
+   ```bash
+   for f in /srv/jainav/.env /srv/jainav/production.env /srv/jainav/staging.env /etc/hostwatch.env; do printf '%s: ' "${f##*/}"; sudo awk '/^[A-Za-z_][A-Za-z0-9_]*=/ {i = index($0, "="); k = substr($0, 1, i - 1); n[k]++; printf "%s(%d) ", k, length($0) - i} END {for (k in n) if (n[k] > 1) printf "TWICE:%s ", k; print ""}' "$f"; done
+   sudo stat -c '%n %U:%G %a' /srv/jainav/.env /srv/jainav/production.env /srv/jainav/staging.env /srv/jainav/images.env /srv/jainav/postgres/roles.sh /etc/hostwatch.env
+   ```
+
+   It prints each name with the length of its value: `(0)` is an empty value, and `TWICE:NAME` a
+   name set twice. `.env` must list 13 names and `hostwatch.env` 3, and no file may show `(0)` or
+   `TWICE`. The modes must be 600, 600, 600, 644, 755 and 600. Remove a duplicate with
+   `sudo sed -i '/^NAME=/d' <file>`, then run `addenv` again. Never print a value: check a file
+   with `grep -q` or `grep -c`, or with this command.
+
+8. The compose file:
+
+   ```bash
+   sudo app-apply jainav compose ~/incoming/compose.prod.yml
+   ```
+
+   It refuses a file that could reach the host or another app; it also needs the env files and
+   `roles.sh` to exist, and Compose names any required value that is missing (nothing is installed
+   then). It prints the steady memory limits and
+   "installed /srv/jainav/compose.prod.yml; its sha256 is pinned …", and creates `backup-out`.
+   Ignore its "next: …" line: §3 names the services. The backup service gets its image from
+   `app-deploy` (§3).
 
 ## 3. First start
 
-```bash
-sudo app-compose jainav up -d postgres umami
-sudo app-compose jainav ps   # postgres healthy, umami running
-```
-
-`postgres/roles.sh` creates the roles and databases the first time the volume is created. Every
-command through `app-compose` uses the project `jainav` and the files named in
-`/etc/apps/jainav.conf`.
-
-The backup job's image comes from CI too (`backup-image.yml` builds `backup-<commit>`). Deploy it
-once by hand, with a registry token (read:packages) on stdin:
+Run it in an interactive session as in §2, and close that session afterwards if a secret was
+printed. The edge is already running. Always name the services: a bare `up -d` would also try the
+apps and the backup job, whose images stay `:none` until their first deploy.
 
 ```bash
-read -rs PAT && printf '%s\n' "$PAT" | sudo app-deploy jainav backup backup-<commit>@sha256:<digest>
+sudo app-compose jainav up -d postgres
+timeout 180 bash -c 'until journalctl CONTAINER_NAME=jainav-postgres-1 --since -10min -o cat --no-pager | grep -q "PostgreSQL init process complete"; do sleep 3; done' && echo 'init done' || echo 'no init line after 3 minutes'
 ```
 
-Then the settings archive timer (`sudo systemctl enable --now app-config-archive@jainav.timer`,
-§1 step 15) and the edge:
+The second line waits until Postgres has finished its first initialisation. If it prints
+"no init line after 3 minutes", stop and read
+`journalctl CONTAINER_NAME=jainav-postgres-1 -n 30 -o cat --no-pager`. Otherwise start Umami:
 
 ```bash
-sudo app-compose edge up -d
-sudo app-compose edge ps
+sudo app-compose jainav up -d umami
+sudo app-compose jainav ps   # postgres healthy; umami "health: starting" for up to about a minute, then healthy
+sudo app-compose jainav exec -T postgres psql -U postgres -Atc "select datname from pg_database where datname in ('jainav','jainav_staging','umami') order by 1"
 ```
+
+The last line prints the three databases. `postgres/roles.sh` creates the roles and databases the
+first time the volume is created. Every command through `app-compose` uses the project `jainav`
+and the files named in `/etc/apps/jainav.conf`.
+
+The volume is initialised only once: if the first start fails, or ran with a wrong `.env`, a fix
+to `.env` changes nothing in the database. Start over, **only while the database is still
+empty**:
+
+```bash
+sudo app-compose jainav down
+sudo docker volume rm jainav_pgdata
+```
+
+`jainav_pgdata` is the volume `pgdata` of the Compose project `jainav`. Then fix the env file and
+start again. Never do this once the apps have written data: it deletes every database.
+
+**Umami's password, before any DNS record.** Umami starts with the login `admin` / `umami`, and
+the proxied `analytics` record would make its login page public. Change the password over a port
+forward while no record exists:
+
+1. On the server, once `jainav-umami-1` is (healthy), print its address on the project's own
+   network:
+
+   ```bash
+   sudo docker inspect -f '{{with index .NetworkSettings.Networks "jainav_default"}}{{.IPAddress}}{{end}}' jainav-umami-1
+   ```
+
+2. On your machine, in a second terminal, with that address in place of `<address>` (`ops` may
+   forward local ports):
+
+   ```bash
+   ssh -N -L 3001:<address>:3000 jainav
+   ```
+
+3. Open `http://localhost:3001` and sign in as `admin` / `umami`. Change the password and keep it
+   in the password manager. The website for `jainavinfotech.in` can be added now too
+   ([monitoring.md](monitoring.md#umami-analytics)).
+4. Press Ctrl-C in the second terminal to close the forward.
+
+The `analytics` DNS record comes only after this ([launch.md](launch.md) step 4).
+
+**The backup job's image** comes from CI too: the `Backup image` workflow builds
+`backup-<commit>`, and its run summary shows `backup-<40 hex>@sha256:<64 hex>`. The tag carries
+the full 40-character commit. Deploy it once by hand, pasting each line alone:
+
+```bash
+read -rp 'Backup image (backup-<commit>@sha256:<digest>): ' REF
+read -rsp 'Registry token, read:packages: ' PAT; echo; printf '%s\n' "$PAT" | sudo app-deploy jainav backup "$REF"; unset PAT
+```
+
+If the package is public, it needs no token: `sudo app-deploy jainav backup "$REF"`. It prints
+"deploying … to backup (jainav backup)", "switching backup to …" and
+"backup is running backup-<commit>". A failed first deploy stops the service: there is no
+earlier image to go back to. Then `sudo app-compose jainav ps backup` shows it Up, and
+`sudo tail -n 1 /srv/jainav/deploys.log` shows the deploy. When a token was given,
+`journalctl -t app-deploy` holds Docker's "credentials are stored unencrypted" warning, which is
+expected ([§5](#5-deploy)).
+
+Then the settings archive. It comes after the deploy, so that `deploys.log` exists; otherwise it
+alerts that it archived without it:
+
+```bash
+sudo systemctl enable --now app-config-archive@jainav.timer
+sudo systemctl start app-config-archive@jainav.service
+sudo ls -l /srv/jainav/backup-out
+```
+
+The listing shows a `config-<stamp>.tar.age` (0644).
 
 The apps start with the first deploy (§5). Their healthcheck calls `/api/v1/health`, which
 initializes Payload, and Payload applies the migrations (`prodMigrations`).
 
-Check, then fill the rest:
+Check, before the other timers:
 
-- `sudo hostwatch check` is clean;
+- `sudo hostwatch check` ends with "hostwatch check: clean". It never reads `/etc/hostwatch.env`,
+  so it doesn't prove that alerts arrive: the alert test of §2 does;
 - `journalctl COM_DOCKER_COMPOSE_PROJECT=jainav -n 5` shows lines;
-- the leak test passes ([edge.md §6](edge.md#6-the-leak-test));
-- `sudo systemctl restart docker` keeps 443 answering;
-- `/etc/hostwatch.env` is filled in (`root:root 0600`) and the timers are enabled (§1 step 15).
+- `sudo systemctl restart docker` keeps 443 answering. Start this loop, and run the restart in a
+  second session while it runs:
 
-**Launch gate.** Authenticated origin pulls are on for every zone, and tested, before the first
-container of a second app runs on this server ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls)).
-Cloudflare Access on `/admin*` and `/api/users/*` comes before the first production deploy.
+  ```bash
+  for i in $(seq 40); do curl -sk -o /dev/null -w '%{http_code} ' --max-time 2 --resolve www.jainavinfotech.in:443:127.0.0.1 https://www.jainavinfotech.in/; sleep 1; done; echo
+  ```
+
+  It prints `308` throughout. Afterwards:
+  `sudo app-compose edge ps; sudo app-compose jainav ps; sudo cf-ranges verify && echo ok`;
+
+- the straight-to-the-origin step of the leak test times out
+  ([edge.md §6](edge.md#6-the-leak-test), step 3). From your own machine, with the server's
+  address:
+
+  ```bash
+  curl -4 -k --max-time 5 -o /dev/null -w '%{http_code}\n' https://<server-ip>/ ; echo "exit $?"
+  ```
+
+  It prints `000` and `exit 28`. Add a temporary hPanel accept rule for your own address and run
+  it again: it must still time out, because the host's `DOCKER-USER` rules are a layer of their
+  own. Remove the rule afterwards. The other steps need DNS or authenticated origin pulls
+  ([launch.md](launch.md));
+
+- `/etc/hostwatch.env` is filled in (§2): `stat -c '%U:%G %a' /etc/hostwatch.env` prints
+  `root:root 600`.
+
+Then enable the other timers and check them as in §1 step 15; the archive timer is already on.
+
+**Gates.** Authenticated origin pulls are on for the site's zone, and tested, before the first
+production deploy, and on for every zone before the first container of a second app runs on the
+server ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls)). Cloudflare Access on
+`/admin`, `/admin/*`, `/api/users` and `/api/users/*`, on the apex and on staging, is in place
+before the site's DNS records ([launch.md](launch.md#gates-before-the-first-production-deploy)).
 
 After the first deploy of each environment, load the starting content with the tools image
 (§8):
@@ -471,14 +810,21 @@ drafts there. The legal pages need their approved texts first (spec §8.13).
   `prod-v1.0.0` with the production values. `deploy` waits for the required reviewer, then
   deploys it the same way, with the `production` key. Never promote a staging image:
   `NEXT_PUBLIC_*` values differ.
-- **By hand (admin form):** the registry token goes on stdin, never on the command line:
+- **By hand (admin form):** in an interactive `ssh jainav` session (the prompt starts `ops@`),
+  after `sudo -v`, pasting each line alone. The registry token is read at a hidden prompt and goes
+  to `app-deploy` on stdin, never on the command line. Don't run it as
+  `ssh jainav sudo app-deploy …`: sudo has no terminal there to ask for the password, and
+  `ssh -t` makes stdin a terminal, so `app-deploy` would read no token.
 
   ```bash
-  read -rs PAT && printf '%s\n' "$PAT" | ssh jainav sudo app-deploy jainav production \
-    prod-v1.0.0@sha256:<digest> tools-<commit>@sha256:<digest>
+  read -rp 'Image (prod-v1.0.0@sha256:<digest>): ' REF
+  read -rp 'Tools image (tools-<commit>@sha256:<digest>): ' TOOLS
+  read -rsp 'Registry token, read:packages: ' PAT; echo; printf '%s\n' "$PAT" | sudo app-deploy jainav production "$REF" "$TOOLS"; unset PAT
   ```
 
-  A bare tag is accepted too; `app-deploy` records the digest it resolved.
+  A bare tag is accepted too; `app-deploy` records the digest it resolved. A tools tag carries the
+  full 40-character commit. Images already on the server need no token:
+  `sudo app-deploy jainav production "$REF" "$TOOLS"`.
 
 - `app-deploy` points the service at the new image and waits for the healthcheck. In production
   it first dumps the databases (age-encrypted, in `/srv/jainav/predeploy`; the newest three are
@@ -490,19 +836,25 @@ drafts there. The legal pages need their approved texts first (spec §8.13).
     and each environment's recorded tools image.
   - A deploy waits for one already running (CI up to 10 minutes, the admin form 5). Ctrl-C before
     the switch stops it cleanly; from the switch on it is ignored.
+  - Each deploy that logs in to the registry (every CI deploy does) leaves Docker's
+    "credentials are stored unencrypted" warning in `journalctl -t app-deploy`. It is expected:
+    the login lives in a Docker config of the deploy's own under `/run`, removed when it ends.
 - Migrations run when the new container starts. Keep them backward-compatible for one release
   (add columns before using them, drop them a release later), so a rollback still works.
 
 ## 6. Roll back
 
+In an interactive `ssh jainav` session, as in §5 (`ops` reads `deploys.log` only with sudo):
+
 ```bash
-ssh jainav 'tail -5 /srv/jainav/deploys.log'     # find the previous image
-read -rs PAT && printf '%s\n' "$PAT" | ssh jainav sudo app-deploy jainav production \
-  prod-v1.0.0@sha256:<digest>
+sudo tail -n 5 /srv/jainav/deploys.log     # find the previous image
+read -rp 'Previous image (prod-v1.0.0@sha256:<digest>): ' REF
+sudo app-deploy jainav production "$REF"
 ```
 
-The previous image is still on the server. For an older one, redeploy its tag; the token pulls
-it. A rollback does not undo migrations: keep them backward-compatible (§5).
+The previous image is still on the server, so it needs no token. For an older one, redeploy its
+tag with §5's token form; the token pulls it. A rollback does not undo migrations: keep them
+backward-compatible (§5).
 
 ## 7. Change the server setup
 
@@ -510,7 +862,7 @@ Deploys only replace the app images. Everything else goes through `app-apply`, f
 `/home/ops/incoming`:
 
 - **Compose file** (`compose.prod.yml`, the edge's `compose.yml`): `sudo app-apply jainav compose
-compose.prod.yml`. It checks the file (no privileged mode, host paths, ports, device access;
+~/incoming/compose.prod.yml`. It checks the file (no privileged mode, host paths, ports, device access;
   limits and logging as required; no interpolation outside the image, environment, command,
   entrypoint, healthcheck and `x-*` keys; ulimits only `nofile` and `nproc`) and waits up to five
   minutes for a deploy in progress. Then apply it:
@@ -521,8 +873,9 @@ compose.prod.yml`. It checks the file (no privileged mode, host paths, ports, de
     ([edge.md §2](edge.md#2-site-files-and-their-checks)). Run it between 01:00 and 07:00 IST.
 - **Caddy site, certificates, ranges, redaction:** `app-apply jainav site|edge config|edge cert|edge
 redact`; see [edge.md](edge.md).
-- **Env files:** edit and `sudo install` them again, then recreate the service that reads them.
-  `images.env` is written by `app-deploy`; never edit it while a deploy runs.
+- **Env files:** edit them with `sudoedit <file>`, or replace a value on the server:
+  `sudo sed -i '/^NAME=/d' <file>`, then `addenv NAME <file>` (§2). Then recreate the service that
+  reads them. `images.env` is written by `app-deploy`; never edit it while a deploy runs.
 - **Host scripts and settings:** bring a new kit with the same `host/`, `edge/` and `keys/` as
   §1 step 7. Keep every key file in `keys/`: `install.sh` rewrites each deploy user's keys from
   the kit, so a key file left out revokes that key. After hardening root has no SSH, so copy the

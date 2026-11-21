@@ -22,7 +22,11 @@ healthchecks.io takes over the heartbeats.
     `/etc/hostwatch.env` as `HEARTBEAT_URL`. This one also catches a server that is down or
     unable to reach Telegram, because the ping stops in both cases.
 - Alerts: the provider's Telegram integration, to the same chat as the site's alerts
-  (`TELEGRAM_CHAT_ID`). Phase 6 is done only when a test alert has reached Telegram.
+  (`TELEGRAM_CHAT_ID`), plus the account's own email address. A free HetrixTools account can
+  notify only that address; adding another contact fails with
+  "Free accounts can only notify their own email address". So Telegram is the channel that
+  reaches the team, and no upgrade is needed. Phase 6 is done only when a test alert has reached
+  Telegram.
 - Status page on `status.jainavinfotech.in`: create it at the provider, then add the `CNAME` it shows
   (DNS only, [cloudflare.md](cloudflare.md#dns)).
 
@@ -34,11 +38,14 @@ begin `[server]`; the site's and the backup job's begin `[jainav]`, and every ap
 its own bot, so one chat shows who spoke. It sends a problem once, repeats it every 6 hours while
 it lasts, and sends a "resolved" line when it has been clear for a while. The timers are enabled by
 hand ([server.md §3](server.md#3-first-start)); the daily run alerts when one is off. The token,
-chat id and heartbeat URL are in `/etc/hostwatch.env` (root, mode 0600; it warns otherwise).
+chat id and heartbeat URL are in `/etc/hostwatch.env` (root, mode 0600; it warns otherwise),
+filled as in [server.md §2](server.md#2-put-the-files-in-place). `hostwatch check` never reads
+that file, so only a message that arrives proves the token and the chat id:
 
 ```bash
-sudo hostwatch check    # the 5-minute checks, printed: no alerts, nothing saved
-sudo hostwatch daily    # the daily report, sent now
+sudo hostwatch check            # the 5-minute checks, printed: no alerts, nothing saved
+sudo hostwatch daily            # the daily report, sent now
+sudo hostwatch alert 'a test'   # one message to the chat; prints "hostwatch: sent"
 ```
 
 Every 5 minutes:
@@ -128,6 +135,11 @@ Every request gets a ticket number, a due date one month away (Answer by) and, f
   turns on spans, which skip these filters.
 
 - Events say `staging` or `production`, from the site URL.
+- Until the first event arrives, the project page shows Sentry's "Get Started" page. Don't run the
+  `npx @sentry/wizard` it offers: it rewrites the hand-made setup (`src/lib/sentry.ts`,
+  `src/instrumentation.ts`, `src/instrumentation-client.ts`) and is an unpinned download. The
+  Sessions, Releases and Apdex cards with "Start Setup" stay empty by design: the app sends
+  errors only, with no sessions, no release and no tracing.
 - Browsers send their reports to the site's own `/api/v1/relay`, which passes them on to Sentry,
   so ad blockers don't stop them ([decisions](../decisions.md), "Sentry relay"). The relay accepts
   only the DSN the build carries: after changing `STAGING_SENTRY_DSN` or `PRODUCTION_SENTRY_DSN`,
@@ -195,8 +207,10 @@ retention period is up. Quiet a noisy success path in the Caddyfile rather than 
 Umami runs on the VPS at `https://analytics.jainavinfotech.in`. It is cookie-free, so the site has no
 cookie banner.
 
-1. Sign in with Umami's default account (`admin` / `umami`) and **change the password
-   immediately**.
+1. Umami's default login (`admin` / `umami`) is changed right after Umami first starts, before
+   the `analytics` DNS record exists ([server.md §3](server.md#3-first-start)). Check that
+   `https://analytics.jainavinfotech.in/login` refuses `admin` / `umami`; if it doesn't, change
+   the password at once.
 2. Settings → Websites → Add `jainavinfotech.in`. Copy its website ID into the repository variable
    `PRODUCTION_UMAMI_WEBSITE_ID`, and set `PRODUCTION_UMAMI_URL` to
    `https://analytics.jainavinfotech.in`. Leave the `STAGING_UMAMI_*` ones empty, so tests don't count.

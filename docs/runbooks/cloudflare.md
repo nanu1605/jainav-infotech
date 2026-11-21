@@ -20,6 +20,10 @@ Do these in the Cloudflare dashboard for the domain's zone.
 
 All the site names are **A records only**: no AAAA record anywhere, because the origin takes no IPv6 traffic. Nothing that is DNS-only points at the server: a DNS-only record would show its address and let anyone connect around Cloudflare. Mail and `status` records point at the mail provider and the status page, never at the VPS.
 
+Before production, only `staging` and `analytics` of these A records exist. They come once the
+server runs and Umami's default password is changed ([launch.md](launch.md) step 4); the apex and
+`www` wait for the production launch (step 8).
+
 The zone moved from GoDaddy on 2026-11-11, nameservers only: the registration and the mailbox stay
 at GoDaddy. Of GoDaddy's records only the mail records stay ([Email](#email)). Its parking `A`
 record on the apex, its `www` CNAME and its `_domainconnect` CNAME go; the apex and `www` get the
@@ -36,7 +40,8 @@ A records in the table above at launch.
   it, only Cloudflare does.
 - **Authenticated Origin Pulls**: SSL/TLS → Origin Server → Authenticated Origin Pulls →
   _Zone-level_, with our own client certificate (not Cloudflare's shared one), then turned on.
-  It must be on for every zone before a second app runs on the server
+  It must be on for the site's zone, and tested, before the first production deploy, and on for
+  every zone before the first container of a second app runs on the server
   ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls)). It has no effect on the
   `ssh.` tunnel hostname.
 - Edge Certificates: Always Use HTTPS on; minimum TLS 1.2. The app sends HSTS itself
@@ -46,8 +51,11 @@ A records in the table above at launch.
 
 - **Bot Fight Mode: off** (Security → Bots). It can't be bypassed for API traffic, so it would
   break VYRO activation, the update feed and webhooks.
-- **WAF skip rule** (Security → WAF → Custom rules → Create, action _Skip_, skip all remaining
-  custom rules, rate limiting rules, managed rules and Super Bot Fight Mode), expression:
+- **WAF skip rule** (Security → WAF → Custom rules → Create, action _Skip_). Tick _All remaining
+  custom rules_, _Rate limiting rules_, _Managed rules_ and _Super Bot Fight Mode_. Leave _All
+  remaining custom rules in this phase_ unticked: ticking both custom-rule options fails with
+  "skip action parameters 'phase' and 'ruleset' cannot be used together". Leave _More components
+  to skip_ alone. Expression:
 
   ```
   starts_with(http.request.uri.path, "/api/v1/licensing/") or
@@ -56,6 +64,22 @@ A records in the table above at launch.
   starts_with(http.request.uri.path, "/api/v1/downloads/")
   ```
 
+- **Cloudflare's analytics beacon: off.** Cloudflare turns on Web Analytics' automatic setup for
+  free zones, which injects `static.cloudflareinsights.com/beacon.min.js` into HTML pages. The
+  site's CSP blocks it (console errors, which Lighthouse reports), and the site's analytics is
+  Umami alone. _Disable automatic setup_ needs the Pro plan, so on the Free plan add a
+  Configuration Rule (Rules → Configuration Rules) for all incoming requests with the setting
+  _Disable Real User Monitoring (RUM)_. If that setting isn't offered, delete the site under Web
+  Analytics → Manage site. The beacon is injected only for browser-like requests, so check with a
+  browser's headers, on a page that needs no login:
+
+  ```bash
+  curl -sS -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36' \
+    -H 'Accept: text/html' https://analytics.jainavinfotech.in/login | grep -c cloudflareinsights
+  ```
+
+  It must print `0`.
+
 - **Origin firewall:** only Cloudflare reaches the VPS, in four layers: Hostinger's firewall in
   hPanel (443 from Cloudflare's ranges; nothing else open once SSH runs through the tunnel), the
   host's own rules, Caddy's trusted proxies and authenticated origin pulls
@@ -63,17 +87,40 @@ A records in the table above at launch.
   hPanel too ([edge.md §4](edge.md#4-cloudflares-ranges-and-the-origin-firewall)). That is also why the app can trust the
   `CF-Connecting-IP` header for rate limits.
 - **Cloudflare Access** (Zero Trust → Access controls → Applications → Create new application →
-  Self-hosted and private). One application, with these paths:
-  - `jainavinfotech.in/admin` and `jainavinfotech.in/admin/*`
-  - `jainavinfotech.in/api/users/*`
-  - the same three paths on `staging.jainavinfotech.in`
+  Self-hosted and private). One application with eight destinations: the paths `admin`,
+  `admin/*`, `api/users` and `api/users/*`, each on `jainavinfotech.in` and on
+  `staging.jainavinfotech.in`. A path ending in `/*` doesn't cover its parent, so each pair needs
+  both: with `api/users/*` alone, `/api/users` (Payload's list and create endpoint) would stay
+  outside Access. Payload refuses anonymous requests there too; Access is the first layer.
 
   Policy: _Allow_, include the emails of the people who run the site (a policy made as in
   [SSH tunnel](#ssh-tunnel) step 5; `admins` if they are the same people); login method One-time
   PIN only (step 3 there); session 24 hours. Payload's own login (5 attempts, then a 15-minute
-  lock) still applies behind it. Afterwards set the repository variables
-  `STAGING_SMOKE_ADMIN_ACCESS` and `PRODUCTION_SMOKE_ADMIN_ACCESS` to `1`: the smoke tests then
-  check that `/admin` redirects to `cloudflareaccess.com`.
+  lock) still applies behind it.
+
+  Turn **Eager redirect cookie** off and keep it off (the application → Advanced settings →
+  Cookie settings; a new application has it on). With it on, Access sends the browser through
+  every hostname of a multi-domain application after login: while the apex has no DNS record,
+  that is until production, the login then ends on `jainavinfotech.in/cdn-cgi/access/authorized`
+  with NXDOMAIN. With it off, each hostname gets its cookie on its first visit, with no new PIN
+  while the Access session lasts.
+
+  Make the application before any DNS record of the site ([launch.md](launch.md) step 1): until
+  the Owner account exists, the admin lets anyone create the first user, who becomes the Owner.
+  Check it from outside once a hostname has its record, before that environment's first deploy:
+
+  ```bash
+  for p in / /admin /admin/x /api/users /api/users/ /api/users/me /api/users/first-register; do
+    printf '%s ' "$p"; curl -4 -sS -o /dev/null --max-time 40 -w '%{http_code} %{redirect_url}\n' "https://staging.jainavinfotech.in$p"
+  done
+  ```
+
+  On staging, `/` prints `401` (its basic auth), and every other path `302` with the URL of the
+  Access login, on `cloudflareaccess.com`. On the apex ([launch.md](launch.md) step 8), run the
+  loop with `https://jainavinfotech.in`: every path but `/` must print `302`. Then set that
+  environment's repository variable, `STAGING_SMOKE_ADMIN_ACCESS` or
+  `PRODUCTION_SMOKE_ADMIN_ACCESS`, to `1`: its smoke tests then check that `/admin` redirects to
+  `cloudflareaccess.com`.
 
 ## SSH tunnel
 
@@ -219,3 +266,8 @@ Start at `p=none` and read the reports. After 2–4 clean weeks, move to `p=quar
 
 Check: send a contact-form auto-reply to the address <https://www.mail-tester.com> gives you.
 The score must be at least 9/10.
+
+On staging the emails' header icon (`/brand/icon-192.png` on the site's own host) shows broken:
+staging's basic auth covers every path except the licensing, update, webhook and download APIs,
+so Gmail's image proxy gets a 401, and a mail-tester run on staging may list the icon. Production
+has no basic auth: check the icon in the first production mail.
