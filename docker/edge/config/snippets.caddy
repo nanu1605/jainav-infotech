@@ -65,4 +65,17 @@
 		# }
 	}
 }
-# Every app has its own tls_<app> snippet like this one, for its own zone's certificates.
+
+# The same for MenuMesh's zone. Its origin pulls are on before any of its containers run, so
+# client_auth is on from the start: its aop-ca.pem goes in with its certificate, before its site
+# file imports this snippet (docs/runbooks/edge.md §5).
+(tls_menumesh) {
+	tls /certs/menumesh/origin.pem /certs/menumesh/origin-key.pem {
+		client_auth {
+			mode require_and_verify
+			trust_pool file /certs/menumesh/aop-ca.pem
+		}
+	}
+}
+# Every app has its own tls_<app> snippet like these two, for its own zone's certificates, and
+# it lives in this file: Caddy refuses a snippet declared twice.
