@@ -1,9 +1,10 @@
 #!/bin/bash
-# Runs the alert path of docker/host/hostwatch (judge, check_oom, daily_reboot and tg_recover, with
-# notify and tg_send under them) against stubs (tests/host/hostwatch-stubs) of curl and journalctl,
-# and checks what reaches Telegram, what is printed and what is saved. It sources a copy of
-# hostwatch without its main line and with its fixed paths moved into a temporary directory, so
-# this needs no root, Docker, network or server. CI runs it on ubuntu-24.04; Git Bash runs it too.
+# Runs the alert path of docker/host/hostwatch (judge, check_oom, check_ntp, daily_reboot and
+# tg_recover, with notify and tg_send under them) against stubs of curl and journalctl
+# (tests/host/hostwatch-stubs) and of timedatectl (a function below), and checks what reaches
+# Telegram, what is printed and what is saved. It sources a copy of hostwatch without its main
+# line and with its fixed paths moved into a temporary directory, so this needs no root, Docker,
+# network or server. CI runs it on ubuntu-24.04; Git Bash runs it too.
 #   bash tests/host/hostwatch.sh
 set -euo pipefail
 
@@ -37,7 +38,7 @@ chmod +x "$T/bin/curl" "$T/bin/journalctl"
 src=$root/docker/host/hostwatch
 copy=$T/hostwatch
 main_line='main "$@"'
-moved=(ENV_FILE APPS_DIR STATE_DIR FLAG_DIR LOCK_DIR REBOOT_FILE)
+moved=(ENV_FILE APPS_DIR STATE_DIR FLAG_DIR LOCK_DIR REBOOT_FILE TIMESYNC_FILE)
 rewrites=(-e "s|^PATH=/usr/sbin:|PATH=$T/bin:/usr/sbin:|" -e '/^main "\$@"$/d')
 for v in "${moved[@]}"; do rewrites+=(-e "s|^$v=/|$v=$T/|"); done
 sed "${rewrites[@]}" "$src" >"$copy"
@@ -65,7 +66,7 @@ done
 . "$copy"
 # shellcheck disable=SC2153 # TG_FAILED is hostwatch's flag file, not a misspelt TG_FAILS
 for p in "$ENV_FILE" "$APPS_DIR" "$STATE_DIR" "$FLAG_DIR" "$LOCK_DIR" "$REBOOT_FILE" "$TG_FAILED" \
-  "$OUTBOX" "$THROTTLED_FLAG"; do
+  "$OUTBOX" "$THROTTLED_FLAG" "$TIMESYNC_FILE"; do
   case $p in
     "$T"/*) ;;
     *) echo "hostwatch would use $p, outside the test's directory: update this test"; exit 1 ;;
@@ -83,6 +84,17 @@ done
 date() {
   if [ "$#" -eq 1 ] && [ "$1" = +%s ]; then printf '%s\n' "$clock"; else command date "$@"; fi
 }
+# timedatectl logs each call and answers what the case put in $STUB_STATE/timedatectl; with no
+# answer there it fails. A function, so the real one (CI has it) never runs.
+# shellcheck disable=SC2317,SC2329 # called by hostwatch's check_ntp
+timedatectl() {
+  printf 'timedatectl %s\n' "$*" >>"$STUB_STATE/timedatectl.log"
+  cat "$STUB_STATE/timedatectl" 2>/dev/null
+}
+if [ "$(type -t timedatectl)" != function ]; then
+  echo "hostwatch would run the real timedatectl: update this test"
+  exit 1
+fi
 
 # Git Bash's file systems can't give a directory mode 0700, so install -m 0700 (state_init) fails
 # there after making the directory. Only where that probe fails, install runs without its -m.
@@ -466,6 +478,58 @@ next_run 86400
 daily_reboot >"$out" 2>&1
 expect_sent 'sendMessage silent [server] resolved: reboot (clear after 1 d 0 h)'
 expect_no_state reboot
+finish
+
+synced_ago() {   # synced_ago SECONDS: timesyncd last touched its file this long before the clock
+  mkdir -p "${TIMESYNC_FILE%/*}"
+  touch -d "@$((clock - $1))" "$TIMESYNC_FILE"
+}
+expect_asked() {   # expect_asked [CALL...]: the case's timedatectl calls so far
+  local want=''
+  if [ "$#" -gt 0 ]; then want=$(printf '%s\n' "$@"); fi
+  expect 'the timedatectl calls' "$want" "$(cat "$STUB_STATE/timedatectl.log" 2>/dev/null || true)"
+}
+asked='timedatectl show -p NTPSynchronized --value'
+
+start 'ntp: a fresh timesyncd file is enough, timedatectl is not asked'
+synced_ago 600
+check_ntp >"$out" 2>&1
+expect_asked
+expect_sent
+expect_no_state ntp
+finish
+
+start 'ntp: an old, future or missing file asks timedatectl, which says yes'
+echo yes >"$STUB_STATE/timedatectl"
+synced_ago 3600
+check_ntp >"$out" 2>&1
+synced_ago -60
+check_ntp >"$out" 2>&1
+rm "$TIMESYNC_FILE"
+check_ntp >"$out" 2>&1
+expect_asked "$asked" "$asked" "$asked"
+expect_sent
+expect_no_state ntp
+finish
+
+start 'ntp: no file and timedatectl says no is an alert; a fresh file resolves it'
+echo no >"$STUB_STATE/timedatectl"
+check_ntp >"$out" 2>&1
+expect_sent 'sendMessage loud [server] ntp: the clock is not synchronised (timedatectl says no)'
+expect_state ntp "since=$t0" level=1
+for s in 300 600; do
+  next_run "$s"
+  synced_ago 10
+  check_ntp >"$out" 2>&1
+done
+expect_asked "$asked"
+expect_sent 'sendMessage silent [server] resolved: ntp (clear after 10 min)'
+expect_no_state ntp
+finish
+
+start 'ntp: a failed timedatectl call is an alert too'
+check_ntp >"$out" 2>&1
+expect_sent 'sendMessage loud [server] ntp: the clock is not synchronised (timedatectl says nothing)'
 finish
 
 ended=1

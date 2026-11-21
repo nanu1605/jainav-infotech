@@ -28,6 +28,7 @@ PROC_MEMINFO=/proc/meminfo
 CGROUP_DIR=/sys/fs/cgroup
 JOURNAL_DIR=/var/log/journal
 REBOOT_FILE=/var/run/reboot-required
+TIMESYNC_FILE=/run/systemd/timesync/synchronized
 SSHD_DIR=/etc/ssh/sshd_config.d
 BOOTSTRAP_SSH=/etc/cf-ranges/bootstrap-ssh
 CF_RANGES=/usr/local/sbin/cf-ranges
@@ -45,6 +46,7 @@ CPU_BUSY_PCT=55 CPU_BUSY_RUNS=6         # of all 4 vCPUs; 6 runs of 5 minutes = 
 STEAL_HIGH_PCT=10 STEAL_HIGH_RUNS=2     # steal above this for 2 runs = throttled
 STEAL_LOW_PCT=5 STEAL_LOW_RUNS=6        # ...until it stays under this for 30 minutes
 TUNNEL_RUNS=2                           # runs with no tunnel connection before an alert
+NTP_SYNC_SECS=3600                      # timesyncd synchronised the clock within the hour
 HOST_RESERVE_MIB=1536                   # limits plus 1.5 GiB stay below MemTotal
 PEAK_PCT=80                             # memory.peak over this share of its limit is reported
 LINE_BUDGET_DEFAULT=30000               # journal lines a day, unless the conf sets LOG_LINE_BUDGET
@@ -876,8 +878,19 @@ check_envfile() {
   fi
 }
 
+# systemd-timesyncd touches TIMESYNC_FILE on each synchronisation, at most 34 minutes apart.
+# Reading it starts nothing, while timedatectl starts systemd-timedated over D-Bus: five journal
+# lines a run, 1,440 a day. So timedatectl is asked only when the file is missing or old.
 check_ntp() {
-  local sync
+  local sync synced age
+  synced=$(stat -c %Y "$TIMESYNC_FILE" 2>/dev/null) || synced=
+  if is_num "$synced"; then
+    age=$(($(date +%s) - synced))
+    if [ "$age" -ge 0 ] && [ "$age" -lt "$NTP_SYNC_SECS" ]; then
+      judge ntp 0 "ntp: the clock is synchronised"
+      return 0
+    fi
+  fi
   sync=$(timedatectl show -p NTPSynchronized --value 2>/dev/null) || sync=
   if [ "$sync" = yes ]; then
     judge ntp 0 "ntp: the clock is synchronised"
