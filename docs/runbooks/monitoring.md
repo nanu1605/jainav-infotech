@@ -73,10 +73,10 @@ Every 5 minutes:
   ([edge.md §4](edge.md#4-cloudflares-ranges-and-the-origin-firewall)).
 - **networks:** an edge network holds anything but Caddy and its own app's containers
   ([edge.md §1](edge.md#1-how-the-edge-works)).
-- **ntp, envfile, breakglass:** the clock is not synchronised (`systemd-timesyncd` has not
-  synchronised it for an hour, and `timedatectl` does not say it is); `/etc/hostwatch.env` is not
-  root-only; a bootstrap or break-glass file is still there after hardening
-  ([server.md §9](server.md#9-break-glass)).
+- **ntp, envfile, breakglass:** `timedatectl` does not say the clock is synchronised (asked
+  hourly, and on every run while `systemd-timesyncd`'s file is over an hour old or the last
+  answer was not yes); `/etc/hostwatch.env` is not root-only; a bootstrap or break-glass file is
+  still there after hardening ([server.md §9](server.md#9-break-glass)).
 
 Daily it reports in one quiet message, and judges what is wrong:
 
@@ -203,7 +203,7 @@ counts each project's lines a day against its
 `LOG_LINE_BUDGET` (30000 when the app's conf in `/etc/apps` sets none; Jainav 30000, the edge 10000)
 and alerts when one is over, because a journal that outgrows its budgets drops lines before the
 retention period is up. The edge's count, "edge+host", also holds every line from outside a
-container: about 2,600 on a quiet day, mostly the 5-minute hostwatch timer, sysstat, cron and
+container: about 2,700 on a quiet day, mostly the 5-minute hostwatch timer, sysstat, cron and
 Hostinger's guest agent ([decisions](../decisions.md)). Quiet a noisy success path in the Caddyfile
 rather than raising a budget.
 
