@@ -48,7 +48,7 @@ STEAL_HIGH_PCT=10 STEAL_HIGH_RUNS=2     # steal above this for 2 runs = throttle
 STEAL_LOW_PCT=5 STEAL_LOW_RUNS=6        # ...until it stays under this for 30 minutes
 TUNNEL_RUNS=2                           # runs with no tunnel connection before an alert
 NTP_SYNC_SECS=3600                      # timesyncd accepted a reply within the hour
-NTP_ASK_SECS=3600                       # ...and timedatectl said yes within the hour
+NTP_ASK_SECS=3300                       # ...and timedatectl said yes within 55 min: an ask at least hourly
 HOST_RESERVE_MIB=1536                   # limits plus 1.5 GiB stay below MemTotal
 PEAK_PCT=80                             # memory.peak over this share of its limit is reported
 LINE_BUDGET_DEFAULT=30000               # journal lines a day, unless the conf sets LOG_LINE_BUDGET
@@ -883,11 +883,11 @@ check_envfile() {
 }
 
 # The kernel's answer comes through timedatectl, which starts systemd-timedated over D-Bus: five
-# journal lines a call. So a run asks only once an hour while systemd-timesyncd's TIMESYNC_FILE
-# is under an hour old (timesyncd touches it on each server reply it accepts, normally at most 34
-# minutes apart). The file alone is not enough: timesyncd touches it even when setting the clock
-# fails. A missing, old or future-dated file, or a last answer other than yes, asks on every run;
-# hostwatch check always asks and saves nothing.
+# journal lines a call. So a run asks at least hourly, not every run, while systemd-timesyncd's
+# TIMESYNC_FILE is under an hour old (timesyncd touches it on each server reply it accepts, normally
+# at most 34 minutes apart). The file alone is not enough: timesyncd touches it even when setting
+# the clock fails. A missing, old or future-dated file, or a last answer other than yes, asks on
+# every run; hostwatch check always asks and saves nothing.
 check_ntp() {
   local sync synced now t='' a=''
   now=$(date +%s)

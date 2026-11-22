@@ -73,9 +73,9 @@ Every 5 minutes:
   ([edge.md §4](edge.md#4-cloudflares-ranges-and-the-origin-firewall)).
 - **networks:** an edge network holds anything but Caddy and its own app's containers
   ([edge.md §1](edge.md#1-how-the-edge-works)).
-- **ntp, envfile, breakglass:** `timedatectl` does not say the clock is synchronised (asked
-  hourly, and on every run while `systemd-timesyncd`'s file is over an hour old or the last
-  answer was not yes); `/etc/hostwatch.env` is not root-only; a bootstrap or break-glass file is
+- **ntp, envfile, breakglass:** `timedatectl` does not say the clock is synchronised (asked at
+  least hourly, and on every run while `systemd-timesyncd`'s file is missing, over an hour old or
+  dated in the future, or the last answer was not yes); `/etc/hostwatch.env` is not root-only; a bootstrap or break-glass file is
   still there after hardening ([server.md §9](server.md#9-break-glass)).
 
 Daily it reports in one quiet message, and judges what is wrong:

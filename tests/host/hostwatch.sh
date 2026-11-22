@@ -494,14 +494,14 @@ answered_ago() {   # answered_ago SECONDS ANSWER: timedatectl's saved answer, th
 }
 asked='timedatectl show -p NTPSynchronized --value'
 
-start 'ntp: a fresh file and a yes within the hour: timedatectl is not asked'
+start 'ntp: a fresh file and a yes under NTP_ASK_SECS old: timedatectl is not asked'
 synced_ago 600
-answered_ago 600 yes
+answered_ago $((NTP_ASK_SECS - 1)) yes
 check_ntp >"$out" 2>&1
 expect_asked
 expect_sent
 expect_no_state ntp
-expect_text 'the saved answer' "$NTP_ASKED" "$((t0 - 600)) yes"
+expect_text 'the saved answer' "$NTP_ASKED" "$((t0 - NTP_ASK_SECS + 1)) yes"
 finish
 
 start 'ntp: the first run asks and saves the answer; the next run trusts it'
@@ -516,10 +516,10 @@ expect_sent
 expect_no_state ntp
 finish
 
-start 'ntp: a yes an hour old, or a last answer other than yes, asks again'
+start 'ntp: a yes NTP_ASK_SECS old, or a last answer other than yes, asks again'
 synced_ago 600
 echo yes >"$STUB_STATE/timedatectl"
-answered_ago 3600 yes
+answered_ago "$NTP_ASK_SECS" yes
 check_ntp >"$out" 2>&1
 answered_ago 600 no
 check_ntp >"$out" 2>&1
