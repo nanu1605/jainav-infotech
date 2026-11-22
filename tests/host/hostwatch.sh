@@ -1,9 +1,10 @@
 #!/bin/bash
-# Runs the alert path of docker/host/hostwatch (judge, check_oom, daily_reboot and tg_recover, with
-# notify and tg_send under them) against stubs (tests/host/hostwatch-stubs) of curl and journalctl,
-# and checks what reaches Telegram, what is printed and what is saved. It sources a copy of
-# hostwatch without its main line and with its fixed paths moved into a temporary directory, so
-# this needs no root, Docker, network or server. CI runs it on ubuntu-24.04; Git Bash runs it too.
+# Runs the alert path of docker/host/hostwatch (judge, check_oom, check_ntp, daily_reboot and
+# tg_recover, with notify and tg_send under them) against stubs of curl and journalctl
+# (tests/host/hostwatch-stubs) and of timedatectl (a function below), and checks what reaches
+# Telegram, what is printed and what is saved. It sources a copy of hostwatch without its main
+# line and with its fixed paths moved into a temporary directory, so this needs no root, Docker,
+# network or server. CI runs it on ubuntu-24.04; Git Bash runs it too.
 #   bash tests/host/hostwatch.sh
 set -euo pipefail
 
@@ -37,7 +38,7 @@ chmod +x "$T/bin/curl" "$T/bin/journalctl"
 src=$root/docker/host/hostwatch
 copy=$T/hostwatch
 main_line='main "$@"'
-moved=(ENV_FILE APPS_DIR STATE_DIR FLAG_DIR LOCK_DIR REBOOT_FILE)
+moved=(ENV_FILE APPS_DIR STATE_DIR FLAG_DIR LOCK_DIR REBOOT_FILE TIMESYNC_FILE)
 rewrites=(-e "s|^PATH=/usr/sbin:|PATH=$T/bin:/usr/sbin:|" -e '/^main "\$@"$/d')
 for v in "${moved[@]}"; do rewrites+=(-e "s|^$v=/|$v=$T/|"); done
 sed "${rewrites[@]}" "$src" >"$copy"
@@ -65,7 +66,7 @@ done
 . "$copy"
 # shellcheck disable=SC2153 # TG_FAILED is hostwatch's flag file, not a misspelt TG_FAILS
 for p in "$ENV_FILE" "$APPS_DIR" "$STATE_DIR" "$FLAG_DIR" "$LOCK_DIR" "$REBOOT_FILE" "$TG_FAILED" \
-  "$OUTBOX" "$THROTTLED_FLAG"; do
+  "$OUTBOX" "$THROTTLED_FLAG" "$TIMESYNC_FILE" "$NTP_ASKED"; do
   case $p in
     "$T"/*) ;;
     *) echo "hostwatch would use $p, outside the test's directory: update this test"; exit 1 ;;
@@ -83,6 +84,17 @@ done
 date() {
   if [ "$#" -eq 1 ] && [ "$1" = +%s ]; then printf '%s\n' "$clock"; else command date "$@"; fi
 }
+# timedatectl logs each call and answers what the case put in $STUB_STATE/timedatectl; with no
+# answer there it fails. A function, so the real one (CI has it) never runs.
+# shellcheck disable=SC2317,SC2329 # called by hostwatch's check_ntp
+timedatectl() {
+  printf 'timedatectl %s\n' "$*" >>"$STUB_STATE/timedatectl.log"
+  cat "$STUB_STATE/timedatectl" 2>/dev/null
+}
+if [ "$(type -t timedatectl)" != function ]; then
+  echo "hostwatch would run the real timedatectl: update this test"
+  exit 1
+fi
 
 # Git Bash's file systems can't give a directory mode 0700, so install -m 0700 (state_init) fails
 # there after making the directory. Only where that probe fails, install runs without its -m.
@@ -466,6 +478,109 @@ next_run 86400
 daily_reboot >"$out" 2>&1
 expect_sent 'sendMessage silent [server] resolved: reboot (clear after 1 d 0 h)'
 expect_no_state reboot
+finish
+
+synced_ago() {   # synced_ago SECONDS: timesyncd last touched its file this long before the clock
+  mkdir -p "${TIMESYNC_FILE%/*}"
+  touch -d "@$((clock - $1))" "$TIMESYNC_FILE"
+}
+expect_asked() {   # expect_asked [CALL...]: the case's timedatectl calls so far
+  local want=''
+  if [ "$#" -gt 0 ]; then want=$(printf '%s\n' "$@"); fi
+  expect 'the timedatectl calls' "$want" "$(cat "$STUB_STATE/timedatectl.log" 2>/dev/null || true)"
+}
+answered_ago() {   # answered_ago SECONDS ANSWER: timedatectl's saved answer, this long before the clock
+  printf '%s %s\n' "$((clock - $1))" "$2" >"$NTP_ASKED"
+}
+asked='timedatectl show -p NTPSynchronized --value'
+
+start 'ntp: a fresh file and a yes under NTP_ASK_SECS old: timedatectl is not asked'
+synced_ago 600
+answered_ago $((NTP_ASK_SECS - 1)) yes
+check_ntp >"$out" 2>&1
+expect_asked
+expect_sent
+expect_no_state ntp
+expect_text 'the saved answer' "$NTP_ASKED" "$((t0 - NTP_ASK_SECS + 1)) yes"
+finish
+
+start 'ntp: the first run asks and saves the answer; the next run trusts it'
+synced_ago 600
+echo yes >"$STUB_STATE/timedatectl"
+check_ntp >"$out" 2>&1
+expect_text 'the saved answer' "$NTP_ASKED" "$t0 yes"
+next_run 300
+check_ntp >"$out" 2>&1
+expect_asked "$asked"
+expect_sent
+expect_no_state ntp
+finish
+
+start 'ntp: a yes NTP_ASK_SECS old, or a last answer other than yes, asks again'
+synced_ago 600
+echo yes >"$STUB_STATE/timedatectl"
+answered_ago "$NTP_ASK_SECS" yes
+check_ntp >"$out" 2>&1
+answered_ago 600 no
+check_ntp >"$out" 2>&1
+answered_ago 600 nothing
+check_ntp >"$out" 2>&1
+expect_asked "$asked" "$asked" "$asked"
+expect_no_state ntp
+finish
+
+start 'ntp: an old, future or missing file asks timedatectl, which says yes'
+echo yes >"$STUB_STATE/timedatectl"
+answered_ago 600 yes
+synced_ago 3600
+check_ntp >"$out" 2>&1
+synced_ago -60
+check_ntp >"$out" 2>&1
+rm "$TIMESYNC_FILE"
+check_ntp >"$out" 2>&1
+expect_asked "$asked" "$asked" "$asked"
+expect_sent
+expect_no_state ntp
+finish
+
+start 'ntp: a no is an alert and is asked again every run; yes resolves it'
+synced_ago 60
+echo no >"$STUB_STATE/timedatectl"
+check_ntp >"$out" 2>&1
+expect_sent 'sendMessage loud [server] ntp: the clock is not synchronised (timedatectl says no)'
+expect_state ntp "since=$t0" level=1
+next_run 300
+synced_ago 60
+check_ntp >"$out" 2>&1
+expect_sent
+expect_state ntp "since=$t0" level=1
+echo yes >"$STUB_STATE/timedatectl"
+for s in 600 900; do
+  next_run "$s"
+  synced_ago 60
+  check_ntp >"$out" 2>&1
+done
+expect_asked "$asked" "$asked" "$asked"
+expect_sent 'sendMessage silent [server] resolved: ntp (clear after 15 min)'
+expect_no_state ntp
+finish
+
+start 'ntp: a failed timedatectl call is an alert too'
+check_ntp >"$out" 2>&1
+expect_sent 'sendMessage loud [server] ntp: the clock is not synchronised (timedatectl says nothing)'
+expect_text 'the saved answer' "$NTP_ASKED" "$t0 nothing"
+finish
+
+start 'ntp: hostwatch check always asks and saves nothing'
+# shellcheck disable=SC2034 # MODE is read by check_ntp and judge
+MODE=check
+synced_ago 60
+answered_ago 60 yes
+echo yes >"$STUB_STATE/timedatectl"
+check_ntp >"$out" 2>&1
+expect_asked "$asked"
+expect_said 'ok    ntp: the clock is synchronised'
+expect_text 'the saved answer' "$NTP_ASKED" "$((t0 - 60)) yes"
 finish
 
 ended=1

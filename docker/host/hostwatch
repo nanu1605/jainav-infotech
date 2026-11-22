@@ -22,12 +22,14 @@ THROTTLED_FLAG=$FLAG_DIR/throttled      # staging deploys are refused while it e
 LOCK_DIR=/run/app-locks                 # root-only: every root script's lock files live here
 TG_FAILED=$STATE_DIR/tg-failed          # exists while Telegram refuses messages: no heartbeat ping
 OUTBOX=$STATE_DIR/outbox                # one-off alerts Telegram refused: "epoch text" lines
+NTP_ASKED=$STATE_DIR/ntp-asked          # timedatectl's last answer: "epoch answer"
 TG_CHUNK=3500                           # characters per Telegram message (its limit is 4096)
 PROC_STAT=/proc/stat
 PROC_MEMINFO=/proc/meminfo
 CGROUP_DIR=/sys/fs/cgroup
 JOURNAL_DIR=/var/log/journal
 REBOOT_FILE=/var/run/reboot-required
+TIMESYNC_FILE=/run/systemd/timesync/synchronized
 SSHD_DIR=/etc/ssh/sshd_config.d
 BOOTSTRAP_SSH=/etc/cf-ranges/bootstrap-ssh
 CF_RANGES=/usr/local/sbin/cf-ranges
@@ -45,6 +47,8 @@ CPU_BUSY_PCT=55 CPU_BUSY_RUNS=6         # of all 4 vCPUs; 6 runs of 5 minutes = 
 STEAL_HIGH_PCT=10 STEAL_HIGH_RUNS=2     # steal above this for 2 runs = throttled
 STEAL_LOW_PCT=5 STEAL_LOW_RUNS=6        # ...until it stays under this for 30 minutes
 TUNNEL_RUNS=2                           # runs with no tunnel connection before an alert
+NTP_SYNC_SECS=3600                      # timesyncd accepted a reply within the hour
+NTP_ASK_SECS=3300                       # ...and timedatectl said yes within 55 min: an ask at least hourly
 HOST_RESERVE_MIB=1536                   # limits plus 1.5 GiB stay below MemTotal
 PEAK_PCT=80                             # memory.peak over this share of its limit is reported
 LINE_BUDGET_DEFAULT=30000               # journal lines a day, unless the conf sets LOG_LINE_BUDGET
@@ -110,6 +114,8 @@ usage() {
   exit 2
 }
 is_num() { case $1 in '' | *[!0-9]*) return 1 ;; esac; }
+# recent EPOCH NOW SECS: EPOCH is a number, not after NOW and less than SECS before it
+recent() { is_num "$1" && [ "$1" -le "$2" ] && [ $(($2 - $1)) -lt "$3" ]; }
 dock() { timeout 60 docker "$@"; }
 # A check that dies on something unforeseen must not take the others down with it.
 failed() { say "hostwatch: $1 failed unexpectedly (exit $?)"; }
@@ -876,9 +882,28 @@ check_envfile() {
   fi
 }
 
+# The kernel's answer comes through timedatectl, which starts systemd-timedated over D-Bus: five
+# journal lines a call. So a run asks at least hourly, not every run, while systemd-timesyncd's
+# TIMESYNC_FILE is under an hour old (timesyncd touches it on each server reply it accepts, normally
+# at most 34 minutes apart). The file alone is not enough: timesyncd touches it even when setting
+# the clock fails. A missing, old or future-dated file, or a last answer other than yes, asks on
+# every run; hostwatch check always asks and saves nothing.
 check_ntp() {
-  local sync
+  local sync synced now t='' a=''
+  now=$(date +%s)
+  if [ "$MODE" != check ]; then
+    if [ -r "$NTP_ASKED" ]; then read -r t a <"$NTP_ASKED" || true; fi
+    synced=$(stat -c %Y "$TIMESYNC_FILE" 2>/dev/null) || synced=
+    if [ "$a" = yes ] && recent "$t" "$now" "$NTP_ASK_SECS" &&
+      recent "$synced" "$now" "$NTP_SYNC_SECS"; then
+      judge ntp 0 "ntp: the clock is synchronised"
+      return 0
+    fi
+  fi
   sync=$(timedatectl show -p NTPSynchronized --value 2>/dev/null) || sync=
+  if [ "$MODE" != check ]; then
+    { printf '%s %s\n' "$now" "${sync:-nothing}" >"$NTP_ASKED"; } 2>/dev/null || true
+  fi
   if [ "$sync" = yes ]; then
     judge ntp 0 "ntp: the clock is synchronised"
   else

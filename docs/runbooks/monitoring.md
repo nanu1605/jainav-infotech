@@ -73,9 +73,10 @@ Every 5 minutes:
   ([edge.md §4](edge.md#4-cloudflares-ranges-and-the-origin-firewall)).
 - **networks:** an edge network holds anything but Caddy and its own app's containers
   ([edge.md §1](edge.md#1-how-the-edge-works)).
-- **ntp, envfile, breakglass:** the clock is not synchronised; `/etc/hostwatch.env` is not
-  root-only; a bootstrap or break-glass file is still there after hardening
-  ([server.md §9](server.md#9-break-glass)).
+- **ntp, envfile, breakglass:** `timedatectl` does not say the clock is synchronised (asked at
+  least hourly, and on every run while `systemd-timesyncd`'s file is missing, over an hour old or
+  dated in the future, or the last answer was not yes); `/etc/hostwatch.env` is not root-only; a bootstrap or break-glass file is
+  still there after hardening ([server.md §9](server.md#9-break-glass)).
 
 Daily it reports in one quiet message, and judges what is wrong:
 
@@ -197,10 +198,14 @@ than that, or usage nears the limit, raise `SystemMaxUse` and `SystemMaxFiles`
 policy's period stops being true.
 
 The edge's `edge-caddy-1` logs every request of every app, without request headers, the visitor's address or the query
-string. `hostwatch` counts each project's lines a day against its
+string, and nothing from its admin API, which the healthcheck reads every 30 seconds. `hostwatch`
+counts each project's lines a day against its
 `LOG_LINE_BUDGET` (30000 when the app's conf in `/etc/apps` sets none; Jainav 30000, the edge 10000)
 and alerts when one is over, because a journal that outgrows its budgets drops lines before the
-retention period is up. Quiet a noisy success path in the Caddyfile rather than raising a budget.
+retention period is up. The edge's count, "edge+host", also holds every line from outside a
+container: about 2,700 on a quiet day, mostly the 5-minute hostwatch timer, sysstat, cron and
+Hostinger's guest agent ([decisions](../decisions.md)). Quiet a noisy success path in the Caddyfile
+rather than raising a budget.
 
 ## Umami (analytics)
 

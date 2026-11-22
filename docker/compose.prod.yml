@@ -76,7 +76,7 @@ services:
 
   postgres:
     <<: *hardened
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:a77aa70e641402a21411b92b721c58d10f23b50ae5fdd2333efd22d166e1e5f7
     restart: unless-stopped
     # The entrypoint starts as root, fixes the data directory's owner and drops to postgres.
     cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
@@ -202,7 +202,7 @@ services:
   # Postgres that keeps its data in memory, checks it, and is removed afterwards.
   restore-db:
     <<: *hardened
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:a77aa70e641402a21411b92b721c58d10f23b50ae5fdd2333efd22d166e1e5f7
     profiles: [restore-test]
     cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
     # Nothing here has to survive a crash, so no fsync and a small WAL. The 1 GiB of memory the
