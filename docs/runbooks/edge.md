@@ -206,7 +206,7 @@ step 6 Caddy doesn't ask, or asks without requiring it.
    They print dots and dashes while they work, never a key. The CA lasts ten years and the client
    certificate two ([decisions](../decisions.md)). If `mkdir` says the folder exists, nothing
    else ran: an earlier try left it (remove it, `cd ~ && rm -r ~/"$app"-aop`) or an earlier round
-   (move it aside, `mv ~/"$app"-aop ~/"$app"-aop-old`). A command that fails can still leave a
+   (move it aside, `mv -T ~/"$app"-aop ~/"$app"-aop-old`). A command that fails can still leave a
    new key behind: remove the folder and start again. Check the result; nothing here prints a key:
 
    ```bash
@@ -264,7 +264,7 @@ step 6 Caddy doesn't ask, or asks without requiring it.
 
    ```bash
    mkdir -p ~/incoming/before ~/incoming/request
-   [ -e ~/incoming/before/snippets.caddy ] || sudo cat /srv/edge/config/snippets.caddy > ~/incoming/before/snippets.caddy
+   [ -s ~/incoming/before/snippets.caddy ] || sudo cat /srv/edge/config/snippets.caddy > ~/incoming/before/snippets.caddy
    awk -v b="(tls_${app:?}) {" '$0 == b {s = 1} s && sub(/mode require_and_verify/, "mode request") {s = 0} {print}' ~/incoming/snippets.caddy > ~/incoming/request/snippets.caddy
    diff ~/incoming/snippets.caddy ~/incoming/request/snippets.caddy
    sudo app-apply edge config ~/incoming/request/snippets.caddy && t=$(date '+%F %T')
@@ -284,9 +284,11 @@ step 6 Caddy doesn't ask, or asks without requiring it.
    Every host of the zone shows `<zone> origin pulls` with that serial; a host of another zone
    shows that zone's own certificate. A host of the zone with `no certificate`, another name or
    another serial means that Cloudflare doesn't present the new certificate on every connection
-   yet: stop, check its status at Cloudflare, and look again later (`t=$(date '+%F %T')`, open the
-   pages, run the two lines). Leave this copy in place meanwhile, overnight too: until step 6 it
-   accepts any client, as before, and the repository's file goes in only at step 6.
+   yet. A request that was already under way at the install can still end as `no certificate`, so
+   first look once more (`t=$(date '+%F %T')`, open the pages, run the two lines). If it stays,
+   stop, check the certificate's status at Cloudflare, and look again later. Leave this copy in
+   place meanwhile, overnight too: until step 6 it accepts any client, as before, and the
+   repository's file goes in only at step 6.
 
 6. **Require it.** Install the repository's file (a reload):
 
@@ -338,13 +340,16 @@ Certificates Write; until then the old one does no harm. The server keeps its CA
 
 **A new CA**, when it nears its end or a key may have leaked: Caddy checks no revocation, so a new
 CA is the only way to shut out a leaked client key. Move the old folder aside
-(`mv ~/"$app"-aop ~/"$app"-aop-old`) and do step 1 again. The server trusts both CAs first: from
-the new folder, `cat aop-ca.pem ../"$app"-aop-old/aop-ca.pem > aop-ca-both.pem` and
-`scp aop-ca-both.pem jainav:incoming/aop-ca.pem`, then step 4's first line. Then step 2 for the
-new pair, its serial in the log (step 5's two lines, with `t=$(date '+%F %T')` set at the upload),
-the old client certificate deleted at Cloudflare as above, and last the new CA alone: step 3's
-first `scp` and step 4. For another app's zone its owner does the Cloudflare part and sends the
-new files.
+(`mv -T ~/"$app"-aop ~/"$app"-aop-old`, which refuses while an older `-old` folder is still
+there) and do step 1 again. The server trusts both CAs first: from the new folder,
+`cat aop-ca.pem ../"$app"-aop-old/aop-ca.pem > aop-ca-both.pem`,
+`scp aop-ca-both.pem jainav:incoming/aop-ca.pem` and `scp aop-client.pem jainav:incoming/`, then
+step 4's first line. Then step 2 for the new pair, its serial in the log (step 5's two lines, with
+`t=$(date '+%F %T')` set on the server once the certificate shows Active), the old client
+certificate deleted at Cloudflare as above, and last the new CA alone: step 3's first `scp` and
+step 4. Then remove the copies: `rm ~/incoming/aop-ca.pem ~/incoming/aop-client.pem` on the
+server, and `rm -r ../"$app"-aop-old aop-ca-both.pem` here. For another app's zone its owner does
+the Cloudflare part and sends the new files.
 
 ## 4. Cloudflare's ranges and the origin firewall
 
@@ -671,9 +676,10 @@ it marks `app-apply`'s own validation containers, which the limits check skips.
    Ubuntu 24.04's curl, `exit 56 tlsv13 alert certificate required, errno 0`): Caddy answered and
    asked for the client certificate, which only Cloudflare holds. A line with `exit 55` and
    `Connection reset by peer` is the same refusal, met while curl was still sending: run the loop
-   again. `exit 0` means the host takes clients without it. `exit 7` (refused) or `exit 28` (no answer) means Caddy isn't answering at
-   all, which proves nothing. With `zone` unset the loop refuses to run. A page opened through
-   Cloudflare from your machine still answers as before (`staging.` `401`).
+   again. `exit 0` means the host takes clients without it. `exit 7` (refused) or `exit 28` (no
+   answer) means Caddy isn't answering at all, which proves nothing. With `zone` unset the loop
+   refuses to run. A page opened through Cloudflare from your machine still answers as before
+   (`staging.` `401`).
 
 5. **Clean up**, in this order. First the app's own site file goes back: the test block needs
    its entry in `UPSTREAMS`, and without it `app-apply edge validate`, which hostwatch runs
