@@ -909,7 +909,9 @@ redact`; see [edge.md](edge.md).
 - `postgres/roles.sh` only runs on an empty volume: add a database later with `psql` instead.
 
 A recreate costs a few seconds of downtime for that service; Postgres is not recreated by a
-deploy.
+deploy. Recreating Postgres ends every open connection: each site container logs
+`postgres: an idle connection closed` once for each connection it used in the 10 seconds before
+(usually one, sometimes none), and its next query connects again.
 
 ## 8. One-off commands
 
