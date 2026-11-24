@@ -50,6 +50,7 @@ import { SiteSettings } from './globals/SiteSettings'
 import { revalidateCollection } from './hooks/revalidate'
 import { jobs } from './jobs'
 import { outboxAdapter } from './lib/outbox'
+import { watchIdleConnections } from './lib/postgresPool'
 import { docPaths, publicPath, type RoutedCollection } from './lib/routes'
 import { migrations } from './migrations'
 import { auditPlugin } from './plugins/audit'
@@ -259,6 +260,13 @@ export default buildConfig({
     },
     prodMigrations: migrations,
   }),
+  // The adapter gives its pool no 'error' listener, so a connection Postgres closes while idle (a
+  // restart) would throw as an uncaught exception (src/lib/postgresPool.ts).
+  onInit: (payload) => {
+    // Typed as always there, but set only once the adapter has connected to the database.
+    const { pool } = payload.db
+    if (pool) watchIdleConnections(pool, (fields, msg) => payload.logger.warn(fields, msg))
+  },
   // Installers are tens of MB: stream uploads to disk instead of buffering them in memory.
   upload: {
     limits: { fileSize: INSTALLER_MAX_BYTES },
