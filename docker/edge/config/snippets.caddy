@@ -1,16 +1,19 @@
 # Shared by every site file. Only the admin edits this file (docs/runbooks/edge.md). A site file may
 # import site_common, its own tls_<app> and upstream, and nothing else.
 
-# What a log line keeps of a request: its time, method, host, path, status, size and duration, and
-# Cloudflare's address (remote_ip). Gone are request headers (visitor IPs, Access identities), the
-# visitor's address Caddy resolved from them (client_ip), response headers (Location holds 5-minute
-# signed file URLs), staging's login name, the whole query string (newsletter tokens, order numbers,
-# form prefills) and the token in Payload's password reset path. A path can still identify a record.
-# Another app's token-bearing paths are redacted by its own file on the server,
-# /srv/edge/config/log-redact.d/<app>.caddy (root's, 0644, never in git; installed with app-apply
-# edge redact, docs/runbooks/edge.md §7): one `request>uri regexp <pattern> <replacement>` line,
-# applied after the public one below, so the import must stay after it. A glob that matches no file
-# only warns.
+# What a log line keeps of a request: its time, method, host, path, status, size and duration,
+# Cloudflare's address (remote_ip) and the connection's TLS details (request>tls). These include the
+# client certificate of authenticated origin pulls (client_common_name, client_serial): the one
+# Cloudflare presents for the zone, the same on every line, so it names no visitor, and a new serial
+# shows that the certificate was replaced. Gone are request headers (visitor IPs, Access
+# identities), the visitor's address Caddy resolved from them (client_ip), response headers
+# (Location holds 5-minute signed file URLs), staging's login name, the whole query string
+# (newsletter tokens, order numbers, form prefills) and the token in Payload's password reset path.
+# A path can still identify a record. Another app's token-bearing paths are redacted by its own
+# file on the server, /srv/edge/config/log-redact.d/<app>.caddy (root's, 0644, never in git;
+# installed with app-apply edge redact, docs/runbooks/edge.md §7): one
+# `request>uri regexp <pattern> <replacement>` line, applied after the public one below, so the
+# import must stay after it. A glob that matches no file only warns.
 (log_fields) {
 	wrap json
 	request>headers delete
@@ -55,20 +58,23 @@
 	}
 }
 
-# Cloudflare's Origin CA certificate for this app's zone, made from a CSR on the server.
+# Cloudflare's Origin CA certificate for this app's zone, made from a CSR on the server, and the CA
+# of the zone's client certificate: Caddy accepts a connection only with a client certificate that
+# CA signed, which Cloudflare presents for the zone (authenticated origin pulls,
+# docs/runbooks/edge.md §3). Caddy reads aop-ca.pem whenever it loads a site that imports this
+# snippet, so the file goes in with the certificate, before the site file.
 (tls_jainav) {
 	tls /certs/jainav/origin.pem /certs/jainav/origin-key.pem {
-		# The admin enables this at launch, after zone-level Authenticated Origin Pulls is on at Cloudflare.
-		# client_auth {
-		# 	mode require_and_verify
-		# 	trust_pool file /certs/jainav/aop-ca.pem
-		# }
+		client_auth {
+			mode require_and_verify
+			trust_pool file /certs/jainav/aop-ca.pem
+		}
 	}
 }
 
-# The same for MenuMesh's zone. Its origin pulls are on before any of its containers run, so
-# client_auth is on from the start: its aop-ca.pem goes in with its certificate, before its site
-# file imports this snippet (docs/runbooks/edge.md §5).
+# The same for MenuMesh's zone, with its owner's CA. Its origin pulls are on before any of its
+# containers run: its aop-ca.pem goes in with its certificate, before its site file imports this
+# snippet (docs/runbooks/edge.md §5).
 (tls_menumesh) {
 	tls /certs/menumesh/origin.pem /certs/menumesh/origin-key.pem {
 		client_auth {

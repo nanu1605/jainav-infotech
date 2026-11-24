@@ -320,7 +320,8 @@ there, and a pattern such as `/srv/jainav/*.env` doesn't expand: name every file
 | `/srv/edge/config/Caddyfile`, `snippets.caddy`      | root, 0644     | the first ones from `install.sh`; then `app-apply edge config <file>`                       |
 | `/srv/edge/config/sites/jainav.caddy`               | root, 0644     | `app-apply jainav site <file>`                                                              |
 | `/srv/edge/config/log-redact.d/<app>.caddy`         | root, 0644     | `app-apply edge redact <app> <file>` ([edge.md §7](edge.md#7-log-redaction-for-other-apps)) |
-| `/srv/edge/certs/<app>/`                            | root, key 0600 | `app-apply edge cert <app> <origin.pem> <origin-key.pem> [<aop-ca.pem>]`                    |
+| `/srv/edge/certs/<app>/`                            | root, key 0600 | `app-apply edge cert <app> <origin.pem> <origin-key.pem> <aop-ca.pem>`                      |
+| `/srv/edge/certs/<app>/aop-client.pem`              | root, 0644     | `sudo install` by hand, [edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls) |
 | `/srv/edge/config/cloudflare-ranges.caddy`          | root, 0644     | `cf-ranges apply`, which goes through `app-apply edge ranges`                               |
 | `/srv/edge/compose.yml`                             | root, 0644     | `app-apply edge compose <file>`                                                             |
 
@@ -412,8 +413,19 @@ scp docker/edge/compose.yml docker/edge/config/sites/jainav.caddy docker/edge/ed
    `app-apply edge env` and a recreate.
 
 4. The Origin CA certificate for `jainavinfotech.in` and `*.jainavinfotech.in`: make it and
-   install it with `sudo app-apply edge cert jainav ~/csr/origin.pem ~/csr/origin-key.pem` as in
-   [edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls).
+   install it as in [edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls), with
+   the CA certificate of Jainav's origin pulls, from the password manager, as the fourth
+   argument, and the client certificate from the same entry beside it. Put both in
+   `~/incoming/` (`cat > ~/incoming/aop-ca.pem`, paste, Enter, Ctrl-D; the same for
+   `aop-client.pem`), then:
+
+   ```bash
+   sudo app-apply edge cert jainav ~/csr/origin.pem ~/csr/origin-key.pem ~/incoming/aop-ca.pem && shred -u ~/csr/origin-key.pem && rm -r ~/csr
+   sudo install -m 0644 -o root -g root ~/incoming/aop-client.pem /srv/edge/certs/jainav/ && rm ~/incoming/aop-ca.pem ~/incoming/aop-client.pem
+   ```
+
+   Cloudflare keeps presenting that client certificate, so nothing changes there.
+
 5. The site file, then the compose file:
 
    ```bash
@@ -421,8 +433,9 @@ scp docker/edge/compose.yml docker/edge/config/sites/jainav.caddy docker/edge/ed
    sudo app-apply edge compose ~/incoming/compose.yml
    ```
 
-   The site file's check loads the certificate, so it needs step 4. The compose step prints the
-   steady memory limits, creates the four internal edge networks and pins the file's sha256.
+   The site file's check loads the certificate and `aop-ca.pem`, so it needs step 4. The compose
+   step prints the steady memory limits, creates the four internal edge networks and pins the
+   file's sha256.
    Ignore its "between 01:00 and 07:00 IST" line: nothing is served yet.
 
 6. Start Caddy:
@@ -438,26 +451,38 @@ scp docker/edge/compose.yml docker/edge/config/sites/jainav.caddy docker/edge/ed
    "Unnecessary header_up X-Forwarded-Host" warning is expected
    ([edge.md §2](edge.md#2-site-files-and-their-checks)).
 
-7. Checks that need no DNS, on the server:
+7. Checks that need no DNS, on the server. Every site asks for the zone's client certificate,
+   which only Cloudflare presents
+   ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls)), so from here Caddy
+   answers no request. Each host must refuse one:
 
    ```bash
-   curl -sk -o /dev/null -w '%{http_code} %{redirect_url}\n' --resolve www.jainavinfotech.in:443:127.0.0.1 https://www.jainavinfotech.in/x
-   curl -sk -o /dev/null -w '%{http_code}\n' --resolve staging.jainavinfotech.in:443:127.0.0.1 https://staging.jainavinfotech.in/
+   for h in www.jainavinfotech.in staging.jainavinfotech.in; do
+     e=$(curl -sSk -o /dev/null --max-time 5 --resolve "$h:443:127.0.0.1" "https://$h/" 2>&1); echo "$h exit $? ${e##*::}"
+   done
    ```
 
-   They print `308 https://jainavinfotech.in/x` and `401`; the apex answers `502` after about
-   30 s until its app runs. Then the login test, pasted alone:
+   Each line shows an exit status other than 0 and `alert certificate required` (with Ubuntu
+   24.04's curl, `exit 56 tlsv13 alert certificate required, errno 0`): Caddy answers and asks
+   for the certificate ([edge.md §6](edge.md#6-the-leak-test), step 4). Then
+   `sudo app-apply edge validate` prints "the live edge tree is valid" and nothing after it. A
+   line `warning: JAINAV_STAGING_AUTH_HASH holds no bcrypt hash` means `/srv/edge/edge.env`
+   still has the placeholder or a hash cut short: make the hash again (step 3).
+
+   The answers themselves come through Cloudflare, from your machine, once the DNS records point
+   at this server ([launch.md](launch.md), or step 9 of
+   [backups.md](backups.md#disaster-recovery-on-a-new-server)): `https://staging.jainavinfotech.in/`
+   answers `401`, and `https://www.jainavinfotech.in/x` answers `308` to
+   `https://jainavinfotech.in/x` once `www` has its record. Then the login test, in Git Bash,
+   pasted alone:
 
    ```bash
-   IFS= read -rsp 'Staging password: ' P; echo; printf 'user = "jainav:%s"\n' "$P" | curl -sk -o /dev/null -w '%{http_code}\n' --max-time 40 --config - --resolve staging.jainavinfotech.in:443:127.0.0.1 https://staging.jainavinfotech.in/; unset P
+   IFS= read -rsp 'Staging password: ' P; echo; printf 'user = "jainav:%s"\n' "$P" | curl -s -o /dev/null -w '%{http_code}\n' --max-time 40 --config - https://staging.jainavinfotech.in/; unset P
    ```
 
-   `502` after about 30 s means the login was accepted (no staging app runs behind it yet), and
-   `401` that the hash and the password differ. A password with `"` or `\` needs escaping in
-   curl's config syntax. Last, `sudo app-apply edge validate` prints
-   "the live edge tree is valid" and nothing after it. A line
-   `warning: JAINAV_STAGING_AUTH_HASH holds no bcrypt hash` means `/srv/edge/edge.env` still has
-   the placeholder or a hash cut short: make the hash again (step 3).
+   `401` means the hash and the password differ; anything else means the login was accepted
+   (`502` after about 30 s while no staging app runs behind it). A password with `"` or `\` needs
+   escaping in curl's config syntax.
 
 **Jainav**, as `ops`. What its files hold:
 
@@ -729,10 +754,13 @@ Check, before the other timers:
   second session while it runs:
 
   ```bash
-  for i in $(seq 40); do curl -sk -o /dev/null -w '%{http_code} ' --max-time 2 --resolve www.jainavinfotech.in:443:127.0.0.1 https://www.jainavinfotech.in/; sleep 1; done; echo
+  for i in $(seq 40); do curl -sk -o /dev/null --max-time 2 --resolve www.jainavinfotech.in:443:127.0.0.1 https://www.jainavinfotech.in/; printf '%s ' "$?"; sleep 1; done; echo
   ```
 
-  It prints `308` throughout. Afterwards:
+  It prints `56` throughout (a `55` now and then is the same refusal, met while curl was still
+  sending): each second Caddy answered and asked for the client certificate of origin pulls, as
+  in step 7 of §2. A `7` or a `28` means 443 stopped answering, and a `0` that it took a client
+  without the certificate. Afterwards:
   `sudo app-compose edge ps; sudo app-compose jainav ps; sudo cf-ranges verify && echo ok`;
 
 - the straight-to-the-origin step of the leak test times out

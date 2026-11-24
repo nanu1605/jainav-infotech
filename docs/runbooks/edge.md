@@ -40,10 +40,13 @@ they install it, so a wrong file is refused and the running config stays as it w
   | `config/cloudflare-ranges.caddy`     | the trusted proxies, written by `cf-ranges apply`                           |
   | `config/sites/<app>.caddy`           | each app's site file                                                        |
   | `config/log-redact.d/<app>.caddy`    | an app's log redaction, server only ([§7](#7-log-redaction-for-other-apps)) |
-  | `certs/<app>/`                       | `origin.pem`, `origin-key.pem` (0600), `aop-ca.pem`                         |
+  | `certs/<app>/`                       | `origin.pem`, `origin-key.pem` (0600), `aop-ca.pem`, `aop-client.pem`       |
 
-- Log lines hold the time, method, host, path, status, size and duration, and Cloudflare's
-  address. They hold no visitor address, no headers and no query string.
+- Log lines hold the time, method, host, path, status, size and duration, Cloudflare's address,
+  and the connection's TLS details. These include the zone's client certificate from
+  authenticated origin pulls (`client_common_name`, and `client_serial` in decimal): Cloudflare's,
+  the same on every line, kept so that a replaced certificate shows. They hold no visitor address,
+  no headers and no query string.
 - `app-compose edge <compose args>` runs Compose for the edge, for example
   `sudo app-compose edge ps` and `sudo app-compose edge up -d`.
 
@@ -149,17 +152,13 @@ it while the name is unset ("parameter null or not set").
    only early check that the two belong together: `app-apply` checks the files' text only, and
    Caddy loads the pair once a site uses it.
 
-4. Install the pair (checked, then Caddy reloads). The key copy goes only if that worked. For an
-   app whose `tls_<app>` in `snippets.caddy` still has `client_auth` commented out (`tls_jainav`
-   today):
-
-   ```bash
-   sudo app-apply edge cert "$app" ~/csr/origin.pem ~/csr/origin-key.pem && shred -u ~/csr/origin-key.pem && rm -r ~/csr
-   ```
-
-   For an app whose snippet has it on, which is every app after the first, its `aop-ca.pem` goes
-   in with the pair, as a fourth argument. Its owner sends that file first (see the next
-   subsection):
+4. Install the pair (checked, then Caddy reloads). The key copy goes only if that worked. Every
+   `tls_<app>` in `snippets.caddy` has `client_auth` on, so the zone's `aop-ca.pem`, the CA
+   certificate of the next subsection, goes in with the pair as a fourth argument: Caddy reads it
+   whenever it loads a site of the zone, and `app-apply` refuses the site file without it.
+   Jainav's is in the password manager; another app's owner sends theirs. Put it in
+   `~/incoming/aop-ca.pem` (with `scp`, or `cat > ~/incoming/aop-ca.pem`, paste, Enter, Ctrl-D),
+   then:
 
    ```bash
    sudo app-apply edge cert "$app" ~/csr/origin.pem ~/csr/origin-key.pem ~/incoming/aop-ca.pem && shred -u ~/csr/origin-key.pem && rm -r ~/csr
@@ -171,7 +170,9 @@ it while the name is unset ("parameter null or not set").
    (a closed session, Ctrl-C), run it again. Neither stops it halfway: before the swap nothing has
    changed, and once the swap has started `app-apply` finishes it, so the certificate and the key
    in place still match. The second run replaces both and reloads Caddy. Put the expiry on a
-   calendar; hostwatch's daily run also warns before it.
+   calendar; hostwatch's daily run also warns before it. A later renewal of the pair alone may
+   leave out the fourth argument: the installed `aop-ca.pem` stays. The client certificate goes
+   beside it as step 4 of the next subsection shows.
 
 ### Authenticated origin pulls (a launch gate)
 
@@ -184,56 +185,171 @@ first container of a second app runs on the server**
 later, which treats conflicting `client_auth` policies as an error instead of dropping the
 stricter one, so the edge never goes below that version.
 
-For a zone we run, with `app` set as above:
+For a zone we run, with `app` and `zone` set as above, on your machine too. Steps 1 to 3 change
+nothing on the server, so they can run at any time; steps 4 to 6 reload Caddy, between 01:00 and
+07:00 IST, in one session. Order matters: Cloudflare presents the certificate first, then Caddy
+requires it. Cloudflare sends a client certificate only to an origin that asks for one, and until
+step 6 Caddy doesn't ask, or asks without requiring it.
 
-1. On your machine, make a private CA and one client certificate per zone with `openssl`. The
-   CA key goes in the password manager and stays off the server.
-2. Cloudflare → the zone → SSL/TLS → Origin Server → Authenticated Origin Pulls → Zone-level:
-   upload the client certificate and its key, then turn zone-level origin pulls on.
-3. Install the CA certificate on the server. `app-apply edge cert` always takes the Origin CA
-   pair too; name the installed one (or the new pair, if it is new):
+1. **The CA and the client certificate**, on your machine in Git Bash. The commands name
+   `/usr/bin/openssl`, Git for Windows' MSYS build of OpenSSL 3: it takes `/CN=…` as written and
+   writes the LF line endings `app-apply` needs. The `openssl` that Git Bash finds first is a
+   native build, which turns `/CN=…` into a Windows path and writes CRLF. Elsewhere any
+   OpenSSL 3 does. In a new folder that only you can read, as one paste:
 
    ```bash
-   sudo app-apply edge cert "$app" "/srv/edge/certs/$app/origin.pem" \
-     "/srv/edge/certs/$app/origin-key.pem" ~/incoming/aop-ca.pem
+   umask 077; mkdir ~/"${app:?}"-aop && cd ~/"$app"-aop &&
+   /usr/bin/openssl req -x509 -newkey rsa:4096 -noenc -days 3650 -subj "/CN=${zone:?} origin pulls CA" -addext 'basicConstraints=critical,CA:TRUE,pathlen:0' -addext 'keyUsage=critical,keyCertSign,cRLSign' -addext 'subjectKeyIdentifier=hash' -addext 'authorityKeyIdentifier=none' -keyout aop-ca-key.pem -out aop-ca.pem &&
+   /usr/bin/openssl req -x509 -newkey rsa:2048 -noenc -days 730 -CA aop-ca.pem -CAkey aop-ca-key.pem -subj "/CN=${zone:?} origin pulls" -addext 'basicConstraints=critical,CA:FALSE' -addext 'keyUsage=critical,digitalSignature' -addext 'extendedKeyUsage=clientAuth' -addext 'authorityKeyIdentifier=keyid:always' -keyout aop-client-key.pem -out aop-client.pem
    ```
 
-   If the command is interrupted, run it again: it replaces every file it names.
+   They print dots and dashes while they work, never a key. The CA lasts ten years and the client
+   certificate two ([decisions](../decisions.md)). If `mkdir` says the folder exists, nothing
+   else ran: an earlier try left it (remove it, `cd ~ && rm -r ~/"$app"-aop`) or an earlier round
+   (move it aside, `mv -T ~/"$app"-aop ~/"$app"-aop-old`). A command that fails can still leave a
+   new key behind: remove the folder and start again. Check the result; nothing here prints a key:
 
-   The client certificate itself (never its key) may be stored as
-   `/srv/edge/certs/<app>/aop-client.pem`
-   (`sudo install -m 0644 -o root -g root ~/incoming/aop-client.pem "/srv/edge/certs/${app:?}/"`):
-   hostwatch's daily check then warns before it expires too.
+   ```bash
+   for f in aop-ca.pem aop-client.pem; do /usr/bin/openssl x509 -in "$f" -noout -subject -issuer -enddate -ext basicConstraints,keyUsage,extendedKeyUsage; done
+   /usr/bin/openssl verify -CAfile aop-ca.pem -purpose sslclient aop-client.pem
+   [ "$(/usr/bin/openssl x509 -in aop-client.pem -noout -pubkey | sha256sum)" = "$(/usr/bin/openssl pkey -in aop-client-key.pem -pubout | sha256sum)" ] && echo 'pair matches' || echo 'MISMATCH'
+   grep -c $'\r' *.pem
+   ```
 
-4. Only for a snippet that still has the comment marks (`tls_jainav` today): remove them from
-   the `client_auth` block of that app's `tls_<app>` in this repository's `snippets.caddy`, by a
-   pull request like any change to it. After the merge, copy the file to `~/incoming/`, then:
+   The CA names itself as subject and issuer, with `CA:TRUE, pathlen:0` and
+   `Certificate Sign, CRL Sign`, and has no extended key usage. The client certificate names the
+   CA as its issuer, with `CA:FALSE`, `Digital Signature` and `TLS Web Client Authentication`,
+   and ends two years from now. Then come `aop-client.pem: OK`, `pair matches`, and `:0` for every
+   file. The pair check needs its `-pubout`: without it `pkey` prints the key.
+
+2. **The CA stays with you; Cloudflare gets the client pair.** `clip < <file>` copies a file
+   without showing it. Copy a key only while Windows' _Clipboard history across your devices_
+   (Settings → System → Clipboard) is off: it uploads what you copy.
+   - The password manager gets one entry for the zone's origin pulls: the CA key, the CA
+     certificate and the client certificate.
+   - Cloudflare → the zone → SSL/TLS → Origin Server → Authenticated Origin Pulls. Global stays
+     off, and the zone has no per-hostname certificate: one would replace the zone-level
+     certificate for its hostname. Under _Zone-level_, _Upload certificate_: `aop-client.pem` in
+     the certificate field, `aop-client-key.pem` in the private key field, _Continue_. The details
+     show the CA as the issuer and the end date; _Done_. Wait until the certificate shows Active,
+     then turn _Zone-level_ on. Never upload the CA: Cloudflare refuses it ("missing leaf
+     certificate").
+   - Check that the entry holds the whole CA key, from its `-----BEGIN PRIVATE KEY-----` line to
+     its `-----END PRIVATE KEY-----` line. Then empty the clipboard (`clip < /dev/null`; with
+     Windows' clipboard history on, clear that too: Win+V, _Clear all_) and delete both keys:
+     `rm aop-ca-key.pem aop-client-key.pem`.
+     Cloudflare keeps the client key, and nothing else needs it: a new client certificate comes
+     from the CA. The folder keeps `aop-ca.pem` and `aop-client.pem`, which hold no secret.
+
+3. **The files on the server.** From the folder on your machine,
+   `scp aop-ca.pem aop-client.pem jainav:incoming/`, and from the repository root on an
+   up-to-date `main`, `scp docker/edge/config/snippets.caddy jainav:incoming/`.
+
+4. **The CA on the server**, a reload, though no site uses the CA yet. `app-apply edge cert`
+   always takes the Origin CA pair too; name the installed one:
+
+   ```bash
+   sudo app-apply edge cert "$app" "/srv/edge/certs/$app/origin.pem" "/srv/edge/certs/$app/origin-key.pem" ~/incoming/aop-ca.pem
+   sudo install -m 0644 -o root -g root ~/incoming/aop-client.pem "/srv/edge/certs/${app:?}/"
+   ```
+
+   If the first is interrupted, run it again: it replaces every file it names. The second stores
+   the client certificate, never its key, so that hostwatch's daily check warns before it
+   expires; the check reads `aop-ca.pem` too.
+
+5. **See the certificate before Caddy requires it.** Keep the installed `snippets.caddy` for a
+   way back, and make a copy of the repository's in which the zone's snippet asks for a client
+   certificate without checking it (`mode request`). Each copy keeps the name `snippets.caddy`,
+   in its own folder, because `app-apply edge config` installs a file under its own name:
+
+   ```bash
+   mkdir -p ~/incoming/before ~/incoming/request
+   [ -s ~/incoming/before/snippets.caddy ] || sudo cat /srv/edge/config/snippets.caddy > ~/incoming/before/snippets.caddy
+   awk -v b="(tls_${app:?}) {" '$0 == b {s = 1} s && sub(/mode require_and_verify/, "mode request") {s = 0} {print}' ~/incoming/snippets.caddy > ~/incoming/request/snippets.caddy
+   diff ~/incoming/snippets.caddy ~/incoming/request/snippets.caddy
+   sudo app-apply edge config ~/incoming/request/snippets.caddy && t=$(date '+%F %T')
+   ```
+
+   `diff` shows one changed line, `mode request` in `tls_<app>`. After the install, open a page of
+   each live hostname of the zone through Cloudflare from your machine
+   (`curl -s -o /dev/null -w '%{http_code}\n' "https://staging.$zone/"` answers `401`). Then read
+   on the server, for each host, which certificate its requests came with since the install, and
+   the serial of `aop-client.pem` in the log's decimal notation:
+
+   ```bash
+   journalctl CONTAINER_NAME=edge-caddy-1 --since "${t:?}" -o cat --no-pager | grep '"logger":"http.log.access' | sed -E 's/.*"host":"([^"]*)".*"client_common_name":"([^"]*)","client_serial":"([0-9]*)".*/\1: \2, \3/; t; s/.*"host":"([^"]*)".*/\1: no certificate/' | sort | uniq -c
+   python3 -c 'import sys; print(int(sys.argv[1].split("=")[1], 16))' "$(openssl x509 -in ~/incoming/aop-client.pem -noout -serial)"
+   ```
+
+   Every host of the zone shows `<zone> origin pulls` with that serial; a host of another zone
+   shows that zone's own certificate. A host of the zone with `no certificate`, another name or
+   another serial means that Cloudflare doesn't present the new certificate on every connection
+   yet. A request that was already under way at the install can still end as `no certificate`, so
+   first look once more (`t=$(date '+%F %T')`, open the pages, run the two lines). If it stays,
+   stop, check the certificate's status at Cloudflare, and look again later. Leave this copy in
+   place meanwhile, overnight too: until step 6 it accepts any client, as before, and the
+   repository's file goes in only at step 6.
+
+6. **Require it.** Install the repository's file (a reload):
 
    ```bash
    sudo app-apply edge config ~/incoming/snippets.caddy
    ```
 
-   Order matters: Cloudflare presents the certificate first, then Caddy requires it.
+   Then, from your machine at once, each live hostname answers through Cloudflare as before. If
+   one answers `525` or another `52x` instead, put the kept file back first:
+   `sudo app-apply edge config ~/incoming/before/snippets.caddy`. Turning zone-level pulls off at
+   Cloudflare is no way back while Caddy requires the certificate: Caddy would refuse every
+   request. Undo in the reverse order: Caddy first, then Cloudflare. Caddy logs a refused client
+   only at debug level; to see why, switch its log to debug until the next reload:
 
-5. Run the origin test of [§6](#6-the-leak-test): a TLS connection straight to the origin
-   without a client certificate must be refused.
-6. Check that `ssh jainav` and the R2 custom domains (`cdn.`, `downloads.`) still work. Origin
-   pulls only affect proxied hostnames that Caddy serves.
+   ```bash
+   sudo docker exec edge-caddy-1 wget -qO- --header 'Content-Type: application/json' --post-data '"DEBUG"' http://127.0.0.1:2019/config/logging/logs/default/level
+   ```
+
+   The journal then shows `http: TLS handshake error … tls: client didn't provide a certificate`
+   (Cloudflare sent none) or `… signed by unknown authority` (another CA's certificate).
+   `sudo app-apply edge reload` sets the level back.
+
+7. **Test.** The origin test of [§6](#6-the-leak-test), step 4: from the server, every host of the
+   zone refuses a client without the certificate. On the zone's first round, the rest of §6 too.
+   Check that `ssh jainav` and the R2 custom domains (`cdn.`, `downloads.`) still work: origin
+   pulls only affect proxied hostnames that Caddy serves. Then remove the copies:
+   `rm -r ~/incoming/before ~/incoming/request ~/incoming/aop-ca.pem ~/incoming/aop-client.pem`.
 
 **Another app's zone.** Its owner does steps 1 and 2 on their own machine and at Cloudflare: the
-app's own CA and client certificate, the upload of the client pair (the certificate and its
-key), and zone-level origin pulls switched on. They send the admin only `aop-ca.pem` (the CA's
-certificate) and `aop-client.pem` (the client certificate): no private key changes hands. The
-app's `tls_<app>` comes with `client_auth` on, so step 4 doesn't apply. The order is: zone-level
-pulls on at Cloudflare, then `aop-ca.pem` installed with the app's first certificate (step 4 of
-the subsection above), then the app's site file ([§5](#5-adding-an-app)). Caddy's validate loads
-`aop-ca.pem` once a site imports the snippet, so `app-apply` refuses the site file without it.
-`aop-client.pem` is stored as in step 3, step 5 follows the site file, and the owner checks
-their own hostnames that Caddy doesn't serve as in step 6.
+app's own CA and client certificate, the upload of the client pair, and zone-level origin pulls
+switched on. They send the admin only `aop-ca.pem` and `aop-client.pem`: no private key changes
+hands. Its `tls_<app>` comes with `client_auth` on, so `aop-ca.pem` goes in with the app's first
+certificate (step 4 of the subsection above), before the app's site file
+([§5](#5-adding-an-app)): Caddy reads it once a site imports the snippet, so `app-apply` refuses
+the site file without it. `aop-client.pem` is stored as in step 4, steps 5 and 6 don't apply,
+step 7 follows the site file, and the owner checks their own hostnames that Caddy doesn't serve.
 
-Put the client certificate's expiry on the calendar. Replacing it follows the same steps: upload
-the new certificate at Cloudflare first, then update `aop-ca.pem` if the CA changed. For another
-app's zone its owner uploads the new one and sends the new files.
+**A new client certificate**, before the old one ends: hostwatch warns 60 days ahead, and
+Cloudflare can mail too (Notifications, the expiration alert for zone-level authenticated origin
+pulls certificates). In the zone's folder, put the CA key back from the password manager
+(`umask 077; cat > aop-ca-key.pem`, paste, Enter, Ctrl-D), make the client certificate with the
+last command of step 1 (it replaces `aop-client.pem`), run the checks, and do step 2 for it:
+upload, Active (Cloudflare presents the newest), then delete the old one at Cloudflare and both
+keys here. If the dashboard has no delete for it, Cloudflare's docs give the API,
+`DELETE /zones/<zone id>/origin_tls_client_auth/<certificate id>` with a token that has SSL and
+Certificates Write; until then the old one does no harm. The server keeps its CA, and only
+`aop-client.pem` changes: `scp aop-client.pem jainav:incoming/`, step 4's second line, then
+`rm ~/incoming/aop-client.pem`. The serial in the log changes with it.
+
+**A new CA**, when it nears its end or a key may have leaked: Caddy checks no revocation, so a new
+CA is the only way to shut out a leaked client key. Move the old folder aside
+(`mv -T ~/"$app"-aop ~/"$app"-aop-old`, which refuses while an older `-old` folder is still
+there) and do step 1 again. The server trusts both CAs first: from the new folder,
+`cat aop-ca.pem ../"$app"-aop-old/aop-ca.pem > aop-ca-both.pem`,
+`scp aop-ca-both.pem jainav:incoming/aop-ca.pem` and `scp aop-client.pem jainav:incoming/`, then
+step 4's first line. Then step 2 for the new pair, its serial in the log (step 5's two lines, with
+`t=$(date '+%F %T')` set on the server once the certificate shows Active), the old client
+certificate deleted at Cloudflare as above, and last the new CA alone: step 3's first `scp` and
+step 4. Then remove the copies: `rm ~/incoming/aop-ca.pem ~/incoming/aop-client.pem` on the
+server, and `rm -r ../"$app"-aop-old aop-ca-both.pem` here. For another app's zone its owner does
+the Cloudflare part and sends the new files.
 
 ## 4. Cloudflare's ranges and the origin firewall
 
@@ -337,7 +453,10 @@ session, as in [§3](#3-certificates-and-authenticated-origin-pulls): the comman
    ```
 
 5. **The snippet.** The app's `tls_<app>` comes into this repository's `snippets.caddy` by a pull
-   request, with `client_auth` on (MenuMesh's `tls_menumesh` is there already). After the merge,
+   request, with `client_auth` on (MenuMesh's `tls_menumesh` is there already). The file holds
+   `tls_jainav` with `client_auth` on too, so it goes in only once Jainav's origin pulls are on
+   ([§3](#3-certificates-and-authenticated-origin-pulls), steps 1 to 6): before that round's step 4
+   `app-apply` refuses it (there is no `/certs/jainav/aop-ca.pem`). After the merge,
    copy the file from the repository root on your machine, as
    [server.md §2](server.md#2-put-the-files-in-place) copies the other edge files:
 
@@ -418,16 +537,18 @@ session, as in [§3](#3-certificates-and-authenticated-origin-pulls): the comman
 8. **The app's own stack**, from its maintainers' runbook (`sudo app-apply <app> compose …` and
    the rest). Its first container runs only once origin pulls are on for every zone, Jainav's
    included ([§3](#3-certificates-and-authenticated-origin-pulls)). Every later app's snippet comes
-   with `client_auth` on, so check Jainav's zone first, as in [§6](#6-the-leak-test) step 4:
+   with `client_auth` on, so check that Jainav's zone still has them, as in [§6](#6-the-leak-test)
+   step 4:
 
    ```bash
    for h in jainavinfotech.in www.jainavinfotech.in staging.jainavinfotech.in analytics.jainavinfotech.in; do
-     curl -sk -o /dev/null --max-time 5 --resolve "$h:443:127.0.0.1" "https://$h/"; echo "$h exit $?"
+     e=$(curl -sSk -o /dev/null --max-time 5 --resolve "$h:443:127.0.0.1" "https://$h/" 2>&1); echo "$h exit $? ${e##*::}"
    done
    ```
 
-   Every line must end in an exit status other than 0. If one ends in 0, stop here: Jainav's
-   round of origin pulls ([§3](#3-certificates-and-authenticated-origin-pulls)) comes first.
+   Every line must end as §6 step 4 says. If one ends in `exit 0`, stop here: that host takes
+   clients without the certificate, and Jainav's origin pulls
+   ([§3](#3-certificates-and-authenticated-origin-pulls)) come first.
 
 9. **The site file**, after the recreate: its `{$NAME}` placeholders must name values in the
    installed `edge.env` ([§2](#2-site-files-and-their-checks)), and Caddy has those values only
@@ -525,9 +646,10 @@ it marks `app-apply`'s own validation containers, which the limits check skips.
    absent.
 
 2. **The log line.** `journalctl CONTAINER_NAME=edge-caddy-1 -n 5 -o cat` for that request
-   must show no visitor address, no request headers and no query string. For an app with a
-   redaction file, request a path with a made-up token in it: the line must show the replacement,
-   never the token.
+   must show no visitor address, no request headers and no query string. Its TLS details name the
+   zone's client certificate (`client_common_name`, `client_serial`): that is Cloudflare's, the
+   same on every line. For an app with a redaction file, request a path with a made-up token in
+   it: the line must show the replacement, never the token.
 3. **Straight to the origin.** From your machine, with the server's address:
 
    ```bash
@@ -546,12 +668,18 @@ it marks `app-apply`'s own validation containers, which the limits check skips.
 
    ```bash
    for h in "${zone:?}" "www.$zone" "staging.$zone" "analytics.$zone"; do
-     curl -sk -o /dev/null --max-time 5 --resolve "$h:443:127.0.0.1" "https://$h/"; echo "$h exit $?"
+     e=$(curl -sSk -o /dev/null --max-time 5 --resolve "$h:443:127.0.0.1" "https://$h/" 2>&1); echo "$h exit $? ${e##*::}"
    done
    ```
 
-   Every line must end in an exit status other than 0. With `zone` unset they would too, for
-   hosts that don't exist, so the loop refuses to run then.
+   Every line must show an exit status other than 0 and `alert certificate required` (with
+   Ubuntu 24.04's curl, `exit 56 tlsv13 alert certificate required, errno 0`): Caddy answered and
+   asked for the client certificate, which only Cloudflare holds. A line with `exit 55` and
+   `Connection reset by peer` is the same refusal, met while curl was still sending: run the loop
+   again. `exit 0` means the host takes clients without it. `exit 7` (refused) or `exit 28` (no
+   answer) means Caddy isn't answering at all, which proves nothing. With `zone` unset the loop
+   refuses to run. A page opened through Cloudflare from your machine still answers as before
+   (`staging.` `401`).
 
 5. **Clean up**, in this order. First the app's own site file goes back: the test block needs
    its entry in `UPSTREAMS`, and without it `app-apply edge validate`, which hostwatch runs

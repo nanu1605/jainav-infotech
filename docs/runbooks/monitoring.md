@@ -95,8 +95,9 @@ Daily it reports in one quiet message, and judges what is wrong:
   different keys.
 - **timers:** an expected timer is not enabled.
 - **edge-validate:** the live Caddy config no longer validates.
-- **certs:** a certificate expires within 60 days (critical within 14); the authenticated-pull
-  client certificate counts too, when it is stored on the server.
+- **certs:** a certificate under `/srv/edge/certs/<app>/` expires within 60 days (critical within
+  14): the Origin CA certificate, and the CA (`aop-ca.pem`) and client certificate
+  (`aop-client.pem`) of authenticated origin pulls.
 - **cloudflared:** its version is nearly a year old; Cloudflare supports one for a year.
 
 If Telegram refuses a message (token revoked, bot removed from the chat), `hostwatch` keeps
@@ -198,7 +199,10 @@ than that, or usage nears the limit, raise `SystemMaxUse` and `SystemMaxFiles`
 policy's period stops being true.
 
 The edge's `edge-caddy-1` logs every request of every app, without request headers, the visitor's address or the query
-string, and nothing from its admin API, which the healthcheck reads every 30 seconds. `hostwatch`
+string, and nothing from its admin API, which the healthcheck reads every 30 seconds. Each line
+names the zone's client certificate from authenticated origin pulls (Cloudflare's, the same on
+every line). A connection Caddy refuses for want of that certificate is logged only at debug
+level, so it adds no lines ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls)). `hostwatch`
 counts each project's lines a day against its
 `LOG_LINE_BUDGET` (30000 when the app's conf in `/etc/apps` sets none; Jainav 30000, the edge 10000)
 and alerts when one is over, because a journal that outgrows its budgets drops lines before the

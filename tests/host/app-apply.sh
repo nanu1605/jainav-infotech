@@ -11,9 +11,10 @@
 #   - swap_in under INT, TERM and a terminal that takes no writes, with a time limit on every docker
 #     call (docker is a stand-in)
 #   - docker/edge/config and the Jainav site file through the pinned Caddy: validate (also of the
-#     tree at bootstrap, with edge.env.example), the site file's checks, a log-redact file, and a
-#     second app's site whose tls_menumesh has client_auth on (needs docker, the pinned image and
-#     openssl)
+#     tree at bootstrap, with edge.env.example), the site file's checks, a log-redact file, a second
+#     app's site beside Jainav's, each zone with its own origin-pulls CA, and a running Caddy that
+#     serves a client with a certificate from Jainav's CA and refuses one without, or with another
+#     CA's (needs docker, the pinned image and openssl)
 # A part whose tool is missing prints a "skip -" line. CI runs it on ubuntu-24.04; Git Bash runs it
 # too (without jq).
 #   bash tests/host/app-apply.sh
@@ -23,7 +24,8 @@ root=$(cd "$(dirname "$0")/../.." && pwd)
 T=$(mktemp -d)
 # The directory as Docker sees it: Git Bash on Windows needs C:/... for a bind mount.
 T=$(cd "$T" && { pwd -W 2>/dev/null || pwd; })
-trap 'rm -rf "$T"' EXIT
+caddy_run=
+trap 'if [ -n "$caddy_run" ]; then docker rm -f "$caddy_run" >/dev/null 2>&1 || true; fi; rm -rf "$T"' EXIT
 export MSYS_NO_PATHCONV=1
 mkdir -p "$T/cases"
 
@@ -475,6 +477,10 @@ if [ "$caddy_ready" = 1 ]; then
   # Caddy runs as root without DAC_OVERRIDE. On the server root owns the real key; here the
   # runner's user owns this throwaway one, so it must be readable by everyone.
   chmod 0644 "$certs/jainav/origin-key.pem"
+  # The CA of Jainav's origin pulls, a throwaway too: tls_jainav has client_auth on, so Caddy reads
+  # it for every tree that holds Jainav's site file.
+  openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj '/CN=test jainav origin pulls CA' \
+    -keyout "$T/caddy/jainav-aop-ca-key.pem" -out "$certs/jainav/aop-ca.pem" 2>/dev/null
   # bcrypt, as docs/runbooks/server.md §2 makes it: app-apply edge env takes no other hash.
   hash=$(docker run --rm "$image" caddy hash-password --algorithm bcrypt --plaintext 'test-only')
   {
@@ -530,9 +536,9 @@ if [ "$caddy_ready" = 1 ]; then
   expect_clean 'caddy: sites/jainav.caddy passes the site checks' "$(site_case)"
   if [ "$have_jq" != 1 ]; then skip 'the site file check of the adapted JSON (jq is not installed)'; fi
 
-  # A second app's site that imports tls_menumesh, whose client_auth is on from the start: the
-  # server's tree once that site goes in, beside Jainav's without client_auth, both on :443. Its
-  # files are throwaways: a CA for origin pulls, and an origin pair for the test zone.
+  # A second app's site that imports tls_menumesh: the server's tree once that site goes in, beside
+  # Jainav's, both on :443 with client_auth on, each trusting its own zone's CA. Its files are
+  # throwaways: a CA for origin pulls, and an origin pair for the test zone.
   mm=$certs/menumesh
   mkdir -p "$mm"
   openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj '/CN=test origin pulls CA' \
@@ -563,6 +569,84 @@ if [ "$caddy_ready" = 1 ]; then
   rm "$mm/aop-ca.pem"
   expect_refused 'caddy: the menumesh site fails validate without its aop-ca.pem' "$(tree_case "$cfg")" 'caddy validate failed'
   rm -rf "$cfg/sites/menumesh.caddy" "$mm"
+  # Jainav's site needs its CA the same way: the first certificate install takes it.
+  mv "$certs/jainav/aop-ca.pem" "$T/caddy/jainav-aop-ca.pem"
+  expect_refused 'caddy: the jainav site fails validate without its aop-ca.pem' "$(tree_case "$cfg")" 'caddy validate failed'
+  mv "$T/caddy/jainav-aop-ca.pem" "$certs/jainav/aop-ca.pem"
+
+  # tls_jainav at work, not only valid: a running Caddy, with the edge's own limits, serves a client
+  # whose certificate Jainav's CA signed, refuses one without a certificate and one from another CA,
+  # and logs the client certificate's name. The clients are Caddy too, in the same container: one
+  # plain-HTTP site per case that proxies to the TLS site, with the Host header strict_sni_host
+  # compares with the server name.
+  run=$T/caddy/run
+  mkdir -p "$run/config/sites" "$run/certs" "$run/client"
+  cp "$root/docker/edge/config/Caddyfile" "$root/docker/edge/config/snippets.caddy" \
+    "$root/docker/edge/config/cloudflare-ranges.caddy" "$run/config/"
+  cp -r "$certs/jainav" "$run/certs/"
+  openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj '/CN=test origin pulls' \
+    -CA "$certs/jainav/aop-ca.pem" -CAkey "$T/caddy/jainav-aop-ca-key.pem" \
+    -addext 'basicConstraints=critical,CA:FALSE' -addext 'extendedKeyUsage=clientAuth' \
+    -keyout "$run/client/key.pem" -out "$run/client/cert.pem" 2>/dev/null
+  chmod 0644 "$run/client/key.pem"
+  # Another zone's client, from a CA that copies the name of Jainav's: Caddy as a client sends its
+  # certificate only to a server that names its issuer, and only the chain check refuses it
+  # (mode require_and_verify; mode require would take any certificate).
+  openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj '/CN=test jainav origin pulls CA' \
+    -keyout "$T/caddy/other-ca-key.pem" -out "$T/caddy/other-ca.pem" 2>/dev/null
+  openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj '/CN=test other zone' \
+    -CA "$T/caddy/other-ca.pem" -CAkey "$T/caddy/other-ca-key.pem" \
+    -addext 'basicConstraints=critical,CA:FALSE' -addext 'extendedKeyUsage=clientAuth' \
+    -keyout "$run/client/other-key.pem" -out "$run/client/other.pem" 2>/dev/null
+  chmod 0644 "$run/client/other-key.pem"
+  client_site() { # client_site <port> [<tls_client_auth line>]
+    printf '%b\n' "http://:$1 {" '\treverse_proxy https://127.0.0.1:443 {' '\t\theader_up Host example.test' \
+      '\t\ttransport http {' '\t\t\ttls_server_name example.test' '\t\t\ttls_insecure_skip_verify' \
+      ${2:+"\t\t\t$2"} '\t\t}' '\t}' '}'
+  }
+  {
+    printf '%b\n' 'https://example.test {' '\timport site_common' '\timport tls_jainav' '\trespond "ok"' '}'
+    client_site 8081 'tls_client_auth /client/cert.pem /client/key.pem'
+    client_site 8082
+    client_site 8083 'tls_client_auth /client/other.pem /client/other-key.pem'
+  } >"$run/config/sites/test.caddy"
+  caddy_run=app-apply-test-$$
+  if docker run -d --rm --pull=never --network none --name "$caddy_run" \
+    --read-only --tmpfs /tmp --tmpfs /data --tmpfs /config \
+    --cap-drop ALL --cap-add NET_BIND_SERVICE --security-opt no-new-privileges:true \
+    -v "$run/config:/etc/caddy:ro" -v "$run/certs:/certs:ro" -v "$run/client:/client:ro" "$image" >/dev/null; then
+    with=
+    for _ in $(seq 20); do
+      if with=$(docker exec "$caddy_run" wget -qO- http://127.0.0.1:8081/ 2>&1); then break; fi
+      sleep 0.5
+    done
+    if [ "$with" = ok ]; then
+      ok 'caddy: tls_jainav serves a client with a certificate from the zone CA'
+    else
+      bad 'caddy: tls_jainav serves a client with a certificate from the zone CA' 'no answer' "$with"
+    fi
+    refused() { # refused <port> <check>: the client site on <port> gets no answer from the TLS site
+      local out
+      if out=$(docker exec "$caddy_run" wget -qO- "http://127.0.0.1:$1/" 2>&1); then
+        bad "$2" 'it was served' "$out"
+      elif [[ $out == *502* ]]; then
+        ok "$2"
+      else
+        bad "$2" 'no 502 from the client site' "$out"
+      fi
+    }
+    refused 8082 'caddy: tls_jainav refuses a client without a certificate'
+    refused 8083 'caddy: tls_jainav refuses a client certificate from another CA'
+    if docker logs "$caddy_run" 2>/dev/null | grep -q '"client_common_name":"test origin pulls","client_serial":"[0-9]*"'; then
+      ok "caddy: the access log keeps the client certificate's name and serial"
+    else
+      bad "caddy: the access log keeps the client certificate's name and serial" 'not in the log' "$(docker logs "$caddy_run" 2>&1 | tail -n 5)"
+    fi
+    docker rm -f "$caddy_run" >/dev/null 2>&1 || true
+  else
+    bad 'caddy: a running Caddy with tls_jainav' 'docker run failed'
+  fi
+  caddy_run=
 else
   :
 fi
