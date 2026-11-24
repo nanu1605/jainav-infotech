@@ -415,11 +415,17 @@ scp docker/edge/compose.yml docker/edge/config/sites/jainav.caddy docker/edge/ed
 4. The Origin CA certificate for `jainavinfotech.in` and `*.jainavinfotech.in`: make it and
    install it as in [edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls), with
    the CA certificate of Jainav's origin pulls, from the password manager, as the fourth
-   argument:
-   `sudo app-apply edge cert jainav ~/csr/origin.pem ~/csr/origin-key.pem ~/incoming/aop-ca.pem`.
-   The client certificate from the same entry goes beside it, as `~/incoming/aop-client.pem`:
-   `sudo install -m 0644 -o root -g root ~/incoming/aop-client.pem /srv/edge/certs/jainav/`.
-   Cloudflare keeps presenting that certificate, so nothing changes there.
+   argument, and the client certificate from the same entry beside it. Put both in
+   `~/incoming/` (`cat > ~/incoming/aop-ca.pem`, paste, Enter, Ctrl-D; the same for
+   `aop-client.pem`), then:
+
+   ```bash
+   sudo app-apply edge cert jainav ~/csr/origin.pem ~/csr/origin-key.pem ~/incoming/aop-ca.pem && shred -u ~/csr/origin-key.pem && rm -r ~/csr
+   sudo install -m 0644 -o root -g root ~/incoming/aop-client.pem /srv/edge/certs/jainav/ && rm ~/incoming/aop-ca.pem ~/incoming/aop-client.pem
+   ```
+
+   Cloudflare keeps presenting that client certificate, so nothing changes there.
+
 5. The site file, then the compose file:
 
    ```bash
@@ -456,8 +462,9 @@ scp docker/edge/compose.yml docker/edge/config/sites/jainav.caddy docker/edge/ed
    done
    ```
 
-   Each line ends in `exit 56 tlsv13 alert certificate required, errno 0`: Caddy answers and
-   asks for the certificate ([edge.md §6](edge.md#6-the-leak-test), step 4). Then
+   Each line shows an exit status other than 0 and `alert certificate required` (with Ubuntu
+   24.04's curl, `exit 56 tlsv13 alert certificate required, errno 0`): Caddy answers and asks
+   for the certificate ([edge.md §6](edge.md#6-the-leak-test), step 4). Then
    `sudo app-apply edge validate` prints "the live edge tree is valid" and nothing after it. A
    line `warning: JAINAV_STAGING_AUTH_HASH holds no bcrypt hash` means `/srv/edge/edge.env`
    still has the placeholder or a hash cut short: make the hash again (step 3).
@@ -750,8 +757,10 @@ Check, before the other timers:
   for i in $(seq 40); do curl -sk -o /dev/null --max-time 2 --resolve www.jainavinfotech.in:443:127.0.0.1 https://www.jainavinfotech.in/; printf '%s ' "$?"; sleep 1; done; echo
   ```
 
-  It prints `56` throughout: each second Caddy answered and asked for the client certificate of
-  origin pulls, as in step 7 of §2. A `7` or a `28` means 443 stopped answering. Afterwards:
+  It prints `56` throughout (a `55` now and then is the same refusal, met while curl was still
+  sending): each second Caddy answered and asked for the client certificate of origin pulls, as
+  in step 7 of §2. A `7` or a `28` means 443 stopped answering, and a `0` that it took a client
+  without the certificate. Afterwards:
   `sudo app-compose edge ps; sudo app-compose jainav ps; sudo cf-ranges verify && echo ok`;
 
 - the straight-to-the-origin step of the leak test times out
