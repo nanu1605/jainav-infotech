@@ -39,11 +39,15 @@ A records in the table above at launch.
   `sudo app-apply edge cert jainav …`. Caddy serves it for every site of the zone; browsers never see
   it, only Cloudflare does.
 - **Authenticated Origin Pulls**: SSL/TLS → Origin Server → Authenticated Origin Pulls →
-  _Zone-level_, with our own client certificate (not Cloudflare's shared one), then turned on.
-  It must be on for the site's zone, and tested, before the first production deploy, and on for
-  every zone before the first container of a second app runs on the server
+  _Zone-level_, with our own client certificate and its key (made with our own CA, not
+  Cloudflare's shared certificate), uploaded, Active, then turned on. _Global_ stays off, and
+  there is no per-hostname certificate. Cloudflare presents the certificate to an origin that
+  asks for one, and Caddy asks on every site of the zone. It must be on for the site's zone, and
+  tested, before the first production deploy, and on for every zone before the first container
+  of a second app runs on the server
   ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls)). It has no effect on the
-  `ssh.` tunnel hostname.
+  `ssh.` tunnel hostname or on the R2 custom domains. A new client certificate is uploaded before
+  the old one is deleted: Cloudflare presents the newest.
 - Edge Certificates: Always Use HTTPS on; minimum TLS 1.2. The app sends HSTS itself
   (`max-age=31536000; includeSubDomains`, no preload).
 
