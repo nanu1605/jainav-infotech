@@ -119,7 +119,8 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
   hostname before that environment's first deploy (steps 4 and 8).
 - **Authenticated origin pulls** are on for the site's zone, and tested, before the first
   production deploy, and on for every zone before the first container of a second app runs on the
-  server ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls)).
+  server ([edge.md §3](edge.md#3-certificates-and-authenticated-origin-pulls)). Jainav's zone has
+  had them since 2026-11-25, with the leak test passed ([edge.md §6](edge.md#6-the-leak-test)).
 
 ## Done when (spec §20)
 
