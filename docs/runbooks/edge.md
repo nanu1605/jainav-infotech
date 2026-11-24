@@ -27,8 +27,8 @@ they install it, so a wrong file is refused and the running config stays as it w
   2. The host's `DOCKER-USER` rules (`CF-INBOUND`): the same ranges, which Docker's own port
      publishing does not bypass ([§4](#4-cloudflares-ranges-and-the-origin-firewall)).
   3. Caddy's trusted proxies: only Cloudflare's ranges may set the client address.
-  4. Authenticated origin pulls: Caddy accepts a connection only with a client certificate from
-     the zone's own CA, which Cloudflare presents
+  4. Authenticated origin pulls: Caddy serves a site only over a connection with a client
+     certificate from the zone's own CA, which Cloudflare presents
      ([§3](#3-certificates-and-authenticated-origin-pulls)).
 - **Files on the server**, in `/srv/edge`:
 
@@ -633,23 +633,31 @@ it marks `app-apply`'s own validation containers, which the limits check skips.
 1. **Forged headers.** From your machine, through Cloudflare:
 
    ```bash
-   curl -s "https://leaktest.$zone/" \
+   curl -s "https://leaktest.$zone/?leakcheck=1" \
      -H 'X-Forwarded-For: 203.0.113.9' -H 'True-Client-IP: 203.0.113.9' \
-     -H 'CF-Connecting-IP: 203.0.113.9' -H 'X-Real-IP: 203.0.113.9' \
-     -H 'X-Client-IP: 203.0.113.9' -H 'Forwarded: for=203.0.113.9'
+     -H 'X-Real-IP: 203.0.113.9' -H 'X-Client-IP: 203.0.113.9' -H 'Forwarded: for=203.0.113.9'
+   curl -s -w '%{http_code}\n' "https://leaktest.$zone/" -H 'CF-Connecting-IP: 203.0.113.9'
    ```
 
    The echo server prints the headers it got, with their names as Go writes them (`X-Real-Ip`,
-   `Cf-Connecting-Ip`). It passes when the four address headers (`X-Real-IP`, `X-Forwarded-For`,
-   `CF-Connecting-IP`, `Sb-Forwarded-For`) each hold your real address, `X-Forwarded-Host` equals
-   the host, and the other three headers (`True-Client-IP`, `X-Client-IP`, `Forwarded`) are
-   absent.
+   `Cf-Connecting-Ip`). The first request passes when the four address headers (`X-Real-IP`,
+   `X-Forwarded-For`, `CF-Connecting-IP`, `Sb-Forwarded-For`) each hold your real address,
+   `X-Forwarded-Host` equals the host, and the other three headers (`True-Client-IP`,
+   `X-Client-IP`, `Forwarded`) are absent. The second passes when it prints `error code: 1000`,
+   then `403`: Cloudflare lists a request that brings its own `CF-Connecting-IP` as a cause of
+   [error 1000](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1000/)
+   and refused it before it reached the server (2026-11-25). That is why the header has a request
+   of its own: in the first, it would turn the whole reply into that `403`. If the second prints
+   the echo server's reply instead, it passes only when `Cf-Connecting-Ip` holds your real
+   address. Anything else fails. Keep `X-Forwarded-For` to one header under 100 characters:
+   Cloudflare gives error 1000 to a longer one, or to two.
 
 2. **The log line.** `journalctl CONTAINER_NAME=edge-caddy-1 -n 5 -o cat` for that request
-   must show no visitor address, no request headers and no query string. Its TLS details name the
-   zone's client certificate (`client_common_name`, `client_serial`): that is Cloudflare's, the
-   same on every line. For an app with a redaction file, request a path with a made-up token in
-   it: the line must show the replacement, never the token.
+   must show no visitor address, no request headers and no query string (step 1 sent
+   `?leakcheck=1`: the line has the path alone). Its TLS details name the zone's client
+   certificate (`client_common_name`, `client_serial`): that is Cloudflare's, the same on every
+   line. For an app with a redaction file, request a path with a made-up token in it: the line
+   must show the replacement, never the token.
 3. **Straight to the origin.** From your machine, with the server's address:
 
    ```bash
@@ -675,11 +683,11 @@ it marks `app-apply`'s own validation containers, which the limits check skips.
    Every line must show an exit status other than 0 and `alert certificate required` (with
    Ubuntu 24.04's curl, `exit 56 tlsv13 alert certificate required, errno 0`): Caddy answered and
    asked for the client certificate, which only Cloudflare holds. A line with `exit 55` and
-   `Connection reset by peer` is the same refusal, met while curl was still sending: run the loop
-   again. `exit 0` means the host takes clients without it. `exit 7` (refused) or `exit 28` (no
-   answer) means Caddy isn't answering at all, which proves nothing. With `zone` unset the loop
-   refuses to run. A page opened through Cloudflare from your machine still answers as before
-   (`staging.` `401`).
+   `Connection reset by peer` or `Broken pipe` is the same refusal, met while curl was still
+   sending: run the loop again. `exit 0` means the host takes clients without it. `exit 7`
+   (refused) or `exit 28` (no answer) means Caddy isn't answering at all, which proves nothing.
+   With `zone` unset the loop refuses to run. A page opened through Cloudflare from your machine
+   still answers as before (`staging.` `401`).
 
 5. **Clean up**, in this order. First the app's own site file goes back: the test block needs
    its entry in `UPSTREAMS`, and without it `app-apply edge validate`, which hostwatch runs

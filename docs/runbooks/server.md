@@ -464,7 +464,8 @@ scp docker/edge/compose.yml docker/edge/config/sites/jainav.caddy docker/edge/ed
 
    Each line shows an exit status other than 0 and `alert certificate required` (with Ubuntu
    24.04's curl, `exit 56 tlsv13 alert certificate required, errno 0`): Caddy answers and asks
-   for the certificate ([edge.md §6](edge.md#6-the-leak-test), step 4). Then
+   for the certificate ([edge.md §6](edge.md#6-the-leak-test), step 4). An `exit 55` line with
+   `Connection reset by peer` or `Broken pipe` is the same refusal: run the loop again. Then
    `sudo app-apply edge validate` prints "the live edge tree is valid" and nothing after it. A
    line `warning: JAINAV_STAGING_AUTH_HASH holds no bcrypt hash` means `/srv/edge/edge.env`
    still has the placeholder or a hash cut short: make the hash again (step 3).
