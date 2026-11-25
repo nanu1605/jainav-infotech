@@ -88,6 +88,8 @@ Audit log summaries hold only ids for leads, data requests, private files, users
 
 Fonts are served by the site, so browsers make no request to Google Fonts. Each provider sets its own retention and may handle data in other countries; neither is recorded in this repository.
 
+Since Umami 3.5, Umami's database can also hold JavaScript error reports sent with the website id (error message, stack trace, page path, browser, OS, device). The site's script sends none, and Umami's retention ([retention.md](runbooks/retention.md#analytics-umami)) covers them.
+
 ## Logs
 
 | Data                                                                                                                                                                                                                                                                                                                           | Where it comes from                              | Why                                | Stored in                                                | Who can see it                   | Kept for                                                                           |

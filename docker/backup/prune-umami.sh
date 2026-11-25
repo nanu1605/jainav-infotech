@@ -2,7 +2,7 @@
 # shellcheck disable=SC3040
 # (busybox ash, this image's sh, has pipefail)
 # Deletes Umami's visitor data older than UMAMI_RETENTION_DAYS (empty = keep it). Umami has no
-# retention setting of its own. Tables as of Umami 3.4: a new one holding visitor data needs a line
+# retention setting of its own. Tables as of Umami 3.5: a new one holding visitor data needs a line
 # here, and a dropped one fails this script, which Telegram is told about.
 set -eu -o pipefail
 
@@ -41,6 +41,13 @@ DELETE FROM session_link WHERE created_at < now() - make_interval(days => :days)
 DELETE FROM heatmap_event WHERE created_at < now() - make_interval(days => :days);
 DELETE FROM session_replay WHERE created_at < now() - make_interval(days => :days);
 DELETE FROM session_replay_saved WHERE created_at < now() - make_interval(days => :days);
+-- Error reports (Umami 3.5). An issue's title is error text, so it goes once none of its events is
+-- left; error_rate_limit holds only a counter per website.
+DELETE FROM error_event WHERE created_at < now() - make_interval(days => :days);
+DELETE FROM error_issue i
+WHERE i.created_at < now() - make_interval(days => :days)
+  AND NOT EXISTS (SELECT 1 FROM error_event e
+                  WHERE e.website_id = i.website_id AND e.issue_id = i.issue_id);
 -- A session is deleted only once no event is left: a returning visitor's row is reused.
 DELETE FROM session s
 WHERE s.created_at < now() - make_interval(days => :days)
