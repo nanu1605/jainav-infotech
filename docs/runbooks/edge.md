@@ -213,14 +213,14 @@ step 6 Caddy doesn't ask, or asks without requiring it.
    for f in aop-ca.pem aop-client.pem; do /usr/bin/openssl x509 -in "$f" -noout -subject -issuer -enddate -ext basicConstraints,keyUsage,extendedKeyUsage; done
    /usr/bin/openssl verify -CAfile aop-ca.pem -purpose sslclient aop-client.pem
    [ "$(/usr/bin/openssl x509 -in aop-client.pem -noout -pubkey | sha256sum)" = "$(/usr/bin/openssl pkey -in aop-client-key.pem -pubout | sha256sum)" ] && echo 'pair matches' || echo 'MISMATCH'
-   grep -c $'\r' *.pem
+   for f in *.pem; do echo "$f: $(tr -cd '\r' < "$f" | wc -c) CR"; done
    ```
 
    The CA names itself as subject and issuer, with `CA:TRUE, pathlen:0` and
    `Certificate Sign, CRL Sign`, and has no extended key usage. The client certificate names the
    CA as its issuer, with `CA:FALSE`, `Digital Signature` and `TLS Web Client Authentication`,
-   and ends two years from now. Then come `aop-client.pem: OK`, `pair matches`, and `:0` for every
-   file. The pair check needs its `-pubout`: without it `pkey` prints the key.
+   and ends two years from now. Then come `aop-client.pem: OK`, `pair matches`, and `0 CR` for
+   every file. The pair check needs its `-pubout`: without it `pkey` prints the key.
 
 2. **The CA stays with you; Cloudflare gets the client pair.** `clip < <file>` copies a file
    without showing it. Copy a key only while Windows' _Clipboard history across your devices_
@@ -683,11 +683,11 @@ it marks `app-apply`'s own validation containers, which the limits check skips.
    Every line must show an exit status other than 0 and `alert certificate required` (with
    Ubuntu 24.04's curl, `exit 56 tlsv13 alert certificate required, errno 0`): Caddy answered and
    asked for the client certificate, which only Cloudflare holds. A line with `exit 55` and
-   `Connection reset by peer` or `Broken pipe` is the same refusal, met while curl was still
-   sending: run the loop again. `exit 0` means the host takes clients without it. `exit 7`
-   (refused) or `exit 28` (no answer) means Caddy isn't answering at all, which proves nothing.
-   With `zone` unset the loop refuses to run. A page opened through Cloudflare from your machine
-   still answers as before (`staging.` `401`).
+   `Connection reset by peer`, `Broken pipe` or `getpeername() failed with errno 107` is the same
+   refusal, met while curl was still sending: run the loop again. `exit 0` means the host takes
+   clients without it. `exit 7` (refused) or `exit 28` (no answer) means Caddy isn't answering at
+   all, which proves nothing. With `zone` unset the loop refuses to run. A page opened through
+   Cloudflare from your machine still answers as before (`staging.` `401`).
 
 5. **Clean up**, in this order. First the app's own site file goes back: the test block needs
    its entry in `UPSTREAMS`, and without it `app-apply edge validate`, which hostwatch runs
