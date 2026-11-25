@@ -109,7 +109,7 @@ month. The last full run was the local rehearsal of 2026-10-24; replace it after
 on the server:
 
 - `jainav`: 411 tables, 11 migrations, pages and products present;
-- `umami`: 27 tables.
+- `umami`: 27 tables (Umami 3.4; 3.5 adds three, so expect 30).
 
 ## Restore for real (disaster recovery)
 
