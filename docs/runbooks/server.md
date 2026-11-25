@@ -382,14 +382,16 @@ scp docker/edge/compose.yml docker/edge/config/sites/jainav.caddy docker/edge/ed
    first colon. Paste this line alone:
 
    ```bash
-   IFS= read -rsp 'Staging basic-auth password: ' P; echo; H=$(printf '%s\n' "$P" | sudo docker run --rm -i --network none "$(sed -n 's/^CADDY_IMAGE=//p' /etc/apps/edge.conf)" caddy hash-password --algorithm bcrypt); unset P; printf '%s\n' "$H" | awk 'NR==FNR {h=$0; next} /^JAINAV_STAGING_AUTH_HASH=/ {$0="JAINAV_STAGING_AUTH_HASH=\047" h "\047"} {print}' - ~/incoming/edge.env.example > ~/incoming/edge.env; unset H; awk -F= '$1=="JAINAV_STAGING_AUTH_HASH" {print length($2)}' ~/incoming/edge.env
+   IFS= read -rsp 'Staging basic-auth password: ' P; echo; H=$(printf '%s\n' "$P" | sudo docker run --rm -i --network none --log-driver none "$(sed -n 's/^CADDY_IMAGE=//p' /etc/apps/edge.conf)" caddy hash-password --algorithm bcrypt); unset P; printf '%s\n' "$H" | awk 'NR==FNR {h=$0; next} /^JAINAV_STAGING_AUTH_HASH=/ {$0="JAINAV_STAGING_AUTH_HASH=\047" h "\047"} {print}' - ~/incoming/edge.env.example > ~/incoming/edge.env; unset H; awk -F= '$1=="JAINAV_STAGING_AUTH_HASH" {print length($2)}' ~/incoming/edge.env
    ```
 
    The last command must print `62`: a 60-character bcrypt hash and its two single quotes. `2`
    means no hash and `19` the example's placeholder: then don't install, and run the line again.
-   The password goes to Caddy on stdin, so it is on no command line. If the second run prints `2`
-   too (the line relies on Caddy reading the password from stdin when it has no terminal), run
-   `sudo docker run --rm -it "$(sed -n 's/^CADDY_IMAGE=//p' /etc/apps/edge.conf)" caddy hash-password --algorithm bcrypt`,
+   The password goes to Caddy on stdin, so it is on no command line, and `--log-driver none` keeps
+   the hash out of the journal, where Docker sends every container's output. If the second run
+   prints `2` too (the line relies on Caddy reading the password from stdin when it has no
+   terminal), run
+   `sudo docker run --rm -it --log-driver none "$(sed -n 's/^CADDY_IMAGE=//p' /etc/apps/edge.conf)" caddy hash-password --algorithm bcrypt`,
    type the password at its prompts, and paste the hash between the single quotes of
    `JAINAV_STAGING_AUTH_HASH` in `sudoedit /srv/edge/edge.env`, in place of the placeholder. Keep
    the single quotes (the hash holds `$` signs); the user stays `jainav` and `JAINAV_DOMAIN` stays
