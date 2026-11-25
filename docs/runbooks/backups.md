@@ -69,10 +69,19 @@ dead cron or a failed run ([monitoring.md](monitoring.md#uptime-heartbeats-and-s
 ```bash
 sudo app-compose jainav logs --tail 20 backup
 sudo app-compose jainav exec backup rclone lsl backups:jainav-backups/daily/ | tail -4
-sudo app-compose jainav exec backup backup.sh     # run one now
 ```
 
 The listing shows a `jainav-…` dump, an `umami-…` dump and a `config-….tar.age` for the night.
+
+To run one now, make a fresh settings archive first. The job fails, with an alert, when the
+newest archive is more than 2 hours old, and the timer makes one only at 20:50 UTC:
+
+```bash
+sudo systemctl start app-config-archive@jainav.service
+sudo app-compose jainav exec backup backup.sh
+```
+
+The run adds a set of its own next to the night's; nothing is overwritten.
 
 ## Bucket locks
 
