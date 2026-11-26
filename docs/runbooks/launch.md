@@ -7,13 +7,14 @@ Phase 6 in order (spec §20). Each step names who does it. Details are in the ot
 - [x] Domain (`jainavinfotech.in`) added to Cloudflare, nameservers switched (2026-11-11).
 - [ ] Hostinger account with two-factor login; Cloudflare account; Resend account; the mailbox
       (GoDaddy email, bought with the domain); Telegram bots (one for the server, one for the site).
-- [ ] Final company details:
-  - CIN, incorporation date, registered office, GSTIN if any;
+- [x] Final company details (2026-11-26), in the seed and the legal drafts:
+  - CIN, registered office, GSTIN; the incorporation date is optional and still unset;
   - phone and email addresses, business days;
   - the Grievance Officer's name and title.
 - [ ] Legal texts reviewed, ideally by a lawyer: drafts are in `scripts/seed/legal/`, and the seed
       loads them. Decide the refund window and fill the other `{{PLACEHOLDERS}}`. The EULA waits for
-      VYRO Pro: released builds are MIT or Apache-2.0 ([decisions](../decisions.md), "Legal drafts").
+      Clokrix Pro: released builds are MIT or Apache-2.0 ([decisions](../decisions.md), "Legal
+      drafts").
 
 ## The server in short
 
@@ -85,10 +86,11 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
      ([cloudflare.md](cloudflare.md#security)); then `PRODUCTION_SMOKE_ADMIN_ACCESS=1`;
    - tag `v1.0.0`, approve the deploy, seed;
    - create the Owner account in the admin;
-   - in Settings → Site settings, enter the CIN and the Grievance Officer's name and title, in
-     English and Hindi: until then the footer leaves them out without saying so. The Privacy,
-     Privacy Requests, Terms and Refunds pages name the officer in their text too, so a new officer
-     means publishing new versions of them as well;
+   - check Settings → Site settings: the seed fills the CIN, GSTIN, hours and the Grievance
+     Officer's name and title, in English and Hindi (a database seeded before 2026-11-26, such as
+     staging, needs them entered there), and the footer leaves out any that are empty without
+     saying so. The Privacy, Privacy Requests, Terms and Refunds pages name the officer in
+     their text too, so a new officer means publishing new versions of them as well;
    - publish the reviewed content.
 9. **Legal pages:**
    - on staging, in a fresh browser profile, list the cookies and storage on the main pages and
@@ -97,7 +99,7 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
      EULA, and sets the Terms version in Commerce settings to match;
    - Razorpay's activation asks for About us, Contact us, Pricing, Terms, Privacy and Refunds, plus
      a sample invoice. Shipping stays live too.
-10. **VYRO download** (if it goes live): `sudo app-compose jainav tools production - pnpm import:release <tag>`
+10. **Clokrix download** (if it goes live): `sudo app-compose jainav tools production - pnpm import:release <tag>`
     ([server.md §8](server.md#8-one-off-commands)), then the Owner publishes the release.
 11. **Email** ([cloudflare.md](cloudflare.md#email)): Resend domain verified, the mailbox
     addresses, SPF, DKIM, and our DMARC record (`p=none`) in place of GoDaddy's. The emails'
@@ -143,6 +145,6 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
 - [ ] Lighthouse on the production URLs: `LHCI_BASE_URL=https://jainavinfotech.in pnpm lhci` (spec
       §15; Phase 5 measured locally only).
 
-**After launch (Tanishq):** once the pricing page shows real VYRO prices, apply for Razorpay
+**After launch (Tanishq):** once the pricing page shows real Clokrix prices, apply for Razorpay
 activation using this website. First get Razorpay's written confirmation that one-time software
 licenses are accepted ([decisions](../decisions.md), "Legal drafts").

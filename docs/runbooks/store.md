@@ -5,7 +5,7 @@ How to switch on accounts and checkout on staging with Razorpay's test mode. Pro
 ## Inputs from Tanishq
 
 - Razorpay **test** keys (Dashboard → Test mode → Account & Settings → API Keys): key id `rzp_test_…` and secret.
-- The VYRO plans and prices, and from the CA: GST status, SAC code, export treatment, invoice prefix, how long orders and invoices must be kept.
+- The Clokrix plans and prices (decided 2026-11-26: Pro ₹10,000 one-time including GST, with 12 months of updates, and the free version stays), and from the CA: GST status, SAC code, export treatment, invoice prefix, how long orders and invoices must be kept.
 
 ## Steps
 
@@ -20,14 +20,14 @@ How to switch on accounts and checkout on staging with Razorpay's test mode. Pro
 3. **Capture:** Dashboard → Account & Settings → Payment capture: automatic.
 4. **Admin** (staging, as Owner):
    - Settings → Commerce settings: the SAC code, invoice prefixes and, once the CA confirms, "Charge GST" (needs the company GSTIN in Site settings first); the current Terms and EULA versions (they are recorded with every order).
-   - Products → Plans: VYRO Pro's price (paise, GST-inclusive) and "Active".
-   - Content → Legal pages: one holding a `{{BLANK}}` in either language can't be published, here as on production, so fill the blanks in first and delete the EULA's `{{HOLD_UNTIL_VYRO_PRO}}` line in both languages. Then publish Terms, the VYRO EULA (`eula-vyro`), Refunds and Cancellation, and Shipping and Delivery. Until all four are live, the checkout shows "can't be bought right now" and refuses orders.
+   - Products → Plans: Clokrix Pro's price (paise, GST-inclusive) and "Active". The seed sets both since 2026-11-26; a database seeded earlier, such as staging, needs them set here.
+   - Content → Legal pages: one holding a `{{BLANK}}` in either language can't be published, here as on production, so fill the blanks in first and delete the EULA's `{{HOLD_UNTIL_CLOKRIX_PRO}}` line in both languages. Then publish Terms, the Clokrix EULA (`eula-vyro`), Refunds and Cancellation, and Shipping and Delivery. Until all four are live, the checkout shows "can't be bought right now" and refuses orders.
    - Settings → Site settings → Site: "Store enabled".
 5. **Content security policy:** keep the browser console open during the test purchase (step 6), starting from the pricing page. Any `Content-Security-Policy` violation naming a Razorpay host goes into `src/lib/csp.ts` (`RAZORPAY`).
 
 ## Test purchase (spec §20 Phase 7 "done when")
 
-6. Sign in at `/account/sign-in` (the code arrives by email), open VYRO's pricing page → Buy Pro → fill in the billing details, tick the Terms box → Pay. In Razorpay's test checkout use UPI `success@razorpay` or card `4100 2800 0000 1007` (any future expiry, any CVV, any OTP).
+6. Sign in at `/account/sign-in` (the code arrives by email), open Clokrix's pricing page → Buy Pro → fill in the billing details, tick the Terms box → Pay. In Razorpay's test checkout use UPI `success@razorpay` or card `4100 2800 0000 1007` (any future expiry, any CVV, any OTP).
 7. Check:
    - the success page shows the order and, a few seconds later, the invoice link;
    - the order confirmation email arrives with the invoice PDF attached;
