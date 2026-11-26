@@ -28,8 +28,31 @@ grep 'public key' jainav-backup-key.txt     # age1… → BACKUP_AGE_RECIPIENT i
 ```
 
 The same public key is `BACKUP_RECIPIENT` in `/etc/apps/jainav.conf`, which encrypts the settings
-archive. Store `jainav-backup-key.txt` safely, then delete it from the machine you made it on.
-Without it, no backup can ever be restored.
+archive. Without the private key, no backup can ever be restored.
+
+Store the whole file in the password manager and print it. Then check the stored copy before the
+file goes: a copy that was never checked can be another key, and nothing shows it until a restore
+fails. Copy the entry in the password manager, but only while Windows' _Clipboard history across
+your devices_ (Settings → System → Clipboard) is off: it uploads what you copy. Then, in Git Bash
+in the folder with the file, run the `read` line on its own, paste at its prompt (which shows
+nothing) and press Ctrl-D, then run the rest. The `read` takes everything pasted until Ctrl-D, so
+pasting the whole block at once would swallow the other lines.
+
+```bash
+IFS= read -rsd $'\004' -p 'Paste the stored key, then Ctrl-D: ' K; echo
+pub=$(printf '%s\n' "$K" | grep -o 'AGE-SECRET-KEY-1[0-9A-Z]*' |
+  docker run --rm -i postgres:17-alpine sh -c 'apk add -q age >/dev/null </dev/null && age-keygen -y'); unset K
+if [ -z "$pub" ]; then echo 'no key read: see the error above'
+elif [ ! -f jainav-backup-key.txt ]; then echo 'run this in the folder with jainav-backup-key.txt'
+elif tr -d '\r' <jainav-backup-key.txt | grep -qxF "# public key: $pub"; then echo 'same key'
+else echo 'DIFFERENT'; fi
+clip </dev/null    # empties the clipboard; with clipboard history on, also Win+V, Clear all
+```
+
+Only after `same key`, delete `jainav-backup-key.txt` from the machine you made it on. To check a
+stored copy once the file is gone, run the first three lines (up to `unset K`), then
+`echo "$pub"`: the `age1…` key it prints must be the same as `BACKUP_RECIPIENT` on the server
+(`grep '^BACKUP_RECIPIENT=' /etc/apps/jainav.conf`).
 
 ## The settings archive
 
@@ -99,12 +122,16 @@ database's size, and decrypts the newest settings archive to list its file names
 contents. Nothing touches the real database. Run it in the first week of the month, never while
 `hostwatch` reports the server throttled.
 
-The private key goes on `ramfs`, which is never swapped and disappears at unmount:
+The private key goes on `ramfs`, which is never swapped and disappears at unmount. Copy it from
+the password manager as in [The key](#the-key). Run the lines one at a time: the `read` line takes
+everything pasted until Ctrl-D. After the paste, empty the clipboard on your own machine
+(`clip </dev/null` in Git Bash; with clipboard history on, also Win+V, _Clear all_):
 
 ```bash
 sudo install -d -m 700 /run/age
 sudo mount -t ramfs -o mode=700 ramfs /run/age
-sudo tee /run/age/identity.txt >/dev/null     # paste the private key, then Ctrl-D
+IFS= read -rsd $'\004' -p 'Paste the private key, then Ctrl-D: ' K; echo    # shows nothing
+printf '%s\n' "$K" | grep -o 'AGE-SECRET-KEY-1[0-9A-Z]*' | sudo tee /run/age/identity.txt >/dev/null; unset K
 sudo chmod 600 /run/age/identity.txt
 sudo app-compose jainav --profile restore-test run --rm -v /run/age:/run/age:ro restore-test
 sudo app-compose jainav --profile restore-test rm -sf restore-db
@@ -118,7 +145,16 @@ month. The last full run was the local rehearsal of 2026-10-24; replace it after
 on the server:
 
 - `jainav`: 411 tables, 11 migrations, pages and products present;
-- `umami`: 27 tables (Umami 3.4; 3.5 adds three, so expect 30).
+- `umami`: 27 tables (Umami 3.4). Umami 3.5 adds three: the server's run of 2026-11-26 restored 30.
+
+Until the first production deploy, `jainav` has no tables, so the full test fails there. To test
+the key and the dumps before then, use this run line instead. It restores `umami`, then stops at
+the site check (`database "jainav" does not exist`): that stop is expected. Only a full run
+decrypts the settings archive.
+
+```bash
+sudo app-compose jainav --profile restore-test run --rm -v /run/age:/run/age:ro -e BACKUP_DATABASES=umami restore-test
+```
 
 ## Restore for real (disaster recovery)
 
