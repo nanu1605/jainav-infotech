@@ -33,4 +33,4 @@
 
 ## संपर्क
 
-[support@jainavinfotech.in](mailto:support@jainavinfotech.in) पर ईमेल करें, +91 92441 17127 पर कॉल करें या [संपर्क पेज](/contact?topic=support) का इस्तेमाल करें। काम के घंटे: सुबह 9:00 बजे से शाम 6:00 बजे तक (IST), {{BUSINESS_DAYS}}। शिकायतों के लिए देखें [रिफ़ंड और रद्दीकरण](/legal/refunds-cancellation)।
+[support@jainavinfotech.in](mailto:support@jainavinfotech.in) पर ईमेल करें, +91 92441 17127 पर कॉल करें या [संपर्क पेज](/contact?topic=support) का इस्तेमाल करें। काम के घंटे: सोमवार से शनिवार, सुबह 9:00 बजे से शाम 6:00 बजे तक (IST)। शिकायतों के लिए देखें [रिफ़ंड और रद्दीकरण](/legal/refunds-cancellation)।

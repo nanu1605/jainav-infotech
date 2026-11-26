@@ -1,12 +1,12 @@
-{{HOLD_UNTIL_VYRO_PRO}}
+{{HOLD_UNTIL_CLOKRIX_PRO}}
 
-This agreement is between you and Jainav Infotech Private Limited ("we"). It applies only if you buy a VYRO Pro plan, start a Pro trial, or receive a Pro license from us without charge. VYRO's [pricing page](/products/vyro/pricing) shows what is on offer. You do not need this agreement to use the free version of VYRO.
+This agreement is between you and Jainav Infotech Private Limited ("we"). It applies only if you buy a Clokrix Pro plan, start a Pro trial, or receive a Pro license from us without charge. Clokrix's [pricing page](/products/vyro/pricing) shows what is on offer. You do not need this agreement to use the free version of Clokrix.
 
 You accept it by ticking the unticked box at checkout or, for a trial or a license given without charge, by using Pro.
 
 ## Open source code
 
-VYRO's source code is published under your choice of the [MIT](https://opensource.org/license/mit) or [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) license. Open source code and third-party components stay under their own licenses, in every build. Nothing in this agreement restricts what those licenses let you do with that code. This agreement governs only your license key, Pro access and our activation service. Changing the code does not give you a key or a right to use the activation service.
+Clokrix's source code is published under your choice of the [MIT](https://opensource.org/license/mit) or [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) license. Open source code and third-party components stay under their own licenses, in every build. Nothing in this agreement restricts what those licenses let you do with that code. This agreement governs only your license key, Pro access and our activation service. Changing the code does not give you a key or a right to use the activation service.
 
 ## Your license
 
@@ -15,7 +15,7 @@ In return for the price shown at checkout, if any, we grant you a non-exclusive 
 - **Duration:** the license starts when we issue your key. It has no end date unless your plan shows one, but it can end as described below.
 - **Territory:** you may use it anywhere in the world.
 
-If a Pro build contains code that is not under an open source license, you may install and run that code on your activated devices while your license lasts. We or our licensors own that code, the key system, the activation service and the VYRO name and logo.
+If a Pro build contains code that is not under an open source license, you may install and run that code on your activated devices while your license lasts. We or our licensors own that code, the key system, the activation service and the Clokrix name and logo.
 
 ## Devices
 
@@ -31,7 +31,7 @@ If we offer a Pro trial, each device can have one, and it cannot restart. It las
 
 Your update period is 12 months from the day we issue your license, unless your plan or the Licenses page of your account shows a different period or Lifetime. That page shows any end date.
 
-Your license covers Pro on every VYRO build released up to the end of that period. You keep Pro on those builds after the period ends, as long as your license has not ended. It does not cover Pro on builds released later.
+Your license covers Pro on every Clokrix build released up to the end of that period. You keep Pro on those builds after the period ends, as long as your license has not ended. It does not cover Pro on builds released later.
 
 ## Your key and the activation service
 
@@ -59,7 +59,7 @@ Indian copyright law lets a lawful user of a computer program do certain things,
 
 Pro must match its description when you buy it. If it is defective, deficient, not genuine, not as described or agreed, not delivered or delivered late, [Refunds and Cancellation](/legal/refunds-cancellation) sets out your rights.
 
-Beyond that, and as far as the law allows, we do not promise that Pro is error-free or suits your hardware. Some VYRO features can change hardware settings, such as fan curves, so check they suit your machine. Open source code carries the disclaimers in its own license.
+Beyond that, and as far as the law allows, we do not promise that Pro is error-free or suits your hardware. Some Clokrix features can change hardware settings, such as fan curves, so check they suit your machine. Open source code carries the disclaimers in its own license.
 
 As far as the law allows, our total liability for your license is limited to the amount you paid for that plan. Nothing in this agreement limits a right or liability that the law does not allow to be limited, including your rights under the Consumer Protection Act.
 
@@ -71,4 +71,4 @@ We may change this agreement. This page shows its current version and effective 
 
 ## Who we are
 
-Jainav Infotech Private Limited. CIN {{CIN}}. Registered office: 8A Brejeshwary annex, near bangali square, Indore, Madhya Pradesh, 452016. Email: [support@jainavinfotech.in](mailto:support@jainavinfotech.in). Phone: +91 92441 17127. Website: [https://jainavinfotech.in](https://jainavinfotech.in). Hours: 9:00 am to 6:00 pm IST, {{BUSINESS_DAYS}}.
+Jainav Infotech Private Limited. CIN U62099MP2026PTC087972. Registered office: 8A Brejeshwary annex, near bangali square, Indore, Madhya Pradesh, 452016. Email: [support@jainavinfotech.in](mailto:support@jainavinfotech.in). Phone: +91 92441 17127. Website: [https://jainavinfotech.in](https://jainavinfotech.in). Hours: 9:00 am to 6:00 pm IST, Monday to Saturday.

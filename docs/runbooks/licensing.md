@@ -1,6 +1,6 @@
 # Licensing: keys, complimentary licenses, support, testing (Phase 8)
 
-The VYRO licensing API (spec §12, contract in [../licensing-api.md](../licensing-api.md)) signs license tokens with an Ed25519 key, stores license keys encrypted and device ids peppered. This runbook covers the secrets behind that, issuing licenses by hand, the support actions, and testing an environment with `scripts/license-test-client`.
+The Clokrix licensing API (spec §12, contract in [../licensing-api.md](../licensing-api.md)) signs license tokens with an Ed25519 key, stores license keys encrypted and device ids peppered. This runbook covers the secrets behind that, issuing licenses by hand, the support actions, and testing an environment with `scripts/license-test-client`.
 
 Locally nothing is needed: without the licensing variables, development derives all four from `PAYLOAD_SECRET` (kid `dev`). Production and staging refuse to do that: the API, `/api/v1/licensing/health` and creating a license answer 503 until the keys are installed.
 
@@ -8,7 +8,7 @@ Locally nothing is needed: without the licensing variables, development derives 
 
 | Variable                     | What it is                                                           | If it is lost or changed                                                                                                               |
 | ---------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `LICENSING_PRIVATE_KEY`      | Ed25519 signing key (base64 PKCS#8 DER on one line; PEM also works)  | Tokens can't be signed with it any more: rotate ([below](#rotating-the-signing-key)), which needs a VYRO build                         |
+| `LICENSING_PRIVATE_KEY`      | Ed25519 signing key (base64 PKCS#8 DER on one line; PEM also works)  | Tokens can't be signed with it any more: rotate ([below](#rotating-the-signing-key)), which needs a Clokrix build                      |
 | `LICENSING_KEY_ID`           | Its `kid`, in every token header and in `GET /keys`                  | Changes only together with the signing key                                                                                             |
 | `LICENSE_KEY_ENCRYPTION_KEY` | AES-256 key for the stored copies of license keys (32 bytes, base64) | **Never change it.** Every stored key copy becomes unreadable: customers' Licenses pages, the admin and license emails can't show keys |
 | `DEVICE_ID_PEPPER`           | Mixed into the stored device hashes (32 bytes, base64)               | **Never change it.** No device matches its activation any more: every device takes a new slot and customers hit the device limit       |
@@ -35,14 +35,14 @@ Each environment has its own set: staging never uses production's keys (a stagin
    ```
 
 5. Check: `curl -s https://jainavinfotech.in/api/v1/licensing/health` answers `{"ok":true}`, and `curl -s https://jainavinfotech.in/api/v1/licensing/keys` lists the new `kid` with the same `x` as the printed JWK.
-6. Give the public JWK (not the private key) to the VYRO build: release builds embed production's key; test builds may also embed staging's.
+6. Give the public JWK (not the private key) to the Clokrix build: release builds embed production's key; test builds may also embed staging's.
 
 ## Rotating the signing key
 
-Plan this when the day comes (a suspected leak, or a scheduled change). Today the server only knows one key: `GET /keys` lists the active key alone, and `/validate` accepts only tokens with its `kid`. A rotation therefore needs both a server change and a VYRO release, in this order:
+Plan this when the day comes (a suspected leak, or a scheduled change). Today the server only knows one key: `GET /keys` lists the active key alone, and `/validate` accepts only tokens with its `kid`. A rotation therefore needs both a server change and a Clokrix release, in this order:
 
 1. **New pair:** `pnpm gen:licensing-keys --signing-only <new kid>` prints only `LICENSING_PRIVATE_KEY`, `LICENSING_KEY_ID` and the public JWK. The encryption key and pepper stay as they are.
-2. **VYRO build** that embeds both the old and the new public key, released and given time to spread. A build that knows only the old `kid` rejects new tokens offline and drops to the free tier once its token is refreshed.
+2. **Clokrix build** that embeds both the old and the new public key, released and given time to spread. A build that knows only the old `kid` rejects new tokens offline and drops to the free tier once its token is refreshed.
 3. **Server change** (a code change, planned then): sign with the new key, while still listing the old public key in `GET /keys` and accepting it in `/validate` (tokens up to 180 days past `exp` come back with the old `kid`). Deploy it with the new `LICENSING_PRIVATE_KEY` / `LICENSING_KEY_ID`.
 4. **Retire the old key** from `/validate` once no token signed with it can still be presented (30 days of token life + 180 days of grace after the switch), and from `GET /keys` once no supported build needs it.
 
@@ -51,7 +51,7 @@ After a leak, go through the same steps without waiting in step 2: anyone holdin
 ## Issuing a complimentary license (Owner)
 
 1. Someone new: Store → Customers → Create new: email, name, language (emails go out in it). Save.
-2. Store → Licenses → Create new: **Product** (VYRO), **Plan** (Pro), **Customer**. Leave Status `active` and Source `complimentary`. Empty Max activations and Updates until take the plan's values (as seeded: 2 devices, 12 months of updates); fill them in to give something else.
+2. Store → Licenses → Create new: **Product** (Clokrix), **Plan** (Pro), **Customer**. Leave Status `active` and Source `complimentary`. Empty Max activations and Updates until take the plan's values (as seeded: 2 devices, 12 months of updates); fill them in to give something else.
 3. Save. The key is generated on save, appears in the License key field, and is emailed to the customer within a minute (the job queue). The customer also sees it on their account's Licenses page once they sign in with that email.
 
 The license can't be deleted afterwards; revoke it instead.
@@ -66,9 +66,9 @@ Both Owner and Support can do these in Store → Licenses and Store → Activati
 
 ## Testing an environment with the test client
 
-`pnpm license-test-client` behaves like VYRO: it activates, validates, deactivates, starts trials and checks for updates, and verifies every token offline as the app must. `pnpm license-test-client --help` lists everything. Its state (license keys and tokens) lives in `.license-client/`, which is gitignored.
+`pnpm license-test-client` behaves like Clokrix: it activates, validates, deactivates, starts trials and checks for updates, and verifies every token offline as the app must. `pnpm license-test-client --help` lists everything. Its state (license keys and tokens) lives in `.license-client/`, which is gitignored.
 
-**Locally:** `pnpm seed:store` prints the dev customer's VYRO Pro key (it creates `dev-buyer@example.test` and the license the first time). Then, with `pnpm dev` running:
+**Locally:** `pnpm seed:store` prints the dev customer's Clokrix Pro key (it creates `dev-buyer@example.test` and the license the first time). Then, with `pnpm dev` running:
 
 ```bash
 pnpm license-test-client activate --key VYRO-XXXXX-XXXXX-XXXXX-XXXXX

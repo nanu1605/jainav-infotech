@@ -62,8 +62,8 @@ When the dispute ends, the order stops showing Disputed: it goes back to Paid or
 
 ## Contact and complaints
 
-Jainav Infotech Private Limited. CIN {{CIN}}. Registered office: 8A Brejeshwary annex, near bangali square, Indore, Madhya Pradesh, 452016. Email: [support@jainavinfotech.in](mailto:support@jainavinfotech.in). Phone: +91 92441 17127. Hours: 9:00 am to 6:00 pm IST, {{BUSINESS_DAYS}}.
+Jainav Infotech Private Limited. CIN U62099MP2026PTC087972. Registered office: 8A Brejeshwary annex, near bangali square, Indore, Madhya Pradesh, 452016. Email: [support@jainavinfotech.in](mailto:support@jainavinfotech.in). Phone: +91 92441 17127. Hours: 9:00 am to 6:00 pm IST, Monday to Saturday.
 
-You can contact our Grievance Officer at any time, whether or not we have answered you yet: {{GRIEVANCE_OFFICER_NAME}}, {{GRIEVANCE_OFFICER_TITLE}}, at the same email, phone and address, or use the form on [Privacy Requests and Grievances](/legal/privacy-requests). We acknowledge a grievance within 48 hours and resolve it within one month. If you complain about something you bought, our acknowledgement gives you a ticket number, so you can ask about its status, and our Grievance Officer's first reply includes a copy of your complaint as we recorded it.
+You can contact our Grievance Officer at any time, whether or not we have answered you yet: Tanishq Jain, Director, at the same email, phone and address, or use the form on [Privacy Requests and Grievances](/legal/privacy-requests). We acknowledge a grievance within 48 hours and resolve it within one month. If you complain about something you bought, our acknowledgement gives you a ticket number, so you can ask about its status, and our Grievance Officer's first reply includes a copy of your complaint as we recorded it.
 
 You can also call the National Consumer Helpline on 1915, or file a complaint with a consumer commission, including where you live or work, through [e-Jagriti](https://e-jagriti.gov.in). These routes stay open whatever our [Terms of Service](/legal/terms) say about courts.

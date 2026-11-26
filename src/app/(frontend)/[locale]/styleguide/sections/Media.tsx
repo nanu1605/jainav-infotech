@@ -26,13 +26,13 @@ const COPY = {
     hi: 'प्लेसहोल्डर स्क्रीनशॉट: वही ऐप विंडो डार्क मोड में',
   },
   darkCaption: {
-    en: 'VYRO in dark mode. Placeholder art until real screenshots are uploaded.',
-    hi: 'डार्क मोड में VYRO। असली स्क्रीनशॉट अपलोड होने तक यह प्लेसहोल्डर है।',
+    en: 'Clokrix in dark mode. Placeholder art until real screenshots are uploaded.',
+    hi: 'डार्क मोड में Clokrix। असली स्क्रीनशॉट अपलोड होने तक यह प्लेसहोल्डर है।',
   },
   video: { en: 'VideoLoop', hi: 'VideoLoop' },
   videoLabel: {
-    en: 'VYRO’s temperature chart updating (sample loop)',
-    hi: 'VYRO का तापमान चार्ट अपडेट होते हुए (नमूना लूप)',
+    en: 'Clokrix’s temperature chart updating (sample loop)',
+    hi: 'Clokrix का तापमान चार्ट अपडेट होते हुए (नमूना लूप)',
   },
   videoNote: {
     en: 'No video files yet, so this shows the poster state. With a file, the loop plays muted only while it is on screen and stays paused when reduced motion is on. The play/pause button is always there, and the visitor’s choice sticks. Captions come from a WebVTT track in the page’s language.',

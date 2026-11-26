@@ -33,4 +33,4 @@ A paid plan on this website can be bought only with a billing state in India, an
 
 ## Contact
 
-Email [support@jainavinfotech.in](mailto:support@jainavinfotech.in), call +91 92441 17127 or use the [contact page](/contact?topic=support). Hours: 9:00 am to 6:00 pm IST, {{BUSINESS_DAYS}}. For complaints, see [Refunds and Cancellation](/legal/refunds-cancellation).
+Email [support@jainavinfotech.in](mailto:support@jainavinfotech.in), call +91 92441 17127 or use the [contact page](/contact?topic=support). Hours: 9:00 am to 6:00 pm IST, Monday to Saturday. For complaints, see [Refunds and Cancellation](/legal/refunds-cancellation).

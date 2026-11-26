@@ -1,7 +1,7 @@
 {
   "metadata": {
     "title": "Jainav Infotech: software products and custom software",
-    "description": "Jainav Infotech builds its own software products, MenuMesh, VYRO and Baby, and custom software for businesses. Based in Indore, India.",
+    "description": "Jainav Infotech builds its own software products, MenuMesh, Clokrix and Baby, and custom software for businesses. Based in Indore, India.",
     "titleTemplate": "%s | Jainav Infotech"
   },
   "site": {
@@ -12,7 +12,7 @@
   "home": {
     "eyebrow": "Coming soon",
     "title": "Software we build, and software we build for you.",
-    "subtitle": "Products like MenuMesh, VYRO and Baby, plus custom software for your business. The full site is on its way."
+    "subtitle": "Products like MenuMesh, Clokrix and Baby, plus custom software for your business. The full site is on its way."
   },
   "theme": {
     "toggle": "Switch between light and dark theme"
@@ -287,7 +287,7 @@
         "start": "Start"
       },
       "vyro": {
-        "label": "VYRO dashboard illustration: CPU and GPU speedometers and a CPU temperature graph, playing illustrative values",
+        "label": "Clokrix dashboard illustration: CPU and GPU speedometers and a CPU temperature graph, playing illustrative values",
         "illustrative": "Illustrative values",
         "cpu": "CPU",
         "gpu": "GPU",
@@ -858,7 +858,7 @@
     },
     "newsletter": {
       "title": "Newsletter",
-      "text": "New releases from MenuMesh, VYRO and Baby. A few emails a year.",
+      "text": "New releases from MenuMesh, Clokrix and Baby. A few emails a year.",
       "submit": "Subscribe",
       "successTitle": "Check your inbox",
       "successText": "We've sent you a link to confirm your subscription."
@@ -956,7 +956,7 @@
     },
     "newsletter": {
       "subject": "Confirm your subscription",
-      "body": "Please confirm that you'd like to receive news from Jainav Infotech: new releases from MenuMesh, VYRO and Baby, a few times a year.",
+      "body": "Please confirm that you'd like to receive news from Jainav Infotech: new releases from MenuMesh, Clokrix and Baby, a few times a year.",
       "button": "Confirm subscription",
       "expiry": "This link works for 7 days. If you didn't sign up, ignore this email and you won't be subscribed.",
       "unsubscribe": "Unsubscribe"

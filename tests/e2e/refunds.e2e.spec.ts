@@ -1,5 +1,5 @@
 /**
- * Phase 9 refunds in a real browser (spec §20 Phase 9 "done when"): a customer buys VYRO Pro
+ * Phase 9 refunds in a real browser (spec §20 Phase 9 "done when"): a customer buys Clokrix Pro
  * through the stand-in gateway; the Owner signs in to the admin, opens the order and refunds part
  * of it with a reason in the order's Refund drawer; once the gateway's webhook arrives the order is
  * partly refunded with a credit note, the customer has the refund email, and their Orders page
@@ -58,7 +58,7 @@ test('the Owner refunds part of an order and the customer sees the credit note',
   await admin.goto(`/admin/collections/orders/${id}`)
   await admin.getByRole('button', { name: 'Refund…' }).click()
   const drawer = admin.locator('.drawer').filter({ hasText: `Refunds for order ${orderNumber}` })
-  await expect(drawer).toContainText('Can be refunded now: ₹999')
+  await expect(drawer).toContainText('Can be refunded now: ₹10,000')
   await drawer.getByLabel(/^Amount in rupees/).fill('400')
   await drawer.getByLabel(/^Reason/).fill('Partial refund from the end-to-end test')
   await drawer.getByRole('button', { name: 'Review refund' }).click()
@@ -86,7 +86,7 @@ test('the Owner refunds part of an order and the customer sees the credit note',
   // The drawer now shows what is left, and the request is no longer pending.
   await admin.reload()
   await admin.getByRole('button', { name: 'Refund…' }).click()
-  await expect(drawer).toContainText('Can be refunded now: ₹599')
+  await expect(drawer).toContainText('Can be refunded now: ₹9,600')
   await expect(drawer).not.toContainText('Waiting for Razorpay')
 
   for (const [url, status] of [

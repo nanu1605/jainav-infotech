@@ -16,7 +16,7 @@ If you use the site for a business, you confirm that you may accept these Terms 
 
 Some of our apps are free. Where this site offers one for download, you need no account and pay nothing.
 
-Each free app has its own license. That license, not these Terms, decides what you may do with the app and its code, and nothing in these Terms limits it. For example, VYRO's source code is published under your choice of the [MIT](https://opensource.org/license/mit) or [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) license.
+Each free app has its own license. That license, not these Terms, decides what you may do with the app and its code, and nothing in these Terms limits it. For example, Clokrix's source code is published under your choice of the [MIT](https://opensource.org/license/mit) or [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) license.
 
 Licenses like these say the software comes "as is", without warranty, and they limit liability.
 
@@ -71,7 +71,7 @@ Nothing in this section limits what an open source license or the law lets you d
 
 The text, images, design and other content on this site belong to us or our licensors. You may read it, print it and link to it. For anything more, ask us first, unless the law already allows it.
 
-The names and logos of Jainav Infotech, MenuMesh, VYRO and Baby belong to us or our licensors. These Terms give you no right to use them, except to refer truthfully to us and our products.
+The names and logos of Jainav Infotech, MenuMesh, Clokrix and Baby belong to us or our licensors. These Terms give you no right to use them, except to refer truthfully to us and our products.
 
 You keep your rights in what you send us. You allow us to use it to reply to you and deal with your request.
 
@@ -125,7 +125,7 @@ This does not affect your right to:
 
 For a question, [write to us](/contact?topic=support). For a complaint, use the form on [Privacy Requests and Grievances](/legal/privacy-requests#data-request), which gives you a ticket number. We aim to answer refund and other complaint questions within 4 working days, and never later than one month.
 
-You can also write to our Grievance Officer: {{GRIEVANCE_OFFICER_NAME}}, {{GRIEVANCE_OFFICER_TITLE}}, at the email, phone and address below. We acknowledge a grievance within 48 hours and resolve it within one month. If you complain about something you bought, our acknowledgement gives you a ticket number, so you can ask about its status, and our Grievance Officer's first reply includes a copy of your complaint as we recorded it.
+You can also write to our Grievance Officer: Tanishq Jain, Director, at the email, phone and address below. We acknowledge a grievance within 48 hours and resolve it within one month. If you complain about something you bought, our acknowledgement gives you a ticket number, so you can ask about its status, and our Grievance Officer's first reply includes a copy of your complaint as we recorded it.
 
 ## Language
 
@@ -133,4 +133,4 @@ These Terms may also be available in Hindi. If a translation differs from the En
 
 ## Company details
 
-Jainav Infotech Private Limited. CIN {{CIN}}. Registered office: 8A Brejeshwary annex, near bangali square, Indore, Madhya Pradesh, 452016. Email: [support@jainavinfotech.in](mailto:support@jainavinfotech.in). Phone: +91 92441 17127. Website: [https://jainavinfotech.in](https://jainavinfotech.in). Hours: 9:00 am to 6:00 pm IST, {{BUSINESS_DAYS}}.
+Jainav Infotech Private Limited. CIN U62099MP2026PTC087972. Registered office: 8A Brejeshwary annex, near bangali square, Indore, Madhya Pradesh, 452016. Email: [support@jainavinfotech.in](mailto:support@jainavinfotech.in). Phone: +91 92441 17127. Website: [https://jainavinfotech.in](https://jainavinfotech.in). Hours: 9:00 am to 6:00 pm IST, Monday to Saturday.

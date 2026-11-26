@@ -1,10 +1,11 @@
 /**
  * pnpm seed:store — development only. Lets the store be tried locally (and in e2e runs) before
  * the real prices exist: paid plans without a price get a stand-in one and are switched on.
- * The real VYRO Pro price is {{TO_DECIDE}}; this refuses to run against anything but a local
- * database, so the stand-in never reaches staging or production.
+ * The seed now prices Clokrix Pro, so this matters only for a plan added without a price. It
+ * refuses to run against anything but a local database, so a stand-in never reaches staging or
+ * production.
  *
- * It also gives the dev customer (DEV_BUYER) a complimentary VYRO Pro license and prints its key,
+ * It also gives the dev customer (DEV_BUYER) a complimentary Clokrix Pro license and prints its key,
  * for scripts/license-test-client.
  */
 import { register } from 'node:module'
@@ -84,7 +85,7 @@ const pro =
       overrideAccess: true,
     }),
   ))
-if (!vyro || !pro) throw new Error('No VYRO Pro plan: run pnpm seed first.')
+if (!vyro || !pro) throw new Error('No Clokrix Pro plan: run pnpm seed first.')
 
 // The beforeChange hook generates the key; afterRead's licenseKey decrypts it.
 const license =
@@ -110,4 +111,4 @@ const license =
     depth: 0,
     overrideAccess: true,
   }))
-payload.logger.info(`${DEV_BUYER}'s VYRO license (${license.status}): ${license.licenseKey}`)
+payload.logger.info(`${DEV_BUYER}'s Clokrix license (${license.status}): ${license.licenseKey}`)

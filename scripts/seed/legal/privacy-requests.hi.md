@@ -37,12 +37,12 @@
 
 ## शिकायत अधिकारी
 
-{{GRIEVANCE_OFFICER_NAME}}, {{GRIEVANCE_OFFICER_TITLE}}, शिकायतें संभालते हैं और इस बारे में सवालों के जवाब देते हैं कि हम आपके व्यक्तिगत डेटा का इस्तेमाल कैसे करते हैं।
+शिकायतों के लिए, और इस बारे में सवालों के लिए कि हम आपके व्यक्तिगत डेटा का इस्तेमाल कैसे करते हैं, हमारे शिकायत अधिकारी तनिष्क जैन (निदेशक) से संपर्क करें।
 
 - ईमेल: [support@jainavinfotech.in](mailto:support@jainavinfotech.in)
 - फ़ोन: +91 92441 17127
-- पता: Jainav Infotech Private Limited, CIN {{CIN}}, 8A Brejeshwary annex, near bangali square, Indore, Madhya Pradesh, 452016
-- काम के घंटे: सुबह 9:00 बजे से शाम 6:00 बजे तक (IST), {{BUSINESS_DAYS}}
+- पता: Jainav Infotech Private Limited, CIN U62099MP2026PTC087972, 8A Brejeshwary annex, near bangali square, Indore, Madhya Pradesh, 452016
+- काम के घंटे: सोमवार से शनिवार, सुबह 9:00 बजे से शाम 6:00 बजे तक (IST)
 
 ## अगर आप संतुष्ट नहीं हैं
 

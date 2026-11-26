@@ -34,7 +34,7 @@ const COPY = {
     longText: 'Long text and select',
     other: 'Anything else?',
     notes: 'Internal notes (disabled)',
-    notesValue: 'Follow up after the VYRO Pro launch.',
+    notesValue: 'Follow up after the Clokrix Pro launch.',
     service: 'Service',
     chooseService: 'Choose a service',
     budget: 'Budget',
@@ -44,8 +44,8 @@ const COPY = {
     product: 'Which product are you interested in?',
     betaDisabled: 'Beta builds (disabled)',
     budgetDisabled: 'Budget (disabled)',
-    notifyPro: 'Tell me when VYRO Pro launches',
-    beta: 'Get beta builds of VYRO',
+    notifyPro: 'Tell me when Clokrix Pro launches',
+    beta: 'Get beta builds of Clokrix',
     autoUpdate: 'Automatic updates (managed by your organisation)',
     otp: 'One-time code',
     otpLabel: 'Sign-in code',
@@ -112,7 +112,7 @@ const COPY = {
     phone: 'Phone or WhatsApp (optional)',
     phoneHint: 'An Indian mobile number, if you’d like a call back.',
     consent: 'I agree that Jainav Infotech may store these details to reply to this enquiry.',
-    marketing: 'Also send me occasional product news about MenuMesh, VYRO and Baby.',
+    marketing: 'Also send me occasional product news about MenuMesh, Clokrix and Baby.',
     notice:
       'We use your details only to reply to you, and you can ask us to delete them at any time.',
     privacy: 'Privacy policy',
@@ -144,7 +144,7 @@ const COPY = {
     longText: 'लंबा टेक्स्ट और चयन',
     other: 'कुछ और बताना चाहेंगे?',
     notes: 'आंतरिक नोट्स (निष्क्रिय)',
-    notesValue: 'VYRO Pro लॉन्च होने के बाद संपर्क करें।',
+    notesValue: 'Clokrix Pro लॉन्च होने के बाद संपर्क करें।',
     service: 'सेवा',
     chooseService: 'सेवा चुनें',
     budget: 'बजट',
@@ -154,8 +154,8 @@ const COPY = {
     product: 'आपकी रुचि किस प्रोडक्ट में है?',
     betaDisabled: 'बीटा बिल्ड (निष्क्रिय)',
     budgetDisabled: 'बजट (निष्क्रिय)',
-    notifyPro: 'VYRO Pro लॉन्च होने पर मुझे बताएँ',
-    beta: 'VYRO के बीटा बिल्ड पाएँ',
+    notifyPro: 'Clokrix Pro लॉन्च होने पर मुझे बताएँ',
+    beta: 'Clokrix के बीटा बिल्ड पाएँ',
     autoUpdate: 'अपने-आप होने वाले अपडेट (आपकी संस्था द्वारा नियंत्रित)',
     otp: 'वन-टाइम कोड',
     otpLabel: 'साइन-इन कोड',
@@ -197,8 +197,7 @@ const COPY = {
       },
     ],
     details: 'आप क्या बनाना चाहते हैं?',
-    detailsHint:
-      'कुछ पंक्तियाँ काफ़ी हैं: समस्या क्या है, इसे कौन इस्तेमाल करेगा और अभी क्या-क्या मौजूद है।',
+    detailsHint: 'कुछ पंक्तियाँ काफ़ी हैं: समस्या क्या है, इसे कौन इस्तेमाल करेगा और अभी क्या-क्या मौजूद है।',
     detailsPlaceholder: 'यह क्या करेगा, और किसके लिए है?',
     website: 'मौजूदा वेबसाइट या ऐप (वैकल्पिक)',
     budgetQuestion: 'आपके मन में कितना बजट है?',
@@ -220,9 +219,8 @@ const COPY = {
     email: 'ईमेल',
     phone: 'फ़ोन या WhatsApp (वैकल्पिक)',
     phoneHint: 'भारतीय मोबाइल नंबर, अगर आप चाहते हैं कि हम आपको कॉल करें।',
-    consent:
-      'मैं सहमत हूँ कि Jainav Infotech इस पूछताछ का जवाब देने के लिए मेरी यह जानकारी सहेज सकती है।',
-    marketing: 'मुझे MenuMesh, VYRO और Baby से जुड़ी ख़बरें भी कभी-कभार भेजें।',
+    consent: 'मैं सहमत हूँ कि Jainav Infotech इस पूछताछ का जवाब देने के लिए मेरी यह जानकारी सहेज सकती है।',
+    marketing: 'मुझे MenuMesh, Clokrix और Baby से जुड़ी ख़बरें भी कभी-कभार भेजें।',
     notice:
       'आपकी जानकारी का इस्तेमाल सिर्फ़ आपको जवाब देने के लिए होता है, और आप कभी भी इसे हटाने के लिए कह सकते हैं।',
     privacy: 'गोपनीयता नीति',
@@ -247,12 +245,12 @@ type Copy = (typeof COPY)['en']
 const PRODUCTS = {
   en: [
     { value: 'menumesh', label: 'MenuMesh', description: 'QR table ordering for restaurants.' },
-    { value: 'vyro', label: 'VYRO', description: 'Know your machine.' },
+    { value: 'vyro', label: 'Clokrix', description: 'Know your machine.' },
     { value: 'baby', label: 'Baby', description: 'Your private voice assistant for Windows.' },
   ],
   hi: [
     { value: 'menumesh', label: 'MenuMesh', description: 'रेस्तराँ के लिए QR टेबल ऑर्डरिंग।' },
-    { value: 'vyro', label: 'VYRO', description: 'अपनी मशीन को जानिए।' },
+    { value: 'vyro', label: 'Clokrix', description: 'अपनी मशीन को जानिए।' },
     { value: 'baby', label: 'Baby', description: 'Windows के लिए आपका निजी वॉइस असिस्टेंट।' },
   ],
 }
@@ -459,7 +457,7 @@ export default function FormsSection() {
               type="search"
               size="sm"
               leadingIcon={<Search />}
-              placeholder="MenuMesh, VYRO, Baby…"
+              placeholder="MenuMesh, Clokrix, Baby…"
             />
           </FormField>
           <FormField label={c.mobile} error={c.errors.phone}>

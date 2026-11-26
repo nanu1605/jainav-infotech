@@ -88,11 +88,11 @@ On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/la
 - [ ] Sentry project, Umami website, HetrixTools monitors, heartbeats and status page; an uptime alert reaches Telegram.
 - [ ] A real restore test on the server.
 - [ ] SPF / DKIM / DMARC; mail-tester ≥ 9/10.
-- [ ] Legal review (docs/decisions.md, "Legal drafts"): blanks filled, then the Owner publishes every legal page but the EULA (§8.13). Final content check.
-- [ ] VYRO download in production: `pnpm import:release <tag>` (v1.4.0 was imported into dev as a draft on 2026-10-18; the latest is now v2.0.4, whose features the seeded copy doesn't mention), then the Owner publishes it.
+- [ ] Legal review (docs/decisions.md, "Legal drafts"): blanks filled, then the Owner publishes every legal page but the EULA (§8.13). Final content check. The company blanks are filled (2026-11-26); the lawyer's, the CA's and the refund window are left.
+- [ ] Clokrix (formerly VYRO) download in production: `pnpm import:release <tag>` (v1.4.0 was imported into dev as a draft on 2026-10-18; the latest is now v2.0.4, whose features the seeded copy doesn't mention), then the Owner publishes it. The Clokrix project was asked on 2026-11-26 where the live installer is.
 - [ ] Lighthouse on the production URLs (§15); LCP is judged only there. Locally `pnpm lhci` serves HTTP/1.1, reads LCP above 2.5 s and only warns on it; over HTTP/2 the four pages are under it (docs/decisions.md, "LCP budget").
 
-## Milestone C — VYRO store live (Launch 2)
+## Milestone C — Clokrix store live (Launch 2)
 
 ### Phase 7 — Accounts, checkout and invoices (Razorpay test mode)
 
@@ -108,7 +108,7 @@ In the repository (done; tested locally against the stand-in gateway, see docs/d
 With Tanishq's inputs (steps in docs/runbooks/store.md):
 
 - [ ] Razorpay test keys and webhook on staging; a test-mode purchase end to end, including the webhook; CSP checked in the browser.
-- [ ] VYRO plans and prices; from the CA: GST status, SAC code, export treatment, invoice prefix and format, signature line, how long orders and invoices are kept.
+- [ ] Clokrix plans and prices (decided 2026-11-26: Pro ₹10,000 one-time including GST, with 12 months of updates, and the free version stays); from the CA: GST status, SAC code, export treatment, invoice prefix and format, signature line, how long orders and invoices are kept.
 
 ### Phase 8 — Licensing
 
@@ -122,7 +122,7 @@ In the repository (done; tested locally with development keys, see docs/decision
 
 With Tanishq's inputs (steps in docs/runbooks/licensing.md):
 
-- [ ] Licensing keys generated and installed on staging and production; the public key embedded in VYRO.
+- [ ] Licensing keys generated and installed on staging and production; the public key embedded in Clokrix.
 - [ ] Confirm the activation limit (2), monthly deactivations (3), trial length (14 days) and updates policy (12 months, builds in that window stay Pro).
 - [ ] The test client run against staging.
 
@@ -161,10 +161,10 @@ With inputs (steps in docs/runbooks/retention.md):
 
 - [ ] Switch to Razorpay live keys (after activation).
 - [ ] A real purchase with a small amount, then a refund.
-- [ ] Owner publishes the final Terms, Refunds, Shipping and VYRO EULA (the checkout refuses orders until all four are live).
+- [ ] Owner publishes the final Terms, Refunds, Shipping and Clokrix EULA (the checkout refuses orders until all four are live).
 - [ ] Production smoke tests; set `storeEnabled = true`.
 
-Input still missing: a signed VYRO build that uses the licensing API. v1.4.0 (2026-10-18) has a valid update signature but no code signing (SmartScreen warns) and no licensing yet (spec §12.6).
+Input still missing: a signed Clokrix build that uses the licensing API. v1.4.0 (2026-10-18) has a valid update signature but no code signing (SmartScreen warns) and no licensing yet (spec §12.6). The installer is still unsigned (Tanishq, 2026-11-26); whether the current build has licensing was asked of the Clokrix project the same day.
 
 ## Milestone D — Growth (Phase 11+; order agreed after Launch 2)
 
@@ -172,7 +172,7 @@ Input still missing: a signed VYRO build that uses the licensing API. v1.4.0 (20
 - [ ] Look and feel: WebGL home hero; GSAP sequences if needed.
 - [ ] Store: Google sign-in; subscriptions (if chosen); international payments (if enabled); volume licenses and quantity > 1. (Update-feed eligibility via Bearer token is dropped: VYRO updates from GitHub, docs/decisions.md "VYRO updates".)
 - [ ] Baby: shared commerce API + cross-domain sign-in for Baby's website.
-- [ ] Growth: AI assistant, MenuMesh live demo, VYRO browser teaser, creator / affiliate program, verified-buyer reviews, comparison pages, site search, public roadmap, case studies, press kit, partner program, Startup India / Udyam badges.
+- [ ] Growth: AI assistant, MenuMesh live demo, Clokrix browser teaser, creator / affiliate program, verified-buyer reviews, comparison pages, site search, public roadmap, case studies, press kit, partner program, Startup India / Udyam badges.
 
 ## Anytime — Brand swap
 

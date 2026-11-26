@@ -37,12 +37,12 @@ You can withdraw consent at any time. We then stop that use within a reasonable 
 
 ## Grievance Officer
 
-{{GRIEVANCE_OFFICER_NAME}}, {{GRIEVANCE_OFFICER_TITLE}}, handles grievances and answers questions about how we use your personal data.
+Tanishq Jain, Director, handles grievances and answers questions about how we use your personal data.
 
 - Email: [support@jainavinfotech.in](mailto:support@jainavinfotech.in)
 - Phone: +91 92441 17127
-- Address: Jainav Infotech Private Limited, CIN {{CIN}}, 8A Brejeshwary annex, near bangali square, Indore, Madhya Pradesh, 452016
-- Hours: 9:00 am to 6:00 pm IST, {{BUSINESS_DAYS}}
+- Address: Jainav Infotech Private Limited, CIN U62099MP2026PTC087972, 8A Brejeshwary annex, near bangali square, Indore, Madhya Pradesh, 452016
+- Hours: 9:00 am to 6:00 pm IST, Monday to Saturday
 
 ## If you are not satisfied
 

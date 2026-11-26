@@ -17,7 +17,7 @@ export const ProductHero: Block = {
       options: [
         { label: 'None', value: 'none' },
         { label: 'MenuMesh', value: 'menumesh' },
-        { label: 'VYRO', value: 'vyro' },
+        { label: 'Clokrix', value: 'vyro' },
         { label: 'Baby', value: 'baby' },
       ],
       admin: { description: 'Signature animation in place of the media.' },
