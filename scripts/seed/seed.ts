@@ -335,6 +335,7 @@ export async function seed(payload: Payload): Promise<SeedSummary> {
   } else summary.skipped.push('site-settings')
 
   // Checkout records the Terms and EULA versions a buyer accepts: start with the seeded drafts'.
+  // The refund window that Refunds and Cancellation states is seeded with them.
   const commerce = await payload.findGlobal({
     slug: 'commerce-settings',
     depth: 0,

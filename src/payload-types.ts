@@ -4327,7 +4327,7 @@ export interface CommerceSetting {
    */
   currentEulaVersion?: string | null;
   /**
-   * From the refunds policy: {{REFUND_WINDOW_DAYS}}.
+   * The money-back window that Refunds and Cancellation states, in days. Nothing enforces it, so change it together with that page.
    */
   refundWindowDays?: number | null;
   defaultMaxActivations: number;
