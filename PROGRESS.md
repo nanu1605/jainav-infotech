@@ -89,7 +89,7 @@ On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/la
 - [ ] A real restore test on the server.
 - [ ] SPF / DKIM / DMARC; mail-tester ≥ 9/10.
 - [ ] Legal review (docs/decisions.md, "Legal drafts"): blanks filled, then the Owner publishes every legal page but the EULA (§8.13). Final content check. The company blanks are filled (2026-11-26); the lawyer's, the CA's and the refund window are left.
-- [ ] Clokrix (formerly VYRO) download in production: `pnpm import:release <tag>` (v1.4.0 was imported into dev as a draft on 2026-10-18; the latest is now v2.0.4, whose features the seeded copy doesn't mention), then the Owner publishes it. Where the live Clokrix installer is was asked of its chat on 2026-11-26.
+- [ ] Clokrix (formerly VYRO) download in production: `pnpm import:release <tag>` (v1.4.0 was imported into dev as a draft on 2026-10-18; the latest is now v2.0.4, whose features the seeded copy doesn't mention), then the Owner publishes it. The Clokrix project was asked on 2026-11-26 where the live installer is.
 - [ ] Lighthouse on the production URLs (§15); LCP is judged only there. Locally `pnpm lhci` serves HTTP/1.1, reads LCP above 2.5 s and only warns on it; over HTTP/2 the four pages are under it (docs/decisions.md, "LCP budget").
 
 ## Milestone C — Clokrix store live (Launch 2)
@@ -164,7 +164,7 @@ With inputs (steps in docs/runbooks/retention.md):
 - [ ] Owner publishes the final Terms, Refunds, Shipping and Clokrix EULA (the checkout refuses orders until all four are live).
 - [ ] Production smoke tests; set `storeEnabled = true`.
 
-Input still missing, until the Clokrix chat says otherwise: a signed Clokrix build that uses the licensing API. v1.4.0 (2026-10-18) has a valid update signature but no code signing (SmartScreen warns) and no licensing yet (spec §12.6).
+Input still missing: a signed Clokrix build that uses the licensing API. v1.4.0 (2026-10-18) has a valid update signature but no code signing (SmartScreen warns) and no licensing yet (spec §12.6). The installer is still unsigned (Tanishq, 2026-11-26); whether the current build has licensing was asked of the Clokrix project the same day.
 
 ## Milestone D — Growth (Phase 11+; order agreed after Launch 2)
 
