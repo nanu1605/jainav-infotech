@@ -74,7 +74,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
       {
         name: 'MenuMesh',
         slug: 'menumesh',
-        status: 'live',
+        status: 'beta',
         tagline: 'QR table ordering for restaurants.',
       },
       { name: 'Clokrix', slug: 'vyro', status: 'live', tagline: 'Know your machine.' },
@@ -184,7 +184,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
       {
         name: 'MenuMesh',
         slug: 'menumesh',
-        status: 'live',
+        status: 'beta',
         tagline: 'रेस्टोरेंट के लिए QR से टेबल पर ऑर्डर।',
       },
       { name: 'Clokrix', slug: 'vyro', status: 'live', tagline: 'अपनी मशीन को पहचानें।' },

@@ -234,7 +234,7 @@ export default function ContentSection() {
           </Card>
           <Card variant="interactive">
             <div className="mb-3 flex flex-wrap gap-2">
-              <StatusBadge status="live" />
+              <StatusBadge status="beta" />
               <PlatformBadge platform="web" />
             </div>
             <CardTitle href="/products/menumesh">MenuMesh</CardTitle>
@@ -242,7 +242,7 @@ export default function ContentSection() {
           </Card>
           <Card variant="interactive">
             <div className="mb-3 flex flex-wrap gap-2">
-              <StatusBadge status="beta" />
+              <StatusBadge status="live" />
               <PlatformBadge platform="windows" />
             </div>
             <CardTitle href="/products/vyro">Clokrix</CardTitle>

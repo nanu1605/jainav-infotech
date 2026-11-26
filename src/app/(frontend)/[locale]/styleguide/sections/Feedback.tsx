@@ -94,7 +94,7 @@ const COPY = {
 } satisfies Record<string, Text>
 
 const PRODUCTS = [
-  { name: 'MenuMesh', text: COPY.menumesh, status: 'live' },
+  { name: 'MenuMesh', text: COPY.menumesh, status: 'beta' },
   { name: 'Clokrix', text: COPY.vyro, status: 'live' },
   { name: 'Baby', text: COPY.baby, status: 'coming-soon' },
 ] as const
