@@ -1095,10 +1095,15 @@ export const legalPages: DraftSeedDoc<'legal-pages'>[] = [
 
 /**
  * Commerce settings (spec §9.2): the schema defaults, plus the seeded legal drafts' version as
- * the Terms and EULA a buyer accepts. GST stays off and the SAC code empty until the CA confirms
- * them ({{SAC_CODE}}, {{CONFIRM_WITH_CA}}).
+ * the Terms and EULA a buyer accepts, and the refund window that Refunds and Cancellation states
+ * (7 days, set by Tanishq on 2026-11-26; nothing enforces it). GST stays off and the SAC code
+ * empty until the CA confirms them ({{SAC_CODE}}, {{CONFIRM_WITH_CA}}).
  */
-export const commerceSettings = { currentTermsVersion: '0.1', currentEulaVersion: '0.1' }
+export const commerceSettings = {
+  currentTermsVersion: '0.1',
+  currentEulaVersion: '0.1',
+  refundWindowDays: 7,
+}
 
 // ─── Globals ─────────────────────────────────────────────────────────────────
 

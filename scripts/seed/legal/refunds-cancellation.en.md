@@ -1,4 +1,4 @@
-We are Jainav Infotech Private Limited. This page explains how cancelling and refunds work if you buy a paid plan on this website. In short: ask within {{REFUND_WINDOW_DAYS}} days of purchase and we refund you for any reason. After that, we fix or refund anything defective, deficient, not genuine, not as described or agreed, not delivered or delivered late. Nothing here takes away a right the law gives you, including under the Consumer Protection Act.
+We are Jainav Infotech Private Limited. This page explains how cancelling and refunds work if you buy a paid plan on this website. In short: ask within 7 days of purchase and we refund you for any reason. After that, we fix or refund anything defective, deficient, not genuine, not as described or agreed, not delivered or delivered late. Nothing here takes away a right the law gives you, including under the Consumer Protection Act.
 
 ## Who this page covers
 
@@ -14,7 +14,7 @@ We charge no cancellation fee. Once you have paid, cancelling means asking for a
 
 ## Money back for any reason
 
-If you ask within {{REFUND_WINDOW_DAYS}} days of purchase, we refund what you paid, for any reason, even if you have already activated your key. We count from the date on your order and invoice, in India time.
+If you ask within 7 days of purchase, we refund what you paid, for any reason, even if you have already activated your key. We count from the date on your order and invoice, in India time.
 
 ## Cases we always put right
 

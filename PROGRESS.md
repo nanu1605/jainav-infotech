@@ -88,7 +88,7 @@ On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/la
 - [ ] Sentry project, Umami website, HetrixTools monitors, heartbeats and status page; an uptime alert reaches Telegram.
 - [ ] A real restore test on the server.
 - [ ] SPF / DKIM / DMARC; mail-tester ≥ 9/10.
-- [ ] Legal review (docs/decisions.md, "Legal drafts"): blanks filled, then the Owner publishes every legal page but the EULA (§8.13). Final content check. The company blanks are filled (2026-11-26); the lawyer's, the CA's and the refund window are left.
+- [ ] Legal review (docs/decisions.md, "Legal drafts"): blanks filled, then the Owner publishes every legal page but the EULA (§8.13). Final content check. The company blanks and the refund window (7 days) are filled (2026-11-26); the lawyer's and the CA's are left.
 - [ ] Clokrix (formerly VYRO) download in production: `pnpm import:release <tag>` (v1.4.0 was imported into dev as a draft on 2026-10-18; the latest is now v2.0.4, whose features the seeded copy doesn't mention), then the Owner publishes it. The Clokrix project was asked on 2026-11-26 where the live installer is.
 - [ ] Lighthouse on the production URLs (§15); LCP is judged only there. Locally `pnpm lhci` serves HTTP/1.1, reads LCP above 2.5 s and only warns on it; over HTTP/2 the four pages are under it (docs/decisions.md, "LCP budget").
 
@@ -140,7 +140,7 @@ In the repository (done; tested locally with the stand-in gateway, see docs/deci
 With Tanishq's inputs (steps in docs/runbooks/store.md):
 
 - [ ] A test-mode refund from the admin and from Razorpay's dashboard on staging; the dispute and paid-twice paths if Razorpay's test mode can raise them.
-- [ ] From the CA: the credit note layout, the CA report's columns (CSV or XLSX, rate-wise or B2B/B2C splits) and the refund window.
+- [ ] From the CA: the credit note layout and the CA report's columns (CSV or XLSX, rate-wise or B2B/B2C splits). The refund window is set: 7 days (2026-11-26).
 
 ### Before the store opens: the store against the legal drafts
 

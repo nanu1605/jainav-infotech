@@ -12,9 +12,9 @@ Phase 6 in order (spec §20). Each step names who does it. Details are in the ot
   - phone and email addresses, business days;
   - the Grievance Officer's name and title.
 - [ ] Legal texts reviewed, ideally by a lawyer: drafts are in `scripts/seed/legal/`, and the seed
-      loads them. Decide the refund window and fill the other `{{PLACEHOLDERS}}`. The EULA waits for
-      Clokrix Pro: released builds are MIT or Apache-2.0 ([decisions](../decisions.md), "Legal
-      drafts").
+      loads them. The refund window is 7 days (2026-11-26); fill the other `{{PLACEHOLDERS}}`. The
+      EULA waits for Clokrix Pro: released builds are MIT or Apache-2.0
+      ([decisions](../decisions.md), "Legal drafts").
 
 ## The server in short
 

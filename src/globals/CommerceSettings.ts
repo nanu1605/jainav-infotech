@@ -189,7 +189,10 @@ export const CommerceSettings: GlobalConfig = {
               name: 'refundWindowDays',
               type: 'number',
               validate: positive,
-              admin: { description: 'From the refunds policy: {{REFUND_WINDOW_DAYS}}.' },
+              admin: {
+                description:
+                  'The money-back window that Refunds and Cancellation states, in days. Nothing enforces it, so change it together with that page.',
+              },
             },
           ],
         },
