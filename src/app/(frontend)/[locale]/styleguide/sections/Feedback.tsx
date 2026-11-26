@@ -29,7 +29,7 @@ const COPY = {
   neutral: { en: 'Neutral', hi: 'सामान्य' },
   success: { en: 'Success', hi: 'सफल' },
   danger: { en: 'Danger', hi: 'गड़बड़ी' },
-  updateReady: { en: 'A new version of VYRO is ready', hi: 'VYRO का नया वर्शन तैयार है' },
+  updateReady: { en: 'A new version of Clokrix is ready', hi: 'Clokrix का नया वर्शन तैयार है' },
   updateReadyText: {
     en: 'It installs the next time you open the app.',
     hi: 'अगली बार ऐप खोलने पर यह इंस्टॉल हो जाएगा।',
@@ -85,7 +85,7 @@ const COPY = {
   checkUpdates: { en: 'Check for updates', hi: 'अपडेट देखें' },
   checkOffline: { en: 'Check while offline', hi: 'ऑफ़लाइन रहते हुए जाँचें' },
   checking: { en: 'Checking…', hi: 'जाँच हो रही है…' },
-  upToDate: { en: 'VYRO is up to date', hi: 'VYRO अप टू डेट है' },
+  upToDate: { en: 'Clokrix is up to date', hi: 'Clokrix अप टू डेट है' },
   upToDateText: {
     en: 'You have 1.4.0, the latest stable release.',
     hi: 'आपके पास 1.4.0 है, जो सबसे नया स्टेबल रिलीज़ है।',
@@ -95,7 +95,7 @@ const COPY = {
 
 const PRODUCTS = [
   { name: 'MenuMesh', text: COPY.menumesh, status: 'live' },
-  { name: 'VYRO', text: COPY.vyro, status: 'beta' },
+  { name: 'Clokrix', text: COPY.vyro, status: 'live' },
   { name: 'Baby', text: COPY.baby, status: 'coming-soon' },
 ] as const
 

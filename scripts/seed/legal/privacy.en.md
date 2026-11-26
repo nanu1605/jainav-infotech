@@ -1,4 +1,4 @@
-We are Jainav Infotech Private Limited, CIN {{CIN}}. We collect and keep the personal data described here. This policy covers this website, our store and our licensing service. It does not cover what an app does on your device. MenuMesh and Baby have or will have their own websites and policies. If you use one and cannot find its policy, [ask us](/contact?topic=support).
+We are Jainav Infotech Private Limited, CIN U62099MP2026PTC087972. We collect and keep the personal data described here. This policy covers this website, our store and our licensing service. It does not cover what an app does on your device. MenuMesh and Baby have or will have their own websites and policies. If you use one and cannot find its policy, [ask us](/contact?topic=support).
 
 In short: we use your data to reply to you, run your account, orders and licenses if you have them, keep this site working and see how it is used, and, only if you choose, email you news. Some is collected even if you only read our pages (see Technical data). The companies under Who receives it get some of it. To ask what we hold, correct it, ask us to delete it or complain, use [Privacy Requests and Grievances](/legal/privacy-requests).
 
@@ -129,11 +129,11 @@ We may change this policy. This page shows the current version and effective dat
 
 ## Grievance Officer
 
-{{GRIEVANCE_OFFICER_NAME}}, {{GRIEVANCE_OFFICER_TITLE}}, handles grievances and answers questions about how we use your personal data.
+Tanishq Jain, Director, handles grievances and answers questions about how we use your personal data.
 
 - Email: [support@jainavinfotech.in](mailto:support@jainavinfotech.in)
 - Phone: +91 92441 17127
 - Address: Jainav Infotech Private Limited, 8A Brejeshwary annex, near bangali square, Indore, Madhya Pradesh, 452016
-- Hours: 9:00 am to 6:00 pm IST, {{BUSINESS_DAYS}}
+- Hours: 9:00 am to 6:00 pm IST, Monday to Saturday
 
 We acknowledge a grievance within 48 hours and resolve it within one month. For refunds and other purchase complaints, see [Refunds and Cancellation](/legal/refunds-cancellation).

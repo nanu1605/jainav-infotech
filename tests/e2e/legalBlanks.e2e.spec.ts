@@ -80,14 +80,26 @@ test('the footer names the Grievance Officer once set, in both languages', async
   request,
 }) => {
   test.skip(!process.env.DEV_ADMIN_EMAIL, 'Needs the seeded Owner (DEV_ADMIN_* in .env)')
-  const token = await ownerToken(request)
+  const headers = { Authorization: `JWT ${await ownerToken(request)}` }
+  type Officer = { name?: string | null; title?: string | null }
+  const officerIn = async (locale: 'en' | 'hi'): Promise<Officer> => {
+    const res = await request.get(
+      `/api/globals/site-settings?locale=${locale}&fallback-locale=none`,
+      { headers },
+    )
+    expect(res.status()).toBe(200)
+    const body = (await res.json()) as { company?: { grievanceOfficer?: Officer | null } }
+    return body.company?.grievanceOfficer ?? {}
+  }
   const setOfficer = async (locale: 'en' | 'hi', name: string | null, title: string | null) => {
     const res = await request.post(`/api/globals/site-settings?locale=${locale}`, {
-      headers: { Authorization: `JWT ${token}` },
+      headers,
       data: { company: { grievanceOfficer: { name, title } } },
     })
     expect(res.status()).toBe(200)
   }
+  // The seed names the real officer: put back whatever this database had.
+  const before = { en: await officerIn('en'), hi: await officerIn('hi') }
   const legal = page.locator('footer address')
   try {
     await setOfficer('en', 'Asha Rao', 'Director')
@@ -105,12 +117,22 @@ test('the footer names the Grievance Officer once set, in both languages', async
     await page.goto('/hi')
     await expect(legal).toContainText('शिकायत अधिकारी: Asha Rao')
     await expect(legal).not.toContainText('Director')
-  } finally {
-    await setOfficer('hi', null, null)
+
+    // Without a name, the footer leaves the officer out.
     await setOfficer('en', null, null)
+    await page.goto('/')
+    await expect(legal).not.toContainText('Grievance Officer')
+  } finally {
+    // English first, since Hindi falls back to it; each restore runs even if the other fails.
+    const failed: unknown[] = []
+    for (const locale of ['en', 'hi'] as const) {
+      const officer = before[locale]
+      await setOfficer(locale, officer.name ?? null, officer.title ?? null).catch(
+        (error: unknown) => failed.push(error),
+      )
+    }
+    if (failed.length) throw failed[0]
   }
-  await page.goto('/')
-  await expect(legal).not.toContainText('Grievance Officer')
 })
 
 test('the admin refuses to publish a blank in the other language, and names it', async ({

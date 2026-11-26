@@ -22,8 +22,9 @@ const draftHi = { hiStatus: 'draft' } as const
 // ─── Products ────────────────────────────────────────────────────────────────
 
 // Product copy checked against each product's own code, site and releases on 2026-10-16
-// (MenuMesh: its repo and menumesh.in; Baby: nanu1605/baby v6.0.1; VYRO: nanu1605/vyro and
-// vyro-releases v0.3.0). MenuMesh's Hindi follows MenuMesh's own approved words (ग्राहक, डिश).
+// (MenuMesh: its repo and menumesh.in; Baby: nanu1605/baby v6.0.1; Clokrix, then called VYRO:
+// nanu1605/vyro and vyro-releases v0.3.0). MenuMesh's Hindi follows MenuMesh's own approved
+// words (ग्राहक, डिश).
 export const products: SeedDoc<'products'>[] = [
   {
     en: {
@@ -35,7 +36,7 @@ export const products: SeedDoc<'products'>[] = [
       type: 'saas',
       category: 'restaurants',
       platforms: ['web'],
-      status: 'live', // {{CONFIRM}}: menumesh.in is still a holding page; 'beta' until it opens?
+      status: 'beta', // menumesh.in is still a holding page (Tanishq, 2026-11-26)
       hostingMode: 'external',
       externalUrl: 'https://menumesh.in',
       accentColor: '#FF6606', // MenuMesh's brand orange
@@ -457,7 +458,7 @@ export const products: SeedDoc<'products'>[] = [
   },
   {
     en: {
-      name: 'VYRO',
+      name: 'Clokrix',
       slug: 'vyro',
       tagline: 'Know your machine.',
       summary:
@@ -465,9 +466,9 @@ export const products: SeedDoc<'products'>[] = [
       type: 'desktop',
       category: 'pc-tools',
       platforms: ['windows'],
-      status: 'beta', // {{CONFIRM}}
+      status: 'live',
       hostingMode: 'hosted',
-      accentColor: '#4CC9F0', // VYRO's app accent
+      accentColor: '#4CC9F0', // Clokrix's app accent
       primaryButton: { type: 'download', channel: 'stable' },
       // secondaryButton (Buy Pro) is linked to the Pro plan once plans exist (see seed.ts).
       featured: true,
@@ -476,7 +477,7 @@ export const products: SeedDoc<'products'>[] = [
       layout: [
         {
           blockType: 'productHero',
-          eyebrow: 'VYRO by Jainav',
+          eyebrow: 'Clokrix by Jainav',
           heading: 'Know your machine.',
           subheading: 'Live temperatures, fan speeds, voltages and clocks in a light, fast app.',
           animation: 'vyro',
@@ -542,7 +543,7 @@ export const products: SeedDoc<'products'>[] = [
             {
               icon: 'repeat',
               title: 'Automatic game profiles',
-              text: 'Start a game and VYRO switches its profile, fan settings and overlay. Quit, and everything goes back.',
+              text: 'Start a game and Clokrix switches its profile, fan settings and overlay. Quit, and everything goes back.',
             },
             {
               icon: 'rewind',
@@ -577,9 +578,9 @@ export const products: SeedDoc<'products'>[] = [
         { blockType: 'pricing', heading: 'Free and Pro', source: 'plans' },
         {
           blockType: 'download',
-          heading: 'Download VYRO',
+          heading: 'Download Clokrix',
           channel: 'stable',
-          note: 'The installer isn’t code-signed yet, so Windows SmartScreen may warn before it runs. Setup also installs the PawnIO driver, which VYRO uses to read CPU, fan and memory sensors.',
+          note: 'The installer isn’t code-signed yet, so Windows SmartScreen may warn before it runs. Setup also installs the PawnIO driver, which Clokrix uses to read CPU, fan and memory sensors.',
         },
       ],
     },
@@ -589,7 +590,7 @@ export const products: SeedDoc<'products'>[] = [
         'देखिए आपका Windows PC अभी क्या कर रहा है, एनिमेटेड गेज पर: इस्तेमाल, क्लॉक, तापमान, पावर और फ़ैन स्पीड, साथ में सात दिन की हिस्ट्री, हेल्थ चेक और अलर्ट। गेमर्स के लिए फ़्रेम रेट, गेम के ऊपर ओवरले और हाल के गेम सेशन का रीप्ले भी।',
       layout: [
         {
-          eyebrow: 'VYRO, Jainav की ओर से',
+          eyebrow: 'Clokrix, Jainav की ओर से',
           heading: 'अपनी मशीन को जानिए।',
           subheading: 'लाइव तापमान, फ़ैन स्पीड, वोल्टेज और क्लॉक, एक हल्के और तेज़ ऐप में।',
         },
@@ -636,7 +637,7 @@ export const products: SeedDoc<'products'>[] = [
             },
             {
               title: 'अपने-आप बदलने वाली गेम प्रोफ़ाइल',
-              text: 'गेम शुरू करते ही VYRO प्रोफ़ाइल, फ़ैन सेटिंग और ओवरले बदल देता है। गेम बंद करते ही सब पहले जैसा।',
+              text: 'गेम शुरू करते ही Clokrix प्रोफ़ाइल, फ़ैन सेटिंग और ओवरले बदल देता है। गेम बंद करते ही सब पहले जैसा।',
             },
             {
               title: 'सेशन रीप्ले',
@@ -668,15 +669,19 @@ export const products: SeedDoc<'products'>[] = [
         },
         { heading: 'Free और Pro' },
         {
-          heading: 'VYRO डाउनलोड करें',
-          note: 'इंस्टॉलर अभी कोड-साइन नहीं है, इसलिए चलाने से पहले Windows SmartScreen चेतावनी दिखा सकता है। सेटअप PawnIO ड्राइवर भी इंस्टॉल करता है, जिससे VYRO CPU, फ़ैन और मेमोरी के सेंसर पढ़ता है।',
+          heading: 'Clokrix डाउनलोड करें',
+          note: 'इंस्टॉलर अभी कोड-साइन नहीं है, इसलिए चलाने से पहले Windows SmartScreen चेतावनी दिखा सकता है। सेटअप PawnIO ड्राइवर भी इंस्टॉल करता है, जिससे Clokrix CPU, फ़ैन और मेमोरी के सेंसर पढ़ता है।',
         },
       ],
     },
   },
 ]
 
-/** VYRO plans. Free vs Pro feature split and the Pro price are {{TO_DECIDE}} (spec Appendix A). */
+/**
+ * Clokrix plans, as Tanishq set them on 2026-11-26: a free version, and Pro at ₹10,000 including
+ * GST ($100 elsewhere), one-time, with 12 months of updates. priceUSD is stored but not shown: the
+ * site sells in INR only (docs/decisions.md).
+ */
 export const vyroPlans: {
   en: Omit<RequiredDataFromCollectionSlug<'plans'>, 'product'>
   hi: HiPatch
@@ -693,16 +698,17 @@ export const vyroPlans: {
     hi: { name: 'फ़्री' },
   },
   {
-    // Inactive until the price is decided; 12 months of updates and 2 devices are the spec §22 defaults.
+    // "Lifetime" is the license, not the updates; 2 devices is the spec §22 default.
     en: {
       code: 'pro',
       name: 'Pro',
       billing: 'one_time',
-      priceINR: null, // {{TO_DECIDE}}
+      priceINR: 10_000_00,
+      priceUSD: 100_00,
       maxActivations: 2,
       updatesForMonths: 12,
       highlight: true,
-      active: false,
+      active: true,
       sortOrder: 2,
     },
     hi: { name: 'प्रो' },
@@ -730,11 +736,7 @@ export const services: (SeedDoc<'services'> & { related: string[] })[] = [
     hi: {
       title: 'कस्टम सॉफ़्टवेयर और SaaS',
       summary: 'वेब ऐप, SaaS प्लेटफ़ॉर्म, और मोबाइल व डेस्कटॉप ऐप।',
-      capabilities: [
-        { text: 'वेब ऐप' },
-        { text: 'SaaS प्लेटफ़ॉर्म' },
-        { text: 'मोबाइल और डेस्कटॉप ऐप' },
-      ],
+      capabilities: [{ text: 'वेब ऐप' }, { text: 'SaaS प्लेटफ़ॉर्म' }, { text: 'मोबाइल और डेस्कटॉप ऐप' }],
     },
   },
   {
@@ -828,11 +830,11 @@ export const founder: SeedDoc<'team'> = {
   en: {
     name: 'Tanishq Jain',
     role: 'Founder',
-    // From Tanishq's resume and the MenuMesh and VYRO repos (2026-10-16); written without pronouns.
-    bio: 'Tanishq Jain founded Jainav Infotech and builds its products. MenuMesh is a QR table-ordering platform for restaurants, built with Next.js and Supabase, that takes an order from the guest’s phone through the kitchen to a GST bill. VYRO is a light Windows hardware monitor written in Rust and Svelte, with live sensors, history, health alerts and in-game frame rates. Baby is a voice assistant for Windows that keeps speech recognition and memory on the PC.\n\nBefore Jainav, Tanishq spent a year and a half as a software engineer at Bosch Global Software Technologies in Bangalore, building CI/CD pipelines and moving services to Docker and Kubernetes, then built a complete online counselling platform as a freelancer, from bookings to Razorpay payments. Tanishq was selected for Google Summer of Code 2022 (the PEcAn project) and studied Computer Science and Engineering at Bangalore Institute of Technology.',
-    // {{CONFIRM}}: drafted from the products' principles; Tanishq to approve or replace.
+    // From Tanishq's resume and the MenuMesh and VYRO (now Clokrix) repos (2026-10-16); written
+    // without pronouns.
+    bio: 'Tanishq Jain founded Jainav Infotech and builds its products. MenuMesh is a QR table-ordering platform for restaurants, built with Next.js and Supabase, that takes an order from the guest’s phone through the kitchen to a GST bill. Clokrix is a light Windows hardware monitor written in Rust and Svelte, with live sensors, history, health alerts and in-game frame rates. Baby is a voice assistant for Windows that keeps speech recognition and memory on the PC.\n\nBefore Jainav, Tanishq spent a year and a half as a software engineer at Bosch Global Software Technologies in Bangalore, building CI/CD pipelines and moving services to Docker and Kubernetes, then built a complete online counselling platform as a freelancer, from bookings to Razorpay payments. Tanishq was selected for Google Summer of Code 2022 (the PEcAn project) and studied Computer Science and Engineering at Bangalore Institute of Technology.',
     quote:
-      'Software should be something you would want to use yourself: light on your machine, clear about what it does, and private from the start.',
+      'If a hardware monitor slows down the game it’s measuring, it isn’t doing its job. I try to hold everything I build to tests that simple.',
     links: [
       { label: 'LinkedIn', url: 'https://www.linkedin.com/in/tanishqjain010' },
       { label: 'Instagram', url: 'https://www.instagram.com/tan.ishq_1605/' },
@@ -842,9 +844,9 @@ export const founder: SeedDoc<'team'> = {
   },
   hi: {
     role: 'संस्थापक',
-    bio: 'तनिष्क जैन Jainav Infotech के संस्थापक हैं, और इसके प्रोडक्ट इन्हीं के बनाए हैं। MenuMesh रेस्टोरेंट के लिए QR टेबल-ऑर्डरिंग प्लैटफ़ॉर्म है, जो Next.js और Supabase पर बना है और ऑर्डर को ग्राहक के फ़ोन से किचन होते हुए GST बिल तक ले जाता है। VYRO, Rust और Svelte में लिखा एक हल्का Windows हार्डवेयर मॉनिटर है, जिसमें लाइव सेंसर, हिस्ट्री, हेल्थ अलर्ट और गेम के फ़्रेम रेट दिखते हैं। Baby, Windows के लिए वॉइस असिस्टेंट है, जो स्पीच रिकग्निशन और मेमोरी PC पर ही रखता है।\n\nJainav से पहले तनिष्क ने बेंगलुरु में Bosch Global Software Technologies में डेढ़ साल सॉफ़्टवेयर इंजीनियर के रूप में काम किया: CI/CD पाइपलाइन बनाईं और सर्विसेज़ को Docker और Kubernetes पर चलाया। फिर फ़्रीलांसर के तौर पर एक पूरा ऑनलाइन काउंसलिंग प्लैटफ़ॉर्म बनाया, बुकिंग से लेकर Razorpay पेमेंट तक। Google Summer of Code 2022 (PEcAn प्रोजेक्ट) में तनिष्क का चयन हुआ था, और पढ़ाई Bangalore Institute of Technology से कंप्यूटर साइंस एंड इंजीनियरिंग में की।',
+    bio: 'तनिष्क जैन Jainav Infotech के संस्थापक हैं, और इसके प्रोडक्ट इन्हीं के बनाए हैं। MenuMesh रेस्टोरेंट के लिए QR टेबल-ऑर्डरिंग प्लैटफ़ॉर्म है, जो Next.js और Supabase पर बना है और ऑर्डर को ग्राहक के फ़ोन से किचन होते हुए GST बिल तक ले जाता है। Clokrix, Rust और Svelte में लिखा एक हल्का Windows हार्डवेयर मॉनिटर है, जिसमें लाइव सेंसर, हिस्ट्री, हेल्थ अलर्ट और गेम के फ़्रेम रेट दिखते हैं। Baby, Windows के लिए वॉइस असिस्टेंट है, जो स्पीच रिकग्निशन और मेमोरी PC पर ही रखता है।\n\nJainav से पहले तनिष्क ने बेंगलुरु में Bosch Global Software Technologies में डेढ़ साल सॉफ़्टवेयर इंजीनियर के रूप में काम किया: CI/CD पाइपलाइन बनाईं और सर्विसेज़ को Docker और Kubernetes पर चलाया। फिर फ़्रीलांसर के तौर पर एक पूरा ऑनलाइन काउंसलिंग प्लैटफ़ॉर्म बनाया, बुकिंग से लेकर Razorpay पेमेंट तक। Google Summer of Code 2022 (PEcAn प्रोजेक्ट) में तनिष्क का चयन हुआ था, और पढ़ाई Bangalore Institute of Technology से कंप्यूटर साइंस एंड इंजीनियरिंग में की।',
     quote:
-      'सॉफ़्टवेयर ऐसा होना चाहिए जिसे ख़ुद इस्तेमाल करने का मन करे: मशीन पर हल्का, अपने काम के बारे में साफ़, और शुरू से ही प्राइवेट।',
+      'अगर हार्डवेयर मॉनिटर उसी गेम को धीमा कर दे जिसे वह माप रहा है, तो वह अपना काम ठीक से नहीं कर रहा। मेरी कोशिश रहती है कि मैं जो भी बनाऊँ, वह ऐसी ही सीधी कसौटियों पर खरा उतरे।',
   },
 }
 
@@ -853,14 +855,14 @@ export const faqs: SeedDoc<'faqs'>[] = [
     en: {
       question: 'What does Jainav Infotech do?',
       answer:
-        'We build our own software products, MenuMesh, VYRO and Baby, and custom software for businesses.',
+        'We build our own software products, MenuMesh, Clokrix and Baby, and custom software for businesses.',
       category: 'general',
       sortOrder: 1,
     },
     hi: {
       question: 'Jainav Infotech क्या करता है?',
       answer:
-        'हम अपने सॉफ़्टवेयर प्रोडक्ट, MenuMesh, VYRO और Baby, और व्यवसायों के लिए कस्टम सॉफ़्टवेयर बनाते हैं।',
+        'हम अपने सॉफ़्टवेयर प्रोडक्ट, MenuMesh, Clokrix और Baby, और व्यवसायों के लिए कस्टम सॉफ़्टवेयर बनाते हैं।',
     },
   },
   {
@@ -950,7 +952,7 @@ export const pages: SeedDoc<'pages'>[] = [
           blockType: 'hero',
           headline: 'Software we build, and software we build for you.',
           subheadline:
-            'Products like MenuMesh, VYRO and Baby, plus custom software for your business.',
+            'Products like MenuMesh, Clokrix and Baby, plus custom software for your business.',
           primary: { label: 'Explore products', href: '/products' },
           secondary: { label: 'Build with us', href: '/services' },
           chips: [
@@ -973,8 +975,7 @@ export const pages: SeedDoc<'pages'>[] = [
       layout: [
         {
           headline: 'सॉफ़्टवेयर जो हम बनाते हैं, और जो हम आपके लिए बनाते हैं।',
-          subheadline:
-            'MenuMesh, VYRO और Baby जैसे प्रोडक्ट, और आपके व्यवसाय के लिए कस्टम सॉफ़्टवेयर।',
+          subheadline: 'MenuMesh, Clokrix और Baby जैसे प्रोडक्ट, और आपके व्यवसाय के लिए कस्टम सॉफ़्टवेयर।',
           primary: { label: 'प्रोडक्ट देखें' },
           secondary: { label: 'हमारे साथ बनाएँ' },
           chips: [
@@ -1033,7 +1034,7 @@ export const pages: SeedDoc<'pages'>[] = [
         {
           blockType: 'hero',
           headline: 'We built these. We can build yours.',
-          subheadline: 'Custom software from the team behind MenuMesh, VYRO and Baby.',
+          subheadline: 'Custom software from the team behind MenuMesh, Clokrix and Baby.',
           primary: { label: 'Start a project', href: '/services#start' },
         },
         { blockType: 'servicesOverview', heading: 'What we do' },
@@ -1056,7 +1057,7 @@ export const pages: SeedDoc<'pages'>[] = [
       layout: [
         {
           headline: 'ये हमने बनाए। आपका भी बना सकते हैं।',
-          subheadline: 'MenuMesh, VYRO और Baby बनाने वाली टीम से कस्टम सॉफ़्टवेयर।',
+          subheadline: 'MenuMesh, Clokrix और Baby बनाने वाली टीम से कस्टम सॉफ़्टवेयर।',
           primary: { label: 'प्रोजेक्ट शुरू करें' },
         },
         { heading: 'हम क्या करते हैं' },
@@ -1084,7 +1085,7 @@ export const legalPages: DraftSeedDoc<'legal-pages'>[] = [
   ['terms', 'Terms of Service', 'सेवा की शर्तें'],
   ['refunds-cancellation', 'Refunds and Cancellation', 'रिफ़ंड और रद्दीकरण'],
   ['shipping-delivery', 'Shipping and Delivery', 'शिपिंग और डिलीवरी'],
-  ['eula-vyro', 'VYRO End User License Agreement', 'VYRO अंतिम उपयोगकर्ता लाइसेंस अनुबंध'],
+  ['eula-vyro', 'Clokrix End User License Agreement', 'Clokrix अंतिम उपयोगकर्ता लाइसेंस अनुबंध'],
   ['cookies', 'Cookie Policy', 'कुकी नीति'],
   ['privacy-requests', 'Privacy Requests and Grievances', 'गोपनीयता अनुरोध और शिकायतें'],
 ].map(([slug, title, titleHi]) => ({
@@ -1105,7 +1106,8 @@ export const siteSettings = {
   en: {
     company: {
       legalName: 'Jainav Infotech Private Limited',
-      cin: '{{CIN}}',
+      cin: 'U62099MP2026PTC087972',
+      gstin: '23AAHCJ6800H1ZS',
       registeredAddress:
         '8A Brejeshwary annex, near bangali square, Indore, Madhya Pradesh, 452016',
       phone: '+91 92441 17127',
@@ -1118,7 +1120,8 @@ export const siteSettings = {
         careers: 'support@jainavinfotech.in',
         privacy: 'support@jainavinfotech.in',
       },
-      businessHours: '9:00 am – 6:00 pm IST', // {{BUSINESS_DAYS}}
+      businessHours: 'Monday to Saturday, 9:00 am – 6:00 pm IST',
+      grievanceOfficer: { name: 'Tanishq Jain', title: 'Director' },
     },
     storeEnabled: false,
     maintenanceMode: false,
@@ -1128,7 +1131,10 @@ export const siteSettings = {
     },
   },
   hi: {
-    company: { businessHours: 'सुबह 9:00 बजे से शाम 6:00 बजे तक (IST)' },
+    company: {
+      businessHours: 'सोमवार से शनिवार, सुबह 9:00 बजे से शाम 6:00 बजे तक (IST)',
+      grievanceOfficer: { name: 'तनिष्क जैन', title: 'निदेशक' },
+    },
     defaultSeo: {
       title: 'Jainav Infotech',
       description: 'इंदौर, भारत से सॉफ़्टवेयर प्रोडक्ट और कस्टम सॉफ़्टवेयर।',
@@ -1150,7 +1156,7 @@ export const navigation = {
         title: 'Products',
         links: [
           { label: 'MenuMesh', href: '/products/menumesh' },
-          { label: 'VYRO', href: '/products/vyro' },
+          { label: 'Clokrix', href: '/products/vyro' },
           { label: 'Baby', href: '/products/baby' },
         ],
       },
@@ -1189,7 +1195,7 @@ export const navigation = {
     footer: [
       {
         title: 'प्रोडक्ट',
-        links: [{ label: 'MenuMesh' }, { label: 'VYRO' }, { label: 'Baby' }],
+        links: [{ label: 'MenuMesh' }, { label: 'Clokrix' }, { label: 'Baby' }],
       },
       {
         title: 'कंपनी',

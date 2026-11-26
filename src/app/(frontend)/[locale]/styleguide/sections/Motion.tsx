@@ -218,7 +218,7 @@ export default function MotionSection() {
         <Demo name="Tilt">
           <Tilt>
             <div className="rounded-lg border border-border bg-surface p-6 shadow-md">
-              <p className="font-display text-xl font-semibold text-fg">VYRO</p>
+              <p className="font-display text-xl font-semibold text-fg">Clokrix</p>
               <p className="mt-2 text-fg-muted">{copy.tilt[locale]}</p>
             </div>
           </Tilt>

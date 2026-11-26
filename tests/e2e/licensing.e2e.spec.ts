@@ -1,5 +1,5 @@
 /**
- * Phase 8 account licensing in a real browser (spec §19 "Account device deactivation"): buy VYRO
+ * Phase 8 account licensing in a real browser (spec §19 "Account device deactivation"): buy Clokrix
  * Pro through the stand-in gateway, activate two devices with the key from the order email, see
  * both on the Licenses page, deactivate one there and use the freed slot; then axe on Licenses and
  * Downloads in both languages. Needs the dev server (the stand-in gateway), so it skips against
@@ -18,10 +18,13 @@ test.describe.configure({ timeout: 180_000 })
 
 test.beforeEach(({ page }, info) => useOwnIp(page, info))
 
-/** `VYRO-` and four groups of five Crockford Base32 characters (no I, L, O or U). */
+/**
+ * `VYRO-` and four groups of five Crockford Base32 characters (no I, L, O or U). The prefix comes
+ * from the product slug, which stays `vyro` after the rename to Clokrix.
+ */
 const KEY = /\bVYRO(?:-[0-9A-HJKMNP-TV-Z]{5}){4}\b/
 
-/** POST /api/v1/licensing/activate as VYRO would, from a new device each time. */
+/** POST /api/v1/licensing/activate as Clokrix would, from a new device each time. */
 const activate = (
   request: APIRequestContext,
   info: TestInfo,
@@ -59,7 +62,7 @@ test('a device deactivated from the account frees its slot', async ({ page, requ
   )
 
   await page.goto('/account/licenses')
-  const license = page.getByRole('region', { name: 'VYRO Pro' })
+  const license = page.getByRole('region', { name: 'Clokrix Pro' })
   await expect(license.getByLabel('License key')).toHaveValue(key)
   const devices = license.getByRole('listitem')
   await expect(devices).toHaveCount(2)
@@ -93,7 +96,7 @@ test('a device deactivated from the account frees its slot', async ({ page, requ
   await expect(license).toContainText('THIRD-PC')
 
   await page.goto('/account/downloads')
-  await expect(page.getByRole('heading', { level: 2, name: 'VYRO' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'Clokrix' })).toBeVisible()
 
   for (const url of [
     '/account/licenses',

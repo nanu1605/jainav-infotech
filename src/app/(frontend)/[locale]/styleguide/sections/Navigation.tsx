@@ -77,7 +77,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
         status: 'live',
         tagline: 'QR table ordering for restaurants.',
       },
-      { name: 'VYRO', slug: 'vyro', status: 'beta', tagline: 'Know your machine.' },
+      { name: 'Clokrix', slug: 'vyro', status: 'live', tagline: 'Know your machine.' },
       {
         name: 'Baby',
         slug: 'baby',
@@ -90,7 +90,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
         title: 'Products',
         links: [
           { label: 'MenuMesh', href: '/products/menumesh' },
-          { label: 'VYRO', href: '/products/vyro' },
+          { label: 'Clokrix', href: '/products/vyro' },
           { label: 'Baby', href: '/products/baby' },
           { label: 'All products', href: '/products' },
         ],
@@ -147,7 +147,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
       ],
     },
     filler:
-      'MenuMesh, VYRO and Baby are software products built and run by Jainav Infotech in Indore. We also build custom software for businesses.',
+      'MenuMesh, Clokrix and Baby are software products built and run by Jainav Infotech in Indore. We also build custom software for businesses.',
     announcements: [
       {
         id: 'styleguide-baby',
@@ -160,7 +160,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
       [
         { label: 'Home', href: '/' },
         { label: 'Products', href: '/products' },
-        { label: 'VYRO', href: '/products/vyro' },
+        { label: 'Clokrix', href: '/products/vyro' },
         { label: 'Pricing' },
       ],
       [
@@ -187,7 +187,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
         status: 'live',
         tagline: 'रेस्टोरेंट के लिए QR से टेबल पर ऑर्डर।',
       },
-      { name: 'VYRO', slug: 'vyro', status: 'beta', tagline: 'अपनी मशीन को पहचानें।' },
+      { name: 'Clokrix', slug: 'vyro', status: 'live', tagline: 'अपनी मशीन को पहचानें।' },
       {
         name: 'Baby',
         slug: 'baby',
@@ -200,7 +200,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
         title: 'प्रोडक्ट',
         links: [
           { label: 'MenuMesh', href: '/products/menumesh' },
-          { label: 'VYRO', href: '/products/vyro' },
+          { label: 'Clokrix', href: '/products/vyro' },
           { label: 'Baby', href: '/products/baby' },
           { label: 'सभी प्रोडक्ट', href: '/products' },
         ],
@@ -236,16 +236,10 @@ const COPY: Record<'en' | 'hi', Copy> = {
         'डेस्कटॉप ब्रेकपॉइंट से छोटी स्क्रीन पर मेन्यू बटन पूरी स्क्रीन वाला मेन्यू खोलता है।',
       ],
       megaMenu: ['मेगा-मेन्यू', 'देखने के लिए यहाँ खुला है; बंद करने के लिए बाहर क्लिक करें।'],
-      footer: [
-        'फ़ुटर',
-        'लिंक कॉलम, न्यूज़लेटर की जगह, सोशल लिंक, भाषा बदलने का विकल्प और क़ानूनी जानकारी।',
-      ],
+      footer: ['फ़ुटर', 'लिंक कॉलम, न्यूज़लेटर की जगह, सोशल लिंक, भाषा बदलने का विकल्प और क़ानूनी जानकारी।'],
       footerMinimal: ['फ़ुटर · न्यूनतम', 'सिर्फ़ वही हिस्से दिखते हैं जो मौजूद हैं।'],
       announcement: ['घोषणा पट्टी', 'बंद करने पर उस घोषणा की id के लिए याद रखा जाता है।'],
-      breadcrumbs: [
-        'ब्रेडक्रंब',
-        'आख़िरी आइटम मौजूदा पेज है। लंबा रास्ता अगली लाइन में चला जाता है।',
-      ],
+      breadcrumbs: ['ब्रेडक्रंब', 'आख़िरी आइटम मौजूदा पेज है। लंबा रास्ता अगली लाइन में चला जाता है।'],
       subNav: [
         'प्रोडक्ट सब-नेविगेशन',
         'होस्ट किए गए प्रोडक्ट पर हेडर के नीचे टिका रहता है; फ़ोन पर बगल में स्क्रॉल होता है।',
@@ -254,13 +248,10 @@ const COPY: Record<'en' | 'hi', Copy> = {
         'भाषा सुझाव',
         'हिंदी पसंद करने वाले ब्राउज़र को अंग्रेज़ी पेज पर दिखता है, जब तक भाषा न चुनी जाए। यहाँ पेज के अंदर दिखाया गया है।',
       ],
-      controls: [
-        'लोगो, भाषा और थीम बदलने के बटन',
-        'हेडर, मोबाइल मेन्यू और फ़ुटर में इस्तेमाल होते हैं।',
-      ],
+      controls: ['लोगो, भाषा और थीम बदलने के बटन', 'हेडर, मोबाइल मेन्यू और फ़ुटर में इस्तेमाल होते हैं।'],
     },
     filler:
-      'MenuMesh, VYRO और Baby, जैनव इन्फोटेक के बनाए और इंदौर से चलाए जाने वाले सॉफ़्टवेयर प्रोडक्ट हैं। हम व्यवसायों के लिए कस्टम सॉफ़्टवेयर भी बनाते हैं।',
+      'MenuMesh, Clokrix और Baby, जैनव इन्फोटेक के बनाए और इंदौर से चलाए जाने वाले सॉफ़्टवेयर प्रोडक्ट हैं। हम व्यवसायों के लिए कस्टम सॉफ़्टवेयर भी बनाते हैं।',
     announcements: [
       {
         id: 'styleguide-baby',
@@ -273,15 +264,14 @@ const COPY: Record<'en' | 'hi', Copy> = {
       [
         { label: 'होम', href: '/' },
         { label: 'प्रोडक्ट', href: '/products' },
-        { label: 'VYRO', href: '/products/vyro' },
+        { label: 'Clokrix', href: '/products/vyro' },
         { label: 'कीमतें' },
       ],
       [
         { label: 'होम', href: '/' },
         { label: 'ब्लॉग', href: '/blog' },
         {
-          label:
-            'Baby अपना वेक वर्ड, आवाज़ पहचानने की सुविधा और मेमोरी आपके अपने कंप्यूटर पर कैसे रखता है',
+          label: 'Baby अपना वेक वर्ड, आवाज़ पहचानने की सुविधा और मेमोरी आपके अपने कंप्यूटर पर कैसे रखता है',
         },
       ],
       [{ label: 'होम' }],
@@ -400,10 +390,10 @@ export default function NavigationSection() {
       <Demo demo={c.demos.subNav}>
         <div className="space-y-3">
           <div className={`${frame} overflow-hidden`}>
-            <ProductSubNav slug="vyro" name="VYRO" active="pricing" />
+            <ProductSubNav slug="vyro" name="Clokrix" active="pricing" />
           </div>
           <div className={`${frame} max-w-xs overflow-hidden`}>
-            <ProductSubNav slug="vyro" name="VYRO" active="support" />
+            <ProductSubNav slug="vyro" name="Clokrix" active="support" />
           </div>
         </div>
       </Demo>

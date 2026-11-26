@@ -61,22 +61,22 @@ const COPY = {
   hiring: { en: 'Hiring (none open)', hi: 'भर्ती (अभी कोई नहीं)' },
   stats: { en: 'Stat', hi: 'Stat' },
   products: { en: 'Products we build and run', hi: 'प्रोडक्ट, जिन्हें हम बनाते और चलाते हैं' },
-  productsText: { en: 'MenuMesh, VYRO and Baby', hi: 'MenuMesh, VYRO और Baby' },
+  productsText: { en: 'MenuMesh, Clokrix and Baby', hi: 'MenuMesh, Clokrix और Baby' },
   languages: { en: 'Languages', hi: 'भाषाएँ' },
   languagesText: {
     en: 'English and Hindi, across the site',
     hi: 'पूरी साइट पर अंग्रेज़ी और हिंदी',
   },
   pillars: { en: 'Service pillars', hi: 'सर्विस के क्षेत्र' },
-  release: { en: 'Latest VYRO release', hi: 'VYRO का नया रिलीज़' },
+  release: { en: 'Latest Clokrix release', hi: 'Clokrix का नया रिलीज़' },
   accordion: { en: 'Accordion: single and multiple', hi: 'Accordion: एक या कई खुले' },
   q1: {
-    en: 'Does VYRO need other monitoring tools?',
-    hi: 'क्या VYRO को दूसरे मॉनिटरिंग टूल चाहिए?',
+    en: 'Does Clokrix need other monitoring tools?',
+    hi: 'क्या Clokrix को दूसरे मॉनिटरिंग टूल चाहिए?',
   },
   a1: {
-    en: 'No. VYRO reads your sensors directly, without third-party monitoring tools.',
-    hi: 'नहीं। VYRO किसी थर्ड-पार्टी मॉनिटरिंग टूल के बिना सीधे आपके सेंसर पढ़ता है।',
+    en: 'No. Clokrix reads your sensors directly, without third-party monitoring tools.',
+    hi: 'नहीं। Clokrix किसी थर्ड-पार्टी मॉनिटरिंग टूल के बिना सीधे आपके सेंसर पढ़ता है।',
   },
   q2: {
     en: 'Who collects the payment for food orders in MenuMesh, and how is the bill printed?',
@@ -135,12 +135,12 @@ const COPY = {
   owner: { en: 'Owner', hi: 'मालिक' },
   cafe: { en: 'Sample Café, Indore', hi: 'सैंपल कैफ़े, इंदौर' },
   quote2: {
-    en: 'VYRO shows every fan and temperature on one screen, and it barely uses any CPU itself.',
-    hi: 'VYRO हर फ़ैन और तापमान एक ही स्क्रीन पर दिखाता है, और ख़ुद मुश्किल से CPU इस्तेमाल करता है।',
+    en: 'Clokrix shows every fan and temperature on one screen, and it barely uses any CPU itself.',
+    hi: 'Clokrix हर फ़ैन और तापमान एक ही स्क्रीन पर दिखाता है, और ख़ुद मुश्किल से CPU इस्तेमाल करता है।',
   },
   itLead: { en: 'IT lead', hi: 'IT लीड' },
   table: { en: 'Table', hi: 'Table' },
-  tableCaption: { en: 'VYRO system requirements', hi: 'VYRO की सिस्टम ज़रूरतें' },
+  tableCaption: { en: 'Clokrix system requirements', hi: 'Clokrix की सिस्टम ज़रूरतें' },
   part: { en: 'Part', hi: 'हिस्सा' },
   minimum: { en: 'Minimum', hi: 'कम से कम' },
   recommended: { en: 'Recommended', hi: 'सुझाया गया' },
@@ -172,8 +172,8 @@ const COPY = {
   },
   publishedTitle: { en: 'Release published', hi: 'रिलीज़ प्रकाशित हो गया' },
   publishedText: {
-    en: 'VYRO 1.4.0 is live on the stable channel.',
-    hi: 'VYRO 1.4.0 अब स्टेबल चैनल पर उपलब्ध है।',
+    en: 'Clokrix 1.4.0 is live on the stable channel.',
+    hi: 'Clokrix 1.4.0 अब स्टेबल चैनल पर उपलब्ध है।',
   },
   draftText: {
     en: 'This page’s Hindi translation is a draft. English is shown where Hindi is missing.',
@@ -187,8 +187,8 @@ const COPY = {
   empty: { en: 'EmptyState', hi: 'EmptyState' },
   noPosts: { en: 'No posts yet', hi: 'अभी कोई पोस्ट नहीं है' },
   noPostsText: {
-    en: 'Our first articles on building MenuMesh, VYRO and Baby are on the way.',
-    hi: 'MenuMesh, VYRO और Baby को बनाने पर हमारे पहले लेख जल्द आ रहे हैं।',
+    en: 'Our first articles on building MenuMesh, Clokrix and Baby are on the way.',
+    hi: 'MenuMesh, Clokrix और Baby को बनाने पर हमारे पहले लेख जल्द आ रहे हैं।',
   },
   subscribe: { en: 'Subscribe to the newsletter', hi: 'न्यूज़लेटर सब्सक्राइब करें' },
   noResults: { en: 'No results for “gaming”', hi: '“गेमिंग” के लिए कोई नतीजा नहीं मिला' },
@@ -245,7 +245,7 @@ export default function ContentSection() {
               <StatusBadge status="beta" />
               <PlatformBadge platform="windows" />
             </div>
-            <CardTitle href="/products/vyro">VYRO</CardTitle>
+            <CardTitle href="/products/vyro">Clokrix</CardTitle>
             <CardDescription>{c(COPY.vyro)}</CardDescription>
           </Card>
           <Card variant="interactive" className="sm:col-span-2">

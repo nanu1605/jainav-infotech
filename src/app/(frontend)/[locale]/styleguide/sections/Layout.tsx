@@ -24,7 +24,7 @@ const COPY = {
       centredEyebrow: 'Why Jainav',
       centredHeading: 'We ship our own products',
       centredIntro:
-        'MenuMesh, VYRO and Baby are used every day, so we know what it takes to run software.',
+        'MenuMesh, Clokrix and Baby are used every day, so we know what it takes to run software.',
       principles: ['Privacy by default', 'Fast, light software', 'Built in Indore, for the world'],
       bare: 'A section without a header: only the rhythm and the container.',
     },
@@ -46,7 +46,7 @@ const COPY = {
       note: 'Direction, gap and alignment. Rows wrap, so longer Hindi labels never overflow.',
       chips: [
         'My restaurant → MenuMesh',
-        'My PC → VYRO',
+        'My PC → Clokrix',
         'A private assistant → Baby',
         'Custom software → Services',
       ],
@@ -73,22 +73,15 @@ const COPY = {
       centredEyebrow: 'Jainav क्यों',
       centredHeading: 'हम अपने ख़ुद के प्रोडक्ट बनाते और चलाते हैं',
       centredIntro:
-        'MenuMesh, VYRO और Baby रोज़ इस्तेमाल होते हैं, इसलिए हम जानते हैं कि सॉफ़्टवेयर चलाने में क्या लगता है।',
-      principles: [
-        'डिफ़ॉल्ट रूप से निजता',
-        'तेज़ और हल्का सॉफ़्टवेयर',
-        'इंदौर में बना, दुनिया के लिए',
-      ],
+        'MenuMesh, Clokrix और Baby रोज़ इस्तेमाल होते हैं, इसलिए हम जानते हैं कि सॉफ़्टवेयर चलाने में क्या लगता है।',
+      principles: ['डिफ़ॉल्ट रूप से निजता', 'तेज़ और हल्का सॉफ़्टवेयर', 'इंदौर में बना, दुनिया के लिए'],
       bare: 'बिना हेडर वाला सेक्शन: सिर्फ़ जगह और कंटेनर।',
     },
     pillars: [
       ['कस्टम सॉफ़्टवेयर और SaaS', 'वेब ऐप, SaaS प्लेटफ़ॉर्म, मोबाइल और डेस्कटॉप ऐप।'],
       ['AI और ML समाधान', 'LLM ऐप और असिस्टेंट, सर्च और RAG, ऑटोमेशन, पूर्वानुमान।'],
       ['क्लाउड और DevOps', 'CI/CD, कंटेनर, क्लाउड सेटअप, मॉनिटरिंग और ख़र्च में कटौती।'],
-      [
-        'ई-कॉमर्स और वेब प्लेटफ़ॉर्म',
-        'ऑनलाइन स्टोर, मार्केटप्लेस, पोर्टल और तेज़ मार्केटिंग वेबसाइटें।',
-      ],
+      ['ई-कॉमर्स और वेब प्लेटफ़ॉर्म', 'ऑनलाइन स्टोर, मार्केटप्लेस, पोर्टल और तेज़ मार्केटिंग वेबसाइटें।'],
     ],
     grid: { title: 'ग्रिड', note: 'फ़ोन पर एक कॉलम; छोटी स्क्रीन से 2; बड़ी स्क्रीन से 3 या 4।' },
     stack: {
@@ -96,7 +89,7 @@ const COPY = {
       note: 'दिशा, दूरी और अलाइनमेंट। पंक्तियाँ अगली लाइन में चली जाती हैं, इसलिए लंबे हिंदी लेबल बाहर नहीं निकलते।',
       chips: [
         'मेरा रेस्टोरेंट → MenuMesh',
-        'मेरा PC → VYRO',
+        'मेरा PC → Clokrix',
         'एक निजी असिस्टेंट → Baby',
         'कस्टम सॉफ़्टवेयर → सेवाएँ',
       ],
