@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.28.0@sha256:bb22d9815c728170f72750f4e5b0d672e06176142e1d602c7e66c050100b7e5b
+# syntax=docker/dockerfile:1.29.0@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 # Production image (spec §18). Built in CI without a database (SKIP_DB_AT_BUILD=1): pages render
 # on first request and are then cached. NEXT_PUBLIC_* values are baked in at build time, so each
 # environment gets its own image; never promote a staging image to production. The BuildKit
@@ -7,7 +7,7 @@
 #   docker build -f docker/Dockerfile --target runner -t jainav-app .
 #   docker build -f docker/Dockerfile --target tools -t jainav-tools .
 
-ARG NODE_IMAGE=node:24.22.2-alpine
+ARG NODE_IMAGE=node:24.22.3-alpine
 
 FROM ${NODE_IMAGE} AS base
 # libc6-compat: prebuilt native modules that expect glibc symbols. HUSKY=0: no git hooks here.
