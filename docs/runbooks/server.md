@@ -916,11 +916,23 @@ redact`; see [edge.md](edge.md).
   `sudo sed -i '/^NAME=/d' <file>`, then `addenv NAME <file>` (§2). Then recreate the service that
   reads them. `images.env` is written by `app-deploy`; never edit it while a deploy runs.
 - **Host scripts and settings:** bring a new kit with the same `host/`, `edge/` and `keys/` as
-  §1 step 7. Keep every key file in `keys/`: `install.sh` rewrites each deploy user's keys from
-  the kit, so a key file left out revokes that key. After hardening root has no SSH, so copy the
-  kit as `ops` and install it with `sudo`. On the PC, make a new folder named `keys` next to the
-  repository's folder and copy only the `.pub` files into it (never a private key). Then, from the
-  repository root (the relative path works in PowerShell and in Git Bash):
+  §1 step 7. `keys/` must hold every app's deploy public key that the server has, not only
+  Jainav's: `gha-jainav-staging.pub`, `gha-jainav-production.pub` and the
+  `gha-<app>-<environment>.pub` of any other app that deploys to the server. `install.sh`
+  (`--harden` too) rewrites each deploy user's keys from the kit, so a key file left out revokes
+  that key. A deploy user with no key file in the kit keeps its installed keys, and `install.sh`
+  warns about it ("the kit has no keys for …"). This lists the deploy keys the server has, one
+  per line, as a `.pub` file holds it; the last word is the file's name without `.pub`:
+
+  ```bash
+  sudo awk '{ print $(NF-2), $(NF-1), $NF }' /etc/ssh/authorized_keys.d/deploy-*
+  ```
+
+  After hardening root has no SSH, so copy the kit as `ops` and install it with `sudo`. On the
+  PC, make a new folder named `keys` next to the repository's folder and put one `.pub` file in
+  it for each of those lines (never a private key): Jainav's are the files from §1 step 6, and
+  another app's is the one its maintainers gave for the server. Then, from the repository root
+  (the relative path works in PowerShell and in Git Bash):
 
   ```bash
   ssh jainav 'rm -rf ~/kit && mkdir ~/kit'
@@ -952,7 +964,6 @@ Run them with the tools image of an environment, on its networks and with its en
 
 ```bash
 sudo app-compose jainav tools production - pnpm payload migrate:status
-sudo app-compose jainav tools production - pnpm import:release <tag>
 sudo app-compose jainav tools staging - pnpm seed
 ```
 
@@ -962,11 +973,11 @@ The `-` is the tools image the environment's last deploy recorded in `images.env
 reference as `<tag>@sha256:<digest>`; a bare tag is refused. Env-file values with `$` or a
 backslash must be in single quotes, as Compose reads them.
 
-`import:release` imports a VYRO release from GitHub `nanu1605/vyro-releases`. It checks the
-installer's SHA-256 against `SHA256SUMS.txt` and GitHub, takes the updater signature from
-`latest.json`, uploads the installer to R2 and saves the release as a draft. The Owner publishes
-it in the admin, which also refreshes the cached download page. Add `-- --publish` to publish
-from the command line.
+`import:release` imported a VYRO release from GitHub `nanu1605/vyro-releases`: it checked the
+installer's SHA-256 against `SHA256SUMS.txt` and GitHub, took the updater signature from
+`latest.json`, uploaded the installer to R2 and saved the release as a draft. It is unused since
+2026-11-27: Clokrix downloads and updates from its own site, and that repository is private now,
+so the script can't read it ([decisions](../decisions.md), "Clokrix sells on its own site").
 
 ## 9. Break-glass
 

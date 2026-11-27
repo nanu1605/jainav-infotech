@@ -73,7 +73,7 @@ In the repository (done; rehearsed locally, see docs/runbooks/server.md#rehearsa
 - [x] Logs kept for 180 to 187 days in the host's journal; Caddy's logs and Sentry events filtered (docs/decisions.md).
 - [x] Grievance Officer in site settings and the footer; `{{BLANKS}}` in site settings never print on a page, and legal pages holding one can't be published.
 - [x] Security headers / CSP (§16); `pnpm audit` in CI; Dependabot.
-- [x] VYRO release import (`pnpm import:release`); v0.3.0 verified (SHA-256 `0dacbbaa…25dd3`) and imported into dev as a draft.
+- [x] VYRO release import (`pnpm import:release`); v0.3.0 verified (SHA-256 `0dacbbaa…25dd3`) and imported into dev as a draft. Unused since 2026-11-27: Clokrix downloads from its own site.
 - [x] Runbooks: `docs/runbooks/` (launch, server, cloudflare, backups, monitoring).
 - [x] Legal drafts in English and draft Hindi (`scripts/seed/legal/`), not yet approved; data map corrected against the code.
 
@@ -88,17 +88,21 @@ On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/la
 - [ ] Sentry project, Umami website, HetrixTools monitors, heartbeats and status page; an uptime alert reaches Telegram.
 - [ ] A real restore test on the server.
 - [ ] SPF / DKIM / DMARC; mail-tester ≥ 9/10.
-- [ ] Legal review (docs/decisions.md, "Legal drafts"): blanks filled, then the Owner publishes every legal page but the EULA (§8.13). Final content check. The company blanks and the refund window (7 days) are filled (2026-11-26); the lawyer's and the CA's are left.
-- [ ] Clokrix (formerly VYRO) download in production: `pnpm import:release <tag>` (v1.4.0 was imported into dev as a draft on 2026-10-18; the latest is now v2.0.4, whose features the seeded copy doesn't mention), then the Owner publishes it. The Clokrix project was asked on 2026-11-26 where the live installer is.
+- [ ] Legal review (docs/decisions.md, "Legal drafts"): blanks filled, then the Owner publishes every legal page (§8.13; the seed has had no EULA since 2026-11-27). Final content check. The company blanks and the refund window (7 days) are filled (2026-11-26); the lawyer's and the CA's are left.
+- [x] Clokrix (formerly VYRO) download: done by linking to the Clokrix site's download, `https://clokrix.jainavinfotech.in/download`, which always serves the newest build; nothing is imported (2026-11-27, docs/decisions.md "Clokrix sells on its own site").
+- [ ] Staging's Clokrix updated to the new seed (Tanishq; the steps are in docs/decisions.md, "Clokrix sells on its own site"). Staging was seeded earlier and keeps the old `vyro` product until then.
+- [ ] From the Clokrix team: whether the product copy's version-0.2 CPU figure, the MSI-only fan control and the PawnIO driver note still hold.
 - [ ] Lighthouse on the production URLs (§15); LCP is judged only there. Locally `pnpm lhci` serves HTTP/1.1, reads LCP above 2.5 s and only warns on it; over HTTP/2 the four pages are under it (docs/decisions.md, "LCP budget").
 
-## Milestone C — Clokrix store live (Launch 2)
+## Milestone C — Store live (Launch 2): on hold
+
+**On hold since 2026-11-27.** Clokrix is sold, licensed, downloaded and updated on its own site, so this site's store has no product to sell (docs/decisions.md, "Clokrix sells on its own site"). The store, licensing and refund code stays, and `pnpm seed:store`'s Sample App keeps it tested locally and in e2e. The items stay for a product sold here later; the ones written for Clokrix say that they no longer apply.
 
 ### Phase 7 — Accounts, checkout and invoices (Razorpay test mode)
 
 In the repository (done; tested locally against the stand-in gateway, see docs/decisions.md):
 
-- [x] First: `docs/licensing-api.md` (§12.4), so VYRO app work can start in parallel.
+- [x] First: `docs/licensing-api.md` (§12.4), so VYRO app work can start in parallel. The app work no longer applies: Clokrix licenses on its own site (2026-11-27); the contract stays for products sold here.
 - [x] `customers`, `otpChallenges`, `customerSessions`; email-code sign-in and sessions (§11.2); account pages (overview, orders & invoices, settings with account deletion); `customer` on `dataRequests`.
 - [x] `orders`, `invoices`, `invoiceCounters`, `webhookEvents`, `coupons`; `commerceSettings`.
 - [x] Checkout flow (§11.3): acceptance checkbox, verify, webhook, fulfilment transaction, post-commit jobs, paid-twice flagging, reconciliation job, success / failure pages; a local stand-in for Razorpay while no keys are set.
@@ -107,8 +111,8 @@ In the repository (done; tested locally against the stand-in gateway, see docs/d
 
 With Tanishq's inputs (steps in docs/runbooks/store.md):
 
-- [ ] Razorpay test keys and webhook on staging; a test-mode purchase end to end, including the webhook; CSP checked in the browser.
-- [ ] Clokrix plans and prices (decided 2026-11-26: Pro ₹10,000 one-time including GST, with 12 months of updates, and the free version stays); from the CA: GST status, SAC code, export treatment, invoice prefix and format, signature line, how long orders and invoices are kept.
+- [ ] Razorpay test keys and webhook on staging; a test-mode purchase end to end, including the webhook; CSP checked in the browser. Buying Clokrix Pro no longer applies: the test purchase needs a hosted product with a paid plan on staging (none yet). Locally the Sample App covers it (`/checkout/sample-app/pro`).
+- [ ] From the CA: GST status, SAC code, export treatment, invoice prefix and format, signature line, how long orders and invoices are kept. The Clokrix plans and prices (decided 2026-11-26) no longer apply: Clokrix Pro is sold on its own site (2026-11-27).
 
 ### Phase 8 — Licensing
 
@@ -122,9 +126,9 @@ In the repository (done; tested locally with development keys, see docs/decision
 
 With Tanishq's inputs (steps in docs/runbooks/licensing.md):
 
-- [ ] Licensing keys generated and installed on staging and production; the public key embedded in Clokrix.
-- [ ] Confirm the activation limit (2), monthly deactivations (3), trial length (14 days) and updates policy (12 months, builds in that window stay Pro).
-- [ ] The test client run against staging.
+- [ ] Licensing keys generated and installed on staging and production, once a product sold here needs them. The public key embedded in Clokrix no longer applies: Clokrix embeds its own (2026-11-27).
+- [ ] Confirm the activation limit (2), monthly deactivations (3), trial length (14 days) and updates policy (12 months, builds in that window stay Pro), for a product sold here. For Clokrix this no longer applies: the app sets its own terms (one PC at a time, a 7-day trial, every update; 2026-11-27).
+- [ ] The test client run against staging, once a product sold here is there. Against Clokrix it no longer applies; locally it runs against the Sample App (its default product).
 
 ### Phase 9 — Store operations
 
@@ -139,8 +143,8 @@ In the repository (done; tested locally with the stand-in gateway, see docs/deci
 
 With Tanishq's inputs (steps in docs/runbooks/store.md):
 
-- [ ] A test-mode refund from the admin and from Razorpay's dashboard on staging; the dispute and paid-twice paths if Razorpay's test mode can raise them.
-- [ ] From the CA: the credit note layout and the CA report's columns (CSV or XLSX, rate-wise or B2B/B2C splits). The refund window is set: 7 days (2026-11-26).
+- [ ] A test-mode refund from the admin and from Razorpay's dashboard on staging; the dispute and paid-twice paths if Razorpay's test mode can raise them. Waits for a product to buy on staging (none yet; Clokrix's purchase no longer applies).
+- [ ] From the CA: the credit note layout and the CA report's columns (CSV or XLSX, rate-wise or B2B/B2C splits). The refund window is set: 7 days (2026-11-26), for this site's sales; the Clokrix site refunds its own within 14 days (2026-11-27).
 
 ### Before the store opens: the store against the legal drafts
 
@@ -161,16 +165,16 @@ With inputs (steps in docs/runbooks/retention.md):
 
 - [ ] Switch to Razorpay live keys (after activation).
 - [ ] A real purchase with a small amount, then a refund.
-- [ ] Owner publishes the final Terms, Refunds, Shipping and Clokrix EULA (the checkout refuses orders until all four are live).
+- [ ] Owner publishes the final Terms, Refunds, Shipping and the product's EULA (the checkout refuses orders until all four are live). The Clokrix EULA no longer applies: it left the seed on 2026-11-27.
 - [ ] Production smoke tests; set `storeEnabled = true`.
 
-Input still missing: a signed Clokrix build that uses the licensing API. v1.4.0 (2026-10-18) has a valid update signature but no code signing (SmartScreen warns) and no licensing yet (spec §12.6). The installer is still unsigned (Tanishq, 2026-11-26); whether the current build has licensing was asked of the Clokrix project the same day.
+Input still missing: a product to sell here. The signed Clokrix build that uses the licensing API no longer applies (2026-11-27): Clokrix 2.5.4 licenses with its own `CLKX-` keys on its own site. Its installer is not Authenticode-signed, so SmartScreen warns on a fresh install.
 
 ## Milestone D — Growth (Phase 11+; order agreed after Launch 2)
 
 - [ ] Admin: custom dashboard; support tickets; Translator role + Translations view + "Draft Hindi with AI"; TOTP 2FA.
 - [ ] Look and feel: WebGL home hero; GSAP sequences if needed.
-- [ ] Store: Google sign-in; subscriptions (if chosen); international payments (if enabled); volume licenses and quantity > 1. (Update-feed eligibility via Bearer token is dropped: VYRO updates from GitHub, docs/decisions.md "VYRO updates".)
+- [ ] Store: Google sign-in; subscriptions (if chosen); international payments (if enabled); volume licenses and quantity > 1. (Update-feed eligibility via Bearer token no longer applies to Clokrix: it updates from its own site, with every update for Pro; docs/decisions.md "Clokrix sells on its own site".)
 - [ ] Baby: shared commerce API + cross-domain sign-in for Baby's website.
 - [ ] Growth: AI assistant, MenuMesh live demo, Clokrix browser teaser, creator / affiliate program, verified-buyer reviews, comparison pages, site search, public roadmap, case studies, press kit, partner program, Startup India / Udyam badges.
 

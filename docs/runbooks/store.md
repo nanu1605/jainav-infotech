@@ -1,11 +1,11 @@
 # Store: test mode on staging (Phase 7)
 
-How to switch on accounts and checkout on staging with Razorpay's test mode. Production keeps the store off until Launch 2 (spec §20 Phase 10). Locally nothing is needed: without Razorpay keys, development uses the stand-in gateway (`docs/decisions.md`, Phase 7).
+How to switch on accounts and checkout on staging with Razorpay's test mode. Production keeps the store off until Launch 2 (spec §20 Phase 10), which has been on hold since 2026-11-27: Clokrix sells on its own site, so this store has no product yet (`docs/decisions.md`, "Clokrix sells on its own site"). Locally nothing is needed: without Razorpay keys, development uses the stand-in gateway (`docs/decisions.md`, Phase 7), and `pnpm seed:store` adds the Sample App to sell.
 
 ## Inputs from Tanishq
 
 - Razorpay **test** keys (Dashboard → Test mode → Account & Settings → API Keys): key id `rzp_test_…` and secret.
-- The Clokrix plans and prices (decided 2026-11-26: Pro ₹10,000 one-time including GST, with 12 months of updates, and the free version stays), and from the CA: GST status, SAC code, export treatment, invoice prefix, how long orders and invoices must be kept.
+- A hosted product sold here, with a paid plan and its price (none yet: Clokrix's plans no longer apply), and from the CA: GST status, SAC code, export treatment, invoice prefix, how long orders and invoices must be kept.
 
 ## Steps
 
@@ -20,14 +20,14 @@ How to switch on accounts and checkout on staging with Razorpay's test mode. Pro
 3. **Capture:** Dashboard → Account & Settings → Payment capture: automatic.
 4. **Admin** (staging, as Owner):
    - Settings → Commerce settings: the SAC code, invoice prefixes and, once the CA confirms, "Charge GST" (needs the company GSTIN in Site settings first); the current Terms and EULA versions (they are recorded with every order); the refund window, 7 days (the seed sets it since 2026-11-26, so a database seeded earlier, such as staging, needs it entered here).
-   - Products → Plans: Clokrix Pro's price (paise, GST-inclusive) and "Active". The seed sets both since 2026-11-26; a database seeded earlier, such as staging, needs them set here.
-   - Content → Legal pages: one holding a `{{BLANK}}` in either language can't be published, here as on production, so fill the blanks in first and delete the EULA's `{{HOLD_UNTIL_CLOKRIX_PRO}}` line in both languages. Then publish Terms, the Clokrix EULA (`eula-vyro`), Refunds and Cancellation, and Shipping and Delivery. Until all four are live, the checkout shows "can't be bought right now" and refuses orders.
+   - Products → Plans: the paid plan's price (paise, GST-inclusive) and "Active", on the hosted product to sell. Since 2026-11-27 the seed creates no plans, and staging has no hosted product to sell yet.
+   - Content → Legal pages: one holding a `{{BLANK}}` in either language can't be published, here as on production, so fill the blanks in first. Then publish Terms, the product's EULA (`eula-<product slug>`: the seed has had none since 2026-11-27, so one is written for the product), Refunds and Cancellation, and Shipping and Delivery. Until all four are live, the checkout shows "can't be bought right now" and refuses orders.
    - Settings → Site settings → Site: "Store enabled".
 5. **Content security policy:** keep the browser console open during the test purchase (step 6), starting from the pricing page. Any `Content-Security-Policy` violation naming a Razorpay host goes into `src/lib/csp.ts` (`RAZORPAY`).
 
 ## Test purchase (spec §20 Phase 7 "done when")
 
-6. Sign in at `/account/sign-in` (the code arrives by email), open Clokrix's pricing page → Buy Pro → fill in the billing details, tick the Terms box → Pay. In Razorpay's test checkout use UPI `success@razorpay` or card `4100 2800 0000 1007` (any future expiry, any CVV, any OTP).
+6. The test purchase goes through a hosted product with a paid plan: none on staging yet, and locally the Sample App, whose Buy Pro opens `/checkout/sample-app/pro`. Sign in at `/account/sign-in` (the code arrives by email), open the product's pricing page → Buy Pro → fill in the billing details, tick the Terms box → Pay. In Razorpay's test checkout use UPI `success@razorpay` or card `4100 2800 0000 1007` (any future expiry, any CVV, any OTP).
 7. Check:
    - the success page shows the order and, a few seconds later, the invoice link;
    - the order confirmation email arrives with the invoice PDF attached;

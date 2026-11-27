@@ -54,7 +54,8 @@ A records in the table above at launch.
 ## Security
 
 - **Bot Fight Mode: off** (Security → Bots). It can't be bypassed for API traffic, so it would
-  break VYRO activation, the update feed and webhooks.
+  break webhooks, and the licensing API and update feed for apps sold here (none yet: since
+  2026-11-27 Clokrix licenses and updates on its own site).
 - **WAF skip rule** (Security → WAF → Custom rules → Create, action _Skip_). Tick _All remaining
   custom rules_, _Rate limiting rules_, _Managed rules_ and _Super Bot Fight Mode_. Leave _All
   remaining custom rules in this phase_ unticked: ticking both custom-rule options fails with
