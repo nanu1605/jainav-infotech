@@ -4,7 +4,7 @@ We are Jainav Infotech Private Limited. Anything you download or buy on this web
 
 A free app that can be downloaded from this website is on that product's page or its download page, reached from the [products page](/products). You do not need an account. To get it again, return to that page. A download page also lists any earlier versions.
 
-If there is nothing to download yet, you will see a waitlist instead. Products that run on their own website, such as MenuMesh, are not delivered through this one.
+If there is nothing to download yet, you will see a waitlist instead. Products that run on their own website, such as MenuMesh, or are sold and downloaded there, such as Clokrix, are not delivered through this one.
 
 ## Paid plans
 
