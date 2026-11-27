@@ -45,12 +45,12 @@ const longTagline = {
 
 export default function ProductSection() {
   const locale = useLocale() as Locale
-  const vyro = seedProduct('vyro', locale)
+  const clokrix = seedProduct('clokrix', locale)
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <ProductCard product={seedProduct('menumesh', locale)} />
-      <ProductCard product={{ ...vyro, logo: demoLogo(vyro.accentColor) }} />
+      <ProductCard product={{ ...clokrix, logo: demoLogo(clokrix.accentColor) }} />
       <ProductCard product={seedProduct('baby', locale)} />
       <ProductCard
         product={{
@@ -70,7 +70,7 @@ export default function ProductSection() {
           tagline: null,
           status: 'beta',
           platforms: null,
-          accentColor: vyro.accentColor,
+          accentColor: clokrix.accentColor,
         }}
         href="/products"
       />

@@ -23,8 +23,9 @@ const draftHi = { hiStatus: 'draft' } as const
 
 // Product copy checked against each product's own code, site and releases on 2026-10-16
 // (MenuMesh: its repo and menumesh.in; Baby: nanu1605/baby v6.0.1; Clokrix, then called VYRO:
-// nanu1605/vyro and vyro-releases v0.3.0). MenuMesh's Hindi follows MenuMesh's own approved
-// words (ग्राहक, डिश).
+// nanu1605/vyro and vyro-releases v0.3.0). Clokrix was rechecked on 2026-11-27 against its own
+// site (clokrix.jainavinfotech.in) and the Clokrix team's website copy. MenuMesh's Hindi follows
+// MenuMesh's own approved words (ग्राहक, डिश).
 export const products: SeedDoc<'products'>[] = [
   {
     en: {
@@ -459,18 +460,24 @@ export const products: SeedDoc<'products'>[] = [
   {
     en: {
       name: 'Clokrix',
-      slug: 'vyro',
+      slug: 'clokrix',
       tagline: 'Know your machine.',
       summary:
-        'See what your Windows PC is doing right now, on animated gauges: usage, clocks, temperatures, power and fan speeds, with seven days of history, health checks and alerts. Gamers also get frame rates, an overlay on top of the game and replays of recent sessions.',
+        'A light Windows hardware monitor: animated CPU and GPU speedometers, sensors for each part of your PC, history, health and alerts. It reads the sensors directly, with no third-party monitoring app or library.',
       type: 'desktop',
       category: 'pc-tools',
       platforms: ['windows'],
       status: 'live',
-      hostingMode: 'hosted',
+      // Clokrix is sold, downloaded and updated on its own site, not here (Tanishq, 2026-11-27).
+      hostingMode: 'external',
+      externalUrl: 'https://clokrix.jainavinfotech.in',
       accentColor: '#4CC9F0', // Clokrix's app accent
-      primaryButton: { type: 'download', channel: 'stable' },
-      // secondaryButton (Buy Pro) is linked to the Pro plan once plans exist (see seed.ts).
+      primaryButton: { type: 'visit' },
+      secondaryLinks: [
+        { kind: 'other', label: 'Buy Pro', url: 'https://clokrix.jainavinfotech.in/buy' },
+        // Always the newest build, the one the app updates from.
+        { kind: 'other', label: 'Download', url: 'https://clokrix.jainavinfotech.in/download' },
+      ],
       featured: true,
       sortOrder: 2,
       ...draftHi,
@@ -488,8 +495,8 @@ export const products: SeedDoc<'products'>[] = [
           items: [
             {
               icon: 'gauge',
-              title: 'Animated CPU and GPU speedometers',
-              text: 'With live clock speeds.',
+              title: 'Live dashboard',
+              text: 'Animated CPU and GPU speedometers and every sensor, with layouts you edit.',
             },
             {
               icon: 'thermometer',
@@ -507,7 +514,7 @@ export const products: SeedDoc<'products'>[] = [
             {
               icon: 'scan-search',
               title: 'Reads sensors directly',
-              text: 'No other monitoring app needed.',
+              text: 'No third-party monitoring app or library.',
             },
             {
               icon: 'feather',
@@ -526,9 +533,11 @@ export const products: SeedDoc<'products'>[] = [
             },
             {
               icon: 'sliders-horizontal',
-              title: 'Fan and pump control',
-              text: 'Your own fan curves, with safety limits. If anything goes wrong, the BIOS settings come back. Only on the MSI B650M GAMING PLUS WIFI for now.',
+              title: 'Fan control and GPU tuning',
+              text: 'Your own fan curves and GPU tuning, with safety limits. One click returns the fans to the BIOS settings and the GPU to stock. Fan control only on the MSI B650M GAMING PLUS WIFI for now.',
             },
+            { icon: 'app-window', title: 'Desktop widgets' },
+            { icon: 'smartphone', title: 'Phone app', text: 'Your PC’s readings on your phone.' },
           ],
         },
         {
@@ -550,6 +559,7 @@ export const products: SeedDoc<'products'>[] = [
               title: 'Session replay',
               text: 'Replay your last 100 game sessions with markers for frame-rate drops, stutters and heat or power limits.',
             },
+            { icon: 'timer', title: 'Benchmark' },
           ],
         },
         {
@@ -575,19 +585,49 @@ export const products: SeedDoc<'products'>[] = [
             { label: 'Disk space', minimum: 'Up to 200 MB for history' },
           ],
         },
-        { blockType: 'pricing', heading: 'Free and Pro', source: 'plans' },
         {
-          blockType: 'download',
-          heading: 'Download Clokrix',
-          channel: 'stable',
-          note: 'The installer isn’t code-signed yet, so Windows SmartScreen may warn before it runs. Setup also installs the PawnIO driver, which Clokrix uses to read CPU, fan and memory sensors.',
+          // As the Clokrix site's /buy page states them (2026-11-27); Pro is bought there.
+          blockType: 'pricing',
+          heading: 'Free and Pro',
+          source: 'manual',
+          tiers: [
+            {
+              name: 'Free',
+              price: '₹0',
+              features: [
+                { text: 'The Dashboard, with its layouts and editing' },
+                { text: 'Pro free for 7 days from Clokrix’s first start, with no card needed' },
+              ],
+            },
+            {
+              name: 'Pro',
+              price: '₹10,000',
+              highlight: true,
+              features: [
+                { text: 'Once, for life, including all taxes ($100 outside India)' },
+                {
+                  text: 'Everything in Free, plus health and alerts, insights, history, gaming, the benchmark, fan control, GPU tuning, desktop widgets, the game overlay, profiles and the phone app',
+                },
+                { text: 'One PC at a time: you can move it to another PC once every 30 days' },
+                { text: 'Every update, for good: one payment, not a subscription' },
+              ],
+            },
+          ],
+          fullPricingUrl: 'https://clokrix.jainavinfotech.in/buy',
+        },
+        {
+          blockType: 'ctaBand',
+          heading: 'Get Clokrix',
+          text: 'Clokrix is free to download from its own website. The installer isn’t code-signed yet, so Windows SmartScreen may warn before it runs. Setup also installs the PawnIO driver, which Clokrix uses to read CPU, fan and memory sensors.',
+          useProductButtons: true,
         },
       ],
     },
     hi: {
       tagline: 'अपनी मशीन को जानिए।',
       summary:
-        'देखिए आपका Windows PC अभी क्या कर रहा है, एनिमेटेड गेज पर: इस्तेमाल, क्लॉक, तापमान, पावर और फ़ैन स्पीड, साथ में सात दिन की हिस्ट्री, हेल्थ चेक और अलर्ट। गेमर्स के लिए फ़्रेम रेट, गेम के ऊपर ओवरले और हाल के गेम सेशन का रीप्ले भी।',
+        'Windows के लिए एक हल्का हार्डवेयर मॉनिटर: एनिमेटेड CPU और GPU स्पीडोमीटर, आपके PC के हर हिस्से के सेंसर, हिस्ट्री, हेल्थ चेक और अलर्ट। यह सेंसर सीधे पढ़ता है, किसी थर्ड-पार्टी मॉनिटरिंग ऐप या लाइब्रेरी के बिना।',
+      secondaryLinks: [{ label: 'Pro ख़रीदें' }, { label: 'डाउनलोड करें' }],
       layout: [
         {
           eyebrow: 'Clokrix, Jainav की ओर से',
@@ -597,7 +637,10 @@ export const products: SeedDoc<'products'>[] = [
         {
           heading: 'आपका PC, एक नज़र में',
           items: [
-            { title: 'एनिमेटेड CPU और GPU स्पीडोमीटर', text: 'लाइव क्लॉक स्पीड के साथ।' },
+            {
+              title: 'लाइव डैशबोर्ड',
+              text: 'एनिमेटेड CPU और GPU स्पीडोमीटर और हर सेंसर, ऐसे लेआउट में जिन्हें आप बदल सकते हैं।',
+            },
             {
               title: 'तापमान',
               text: 'GPU और ड्राइव; AMD Ryzen पर CPU, AMD सिस्टम पर DDR5 मेमोरी, और सपोर्टेड MSI बोर्ड पर मदरबोर्ड।',
@@ -609,7 +652,10 @@ export const products: SeedDoc<'products'>[] = [
             { title: 'वोल्टेज और क्लॉक' },
             { title: 'पूरी सिस्टम जानकारी' },
             { title: 'सिंगल और मल्टी-मॉनिटर जानकारी' },
-            { title: 'सेंसर सीधे पढ़ता है', text: 'किसी दूसरे मॉनिटरिंग ऐप की ज़रूरत नहीं।' },
+            {
+              title: 'सेंसर सीधे पढ़ता है',
+              text: 'किसी थर्ड-पार्टी मॉनिटरिंग ऐप या लाइब्रेरी के बिना।',
+            },
             {
               title: 'कम CPU और मेमोरी उपयोग',
               text: 'हमारे टेस्ट PC पर वर्ज़न 0.2 में, विंडो खुली रहने पर भी औसतन 1% से कम CPU।',
@@ -623,9 +669,11 @@ export const products: SeedDoc<'products'>[] = [
               text: 'किसी भी सेंसर की सीमा तय करें; रीडिंग उसे पार करे तो Windows नोटिफ़िकेशन मिलेगा।',
             },
             {
-              title: 'फ़ैन और पंप कंट्रोल',
-              text: 'सुरक्षा सीमाओं के साथ अपने फ़ैन कर्व। कुछ गड़बड़ हो तो BIOS सेटिंग अपने-आप वापस आ जाती है। अभी सिर्फ़ MSI B650M GAMING PLUS WIFI पर।',
+              title: 'फ़ैन कंट्रोल और GPU ट्यूनिंग',
+              text: 'सुरक्षा सीमाओं के साथ अपने फ़ैन कर्व और GPU ट्यूनिंग। एक क्लिक में फ़ैन BIOS सेटिंग पर और GPU स्टॉक सेटिंग पर लौट आते हैं। फ़ैन कंट्रोल अभी सिर्फ़ MSI B650M GAMING PLUS WIFI पर।',
             },
+            { title: 'डेस्कटॉप विजेट' },
+            { title: 'फ़ोन ऐप', text: 'आपके PC की रीडिंग, आपके फ़ोन पर।' },
           ],
         },
         {
@@ -643,6 +691,7 @@ export const products: SeedDoc<'products'>[] = [
               title: 'सेशन रीप्ले',
               text: 'अपने पिछले 100 गेम सेशन दोबारा देखें, फ़्रेम ड्रॉप, स्टटर और हीट या पावर लिमिट के मार्कर के साथ।',
             },
+            { title: 'बेंचमार्क' },
           ],
         },
         {
@@ -667,59 +716,60 @@ export const products: SeedDoc<'products'>[] = [
             { label: 'डिस्क स्पेस', minimum: 'हिस्ट्री के लिए 200 MB तक' },
           ],
         },
-        { heading: 'Free और Pro' },
         {
-          heading: 'Clokrix डाउनलोड करें',
-          note: 'इंस्टॉलर अभी कोड-साइन नहीं है, इसलिए चलाने से पहले Windows SmartScreen चेतावनी दिखा सकता है। सेटअप PawnIO ड्राइवर भी इंस्टॉल करता है, जिससे Clokrix CPU, फ़ैन और मेमोरी के सेंसर पढ़ता है।',
+          heading: 'Free और Pro',
+          tiers: [
+            {
+              name: 'फ़्री',
+              price: '₹0',
+              features: [
+                { text: 'डैशबोर्ड, उसके लेआउट और एडिटिंग के साथ' },
+                { text: 'Clokrix के पहली बार शुरू होने से 7 दिन तक प्रो मुफ़्त, कार्ड की ज़रूरत नहीं' },
+              ],
+            },
+            {
+              name: 'प्रो',
+              price: '₹10,000',
+              features: [
+                { text: 'एक बार, हमेशा के लिए, सभी टैक्स सहित (भारत के बाहर $100)' },
+                {
+                  text: 'फ़्री का सब कुछ, साथ में हेल्थ चेक और अलर्ट, इनसाइट्स, हिस्ट्री, गेमिंग, बेंचमार्क, फ़ैन कंट्रोल, GPU ट्यूनिंग, डेस्कटॉप विजेट, गेम ओवरले, प्रोफ़ाइल और फ़ोन ऐप',
+                },
+                { text: 'एक समय में एक PC पर: हर 30 दिन में एक बार इसे दूसरे PC पर ले जा सकते हैं' },
+                { text: 'हर अपडेट, हमेशा के लिए: एक ही भुगतान, कोई सब्सक्रिप्शन नहीं' },
+              ],
+            },
+          ],
+        },
+        {
+          heading: 'Clokrix पाएँ',
+          text: 'Clokrix अपनी वेबसाइट पर मुफ़्त डाउनलोड के लिए उपलब्ध है। इंस्टॉलर अभी कोड-साइन नहीं है, इसलिए चलाने से पहले Windows SmartScreen चेतावनी दिखा सकता है। सेटअप PawnIO ड्राइवर भी इंस्टॉल करता है, जिससे Clokrix CPU, फ़ैन और मेमोरी के सेंसर पढ़ता है।',
         },
       ],
     },
   },
 ]
 
+// ─── Redirects ───────────────────────────────────────────────────────────────
+
 /**
- * Clokrix plans, as Tanishq set them on 2026-11-26: a free version, and Pro at ₹10,000 including
- * GST ($100 elsewhere), one-time, with 12 months of updates. priceUSD is stored but not shown: the
- * site sells in INR only (docs/decisions.md).
+ * Paths that send visitors to a product's page with a 308 (spec §7, §8.6). The site follows them
+ * for unknown paths and unknown product slugs, keeping the visitor's language.
  */
-export const vyroPlans: {
-  en: Omit<RequiredDataFromCollectionSlug<'plans'>, 'product'>
-  hi: HiPatch
-}[] = [
-  {
-    en: {
-      code: 'free',
-      name: 'Free',
-      billing: 'one_time',
-      priceINR: 0,
-      active: true,
-      sortOrder: 1,
-    },
-    hi: { name: 'फ़्री' },
-  },
-  {
-    // "Lifetime" is the license, not the updates; 2 devices is the spec §22 default.
-    en: {
-      code: 'pro',
-      name: 'Pro',
-      billing: 'one_time',
-      priceINR: 10_000_00,
-      priceUSD: 100_00,
-      maxActivations: 2,
-      updatesForMonths: 12,
-      highlight: true,
-      active: true,
-      sortOrder: 2,
-    },
-    hi: { name: 'प्रो' },
-  },
+export const redirects: { from: string; product: string }[] = [
+  // Clokrix's vanity path.
+  { from: '/clokrix', product: 'clokrix' },
+  // The vanity path from when Clokrix was called VYRO.
+  { from: '/vyro', product: 'clokrix' },
+  // Clokrix's page until 2026-11-27; its old sub-pages (/products/vyro/pricing…) land here too.
+  { from: '/products/vyro', product: 'clokrix' },
 ]
 
 // ─── Services ────────────────────────────────────────────────────────────────
 
 export const services: (SeedDoc<'services'> & { related: string[] })[] = [
   {
-    related: ['menumesh', 'vyro', 'baby'],
+    related: ['menumesh', 'clokrix', 'baby'],
     en: {
       title: 'Custom software & SaaS',
       slug: 'custom-software',
@@ -957,7 +1007,7 @@ export const pages: SeedDoc<'pages'>[] = [
           secondary: { label: 'Build with us', href: '/services' },
           chips: [
             { label: 'My restaurant', href: '/products/menumesh' },
-            { label: 'My PC', href: '/products/vyro' },
+            { label: 'My PC', href: '/products/clokrix' },
             { label: 'A private assistant', href: '/products/baby' },
             { label: 'Custom software', href: '/services' },
           ],
@@ -1085,7 +1135,6 @@ export const legalPages: DraftSeedDoc<'legal-pages'>[] = [
   ['terms', 'Terms of Service', 'सेवा की शर्तें'],
   ['refunds-cancellation', 'Refunds and Cancellation', 'रिफ़ंड और रद्दीकरण'],
   ['shipping-delivery', 'Shipping and Delivery', 'शिपिंग और डिलीवरी'],
-  ['eula-vyro', 'Clokrix End User License Agreement', 'Clokrix अंतिम उपयोगकर्ता लाइसेंस अनुबंध'],
   ['cookies', 'Cookie Policy', 'कुकी नीति'],
   ['privacy-requests', 'Privacy Requests and Grievances', 'गोपनीयता अनुरोध और शिकायतें'],
 ].map(([slug, title, titleHi]) => ({
@@ -1094,10 +1143,12 @@ export const legalPages: DraftSeedDoc<'legal-pages'>[] = [
 }))
 
 /**
- * Commerce settings (spec §9.2): the schema defaults, plus the seeded legal drafts' version as
- * the Terms and EULA a buyer accepts, and the refund window that Refunds and Cancellation states
- * (7 days, set by Tanishq on 2026-11-26; nothing enforces it). GST stays off and the SAC code
- * empty until the CA confirms them ({{SAC_CODE}}, {{CONFIRM_WITH_CA}}).
+ * Commerce settings (spec §9.2): the schema defaults, plus the versions checkout records with each
+ * order: the seeded Terms draft's, and 0.1 for the EULA of a product sold here. No product EULA is
+ * seeded: since 2026-11-27 Clokrix is sold on its own site (`pnpm seed:store` adds a sample
+ * product's EULA locally). Also the refund window that Refunds and Cancellation states (7 days,
+ * set by Tanishq on 2026-11-26; nothing enforces it). GST stays off and the SAC code empty until
+ * the CA confirms them ({{SAC_CODE}}, {{CONFIRM_WITH_CA}}).
  */
 export const commerceSettings = {
   currentTermsVersion: '0.1',
@@ -1161,7 +1212,7 @@ export const navigation = {
         title: 'Products',
         links: [
           { label: 'MenuMesh', href: '/products/menumesh' },
-          { label: 'Clokrix', href: '/products/vyro' },
+          { label: 'Clokrix', href: '/products/clokrix' },
           { label: 'Baby', href: '/products/baby' },
         ],
       },

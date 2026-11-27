@@ -2,6 +2,8 @@
 
 The contract between the website and the VYRO desktop app (spec §12). The website side is built in Phase 8; this document comes first so the app work can start now. The endpoints, fields and error codes below are fixed: changing them needs Tanishq's approval (spec §0.6), and once a public VYRO build uses them they only ever gain optional fields.
 
+**Clokrix doesn't use this API (2026-11-27).** Clokrix, VYRO's new name, is sold, licensed, downloaded and updated on its own site, `https://clokrix.jainavinfotech.in`, and accepts only its own `CLKX-` keys ([decisions](decisions.md), "Clokrix sells on its own site"). The API stays as written for products sold on this site, of which there are none yet. The examples below keep `vyro` and `VYRO-` keys as sample values; use the slug of a product sold here (locally `sample-app`, from `pnpm seed:store`). The device-id salt `vyro-device-v1` is part of the contract and stays.
+
 - **Base URL:** `https://jainavinfotech.in/api/v1/licensing`
 - **Transport:** HTTPS only. JSON request and response bodies (`Content-Type: application/json`, UTF-8). Request bodies larger than 4 KB are refused.
 - **Clients:** call from Rust (or the Tauri HTTP plugin), not from webview `fetch`: the API sends no CORS headers.
@@ -221,7 +223,7 @@ The public keys as a JWKS. The app embeds these at build time; this endpoint is 
 
 ## Related: the update feed
 
-Not part of this API. VYRO doesn't use it: installed copies update from GitHub (`nanu1605/vyro-releases`, the release's `latest.json`; docs/decisions.md, "VYRO updates"). The site's feed (spec §12.5, built in Phase 3) stays for a later switch:
+Not part of this API. Clokrix doesn't use it: installed copies update from the Clokrix site's own feed (`https://clokrix.jainavinfotech.in/updates/latest.json`; docs/decisions.md, "Clokrix sells on its own site"). The site's feed (spec §12.5, built in Phase 3) stays for products sold here:
 
 ```
 GET https://jainavinfotech.in/api/v1/updates/vyro/{{target}}/{{arch}}/{{current_version}}?channel=stable
@@ -237,4 +239,4 @@ curl -s https://jainavinfotech.in/api/v1/licensing/trial \
   -d '{"product":"vyro","deviceId":"0000000000000000000000000000000000000000000000000000000000000000","appVersion":"1.0.1"}'
 ```
 
-From Phase 8, `scripts/license-test-client` behaves like the app (activate, validate, deactivate, trial, update check) against any environment.
+From Phase 8, `scripts/license-test-client` behaves like the app (activate, validate, deactivate, trial, update check) against any environment. Its `--product` defaults to `sample-app` ([runbooks/licensing.md](runbooks/licensing.md#testing-an-environment-with-the-test-client)).

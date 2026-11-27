@@ -66,16 +66,19 @@ async function ensure<S extends CollectionSlug>(
     context,
     overrideAccess: true,
   })
-  await local.update({
-    collection,
-    id: doc.id,
-    locale: 'hi',
-    data: { ...(withHindi(doc, hi) as object), ...hiRaw },
-    draft,
-    depth: 0,
-    context,
-    overrideAccess: true,
-  })
+  // Nothing to write in Hindi for a collection without localized fields (redirects).
+  if (Object.keys(hi).length || hiRaw) {
+    await local.update({
+      collection,
+      id: doc.id,
+      locale: 'hi',
+      data: { ...(withHindi(doc, hi) as object), ...hiRaw },
+      draft,
+      depth: 0,
+      context,
+      overrideAccess: true,
+    })
+  }
   summary.created.push(label)
   return doc.id
 }
@@ -187,6 +190,8 @@ export async function seed(payload: Payload): Promise<SeedSummary> {
     } else summary.skipped.push('users:dev-owner')
   }
 
+  // The seed creates no plans: Clokrix, the only product that had them, is sold on its own site
+  // since 2026-11-27. `pnpm seed:store` adds a sample product with plans for local store tests.
   const productIds: Record<string, number> = {}
   for (const doc of content.products) {
     productIds[doc.en.slug] = await ensure(payload, summary, {
@@ -198,62 +203,25 @@ export async function seed(payload: Payload): Promise<SeedSummary> {
     })
   }
 
-  const planIds: Record<string, number> = {}
-  for (const plan of content.vyroPlans) {
-    planIds[plan.en.code] = await ensure(payload, summary, {
-      collection: 'plans',
-      label: `plans:vyro/${plan.en.code}`,
-      where: {
-        and: [{ product: { equals: productIds.vyro } }, { code: { equals: plan.en.code } }],
-      },
-      draft: false,
-      en: { ...plan.en, product: productIds.vyro },
-      hi: plan.hi,
-    })
-  }
-
-  // "Buy Pro" needs the Pro plan, which needs the product: link it once both exist.
-  const vyro = await payload.findByID({
-    collection: 'products',
-    id: productIds.vyro,
-    draft: true,
-    depth: 0,
-    overrideAccess: true,
-  })
-  if (!vyro.secondaryButton?.type) {
-    await payload.update({
-      collection: 'products',
-      id: vyro.id,
-      data: { secondaryButton: { type: 'buy', plan: planIds.pro } },
-      draft: true,
-      depth: 0,
-      context,
-      overrideAccess: true,
-    })
-  }
-
-  // Vanity path (spec §7): /vyro → 308 → /products/vyro, served by the catch-all page.
-  const vanity = await payload.find({
-    collection: 'redirects',
-    where: { from: { equals: '/vyro' } },
-    limit: 1,
-    depth: 0,
-    overrideAccess: true,
-  })
-  if (!vanity.docs.length) {
-    await payload.create({
+  // Vanity and old paths (spec §7, §8.6), e.g. /vyro → 308 → /products/clokrix. The catch-all
+  // page and the product pages look them up for paths they don't know.
+  for (const { from, product } of content.redirects) {
+    await ensure(payload, summary, {
       collection: 'redirects',
-      data: {
-        from: '/vyro',
-        to: { type: 'reference', reference: { relationTo: 'products', value: productIds.vyro! } },
+      label: `redirects:${from}`,
+      where: { from: { equals: from } },
+      draft: false,
+      en: {
+        from,
+        to: {
+          type: 'reference',
+          reference: { relationTo: 'products', value: productIds[product] },
+        },
         type: '308',
       },
-      depth: 0,
-      context,
-      overrideAccess: true,
+      hi: {},
     })
-    summary.created.push('redirects:/vyro')
-  } else summary.skipped.push('redirects:/vyro')
+  }
 
   for (const { related, ...doc } of content.services) {
     await ensure(payload, summary, {
@@ -334,8 +302,9 @@ export async function seed(payload: Payload): Promise<SeedSummary> {
     summary.created.push('site-settings')
   } else summary.skipped.push('site-settings')
 
-  // Checkout records the Terms and EULA versions a buyer accepts: start with the seeded drafts'.
-  // The refund window that Refunds and Cancellation states is seeded with them.
+  // Checkout records the Terms and EULA versions a buyer accepts: start with the seeded Terms
+  // draft's, and 0.1 for a product's EULA (none is seeded, see content.commerceSettings). The
+  // refund window that Refunds and Cancellation states is seeded with them.
   const commerce = await payload.findGlobal({
     slug: 'commerce-settings',
     depth: 0,

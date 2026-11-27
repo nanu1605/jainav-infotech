@@ -5,7 +5,7 @@ import type { Locale } from '@/i18n/routing'
 import type { LoadedProduct } from '@/lib/product'
 import type { hostedProductSubpaths } from '@/lib/routes'
 
-/** Title and breadcrumbs (Products › VYRO › Pricing) of a hosted product's sub-page. */
+/** Title and breadcrumbs (Products › Sample App › Pricing) of a hosted product's sub-page. */
 export function SubpageHeader({
   loaded: { product },
   locale,

@@ -11,8 +11,9 @@ healthchecks.io takes over the heartbeats.
   - `https://jainavinfotech.in/`: HTTP 200.
   - `https://jainavinfotech.in/api/v1/health`: HTTP 200 with `"ok":true`. The app and its database
     answer.
-  - From Phase 8: `https://jainavinfotech.in/api/v1/licensing/health`: HTTP 200 with `"ok":true`. The
-    licensing keys are set and the database answers ([licensing.md](licensing.md)).
+  - From Phase 8, once the licensing keys are installed (since 2026-11-27 they wait for a product
+    sold here): `https://jainavinfotech.in/api/v1/licensing/health`: HTTP 200 with `"ok":true`.
+    The licensing keys are set and the database answers ([licensing.md](licensing.md)).
   - Staging, every 15 minutes, where its basic auth allows.
   - The site's update feed is not monitored.
 - Heartbeat monitors (the job pings a URL; the monitor alerts when a ping is missing):

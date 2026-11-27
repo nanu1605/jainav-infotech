@@ -11,8 +11,9 @@ import { signInToAdmin } from './helpers/store'
 const PUBLIC_PAGES = [
   '/',
   '/products',
-  '/products/vyro',
-  '/products/vyro/pricing',
+  '/products/clokrix',
+  // Hosted pricing: the Sample App's (`pnpm seed:store`).
+  '/products/sample-app/pricing',
   '/products/baby',
   '/services',
   '/about',

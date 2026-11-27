@@ -81,7 +81,7 @@ We also [build custom software](/services) for clients. A separate written agree
 
 ## Links to other websites
 
-This site links to services we do not run, such as WhatsApp and Google Maps. We do not control them, and their own terms and privacy notices apply there. MenuMesh and Baby have or will have their own websites, and the terms shown on those websites apply there.
+This site links to services we do not run, such as WhatsApp and Google Maps. We do not control them, and their own terms and privacy notices apply there. MenuMesh, Clokrix and Baby have or will have their own websites, and the terms shown on those websites apply there.
 
 ## Warranties and liability
 

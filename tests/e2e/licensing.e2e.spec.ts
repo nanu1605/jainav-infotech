@@ -1,9 +1,9 @@
 /**
- * Phase 8 account licensing in a real browser (spec §19 "Account device deactivation"): buy Clokrix
- * Pro through the stand-in gateway, activate two devices with the key from the order email, see
- * both on the Licenses page, deactivate one there and use the freed slot; then axe on Licenses and
- * Downloads in both languages. Needs the dev server (the stand-in gateway), so it skips against
- * E2E_BASE_URL like the store suite.
+ * Phase 8 account licensing in a real browser (spec §19 "Account device deactivation"): buy the
+ * Sample App's Pro (`pnpm seed:store`) through the stand-in gateway, activate two devices with the
+ * key from the order email, see both on the Licenses page, deactivate one there and use the freed
+ * slot; then axe on Licenses and Downloads in both languages. Needs the dev server (the stand-in
+ * gateway), so it skips against E2E_BASE_URL like the store suite.
  */
 import { randomBytes } from 'node:crypto'
 
@@ -19,12 +19,12 @@ test.describe.configure({ timeout: 180_000 })
 test.beforeEach(({ page }, info) => useOwnIp(page, info))
 
 /**
- * `VYRO-` and four groups of five Crockford Base32 characters (no I, L, O or U). The prefix comes
- * from the product slug, which stays `vyro` after the rename to Clokrix.
+ * `SAMPLEAPP-` and four groups of five Crockford Base32 characters (no I, L, O or U). The prefix
+ * is the product slug in capitals without the hyphen (src/lib/licensing/keys.ts).
  */
-const KEY = /\bVYRO(?:-[0-9A-HJKMNP-TV-Z]{5}){4}\b/
+const KEY = /\bSAMPLEAPP(?:-[0-9A-HJKMNP-TV-Z]{5}){4}\b/
 
-/** POST /api/v1/licensing/activate as Clokrix would, from a new device each time. */
+/** POST /api/v1/licensing/activate as an app on this site's licensing would, from a new device. */
 const activate = (
   request: APIRequestContext,
   info: TestInfo,
@@ -35,7 +35,7 @@ const activate = (
     headers: { 'cf-connecting-ip': testIp(info) },
     data: {
       licenseKey,
-      product: 'vyro',
+      product: 'sample-app',
       deviceId: randomBytes(32).toString('hex'),
       deviceName,
       os: 'Windows 11 Pro 26100',
@@ -45,7 +45,7 @@ const activate = (
 
 test('a device deactivated from the account frees its slot', async ({ page, request }, info) => {
   const email = address('licenses')
-  await signIn(page, email, '/checkout/vyro/pro')
+  await signIn(page, email, '/checkout/sample-app/pro')
   await fillCheckout(page)
   await pay(page)
   const licenseKey = (await mailTo(email, /is confirmed/)).text.match(KEY)?.[0]
@@ -62,7 +62,7 @@ test('a device deactivated from the account frees its slot', async ({ page, requ
   )
 
   await page.goto('/account/licenses')
-  const license = page.getByRole('region', { name: 'Clokrix Pro' })
+  const license = page.getByRole('region', { name: 'Sample App Pro' })
   await expect(license.getByLabel('License key')).toHaveValue(key)
   const devices = license.getByRole('listitem')
   await expect(devices).toHaveCount(2)
@@ -96,7 +96,7 @@ test('a device deactivated from the account frees its slot', async ({ page, requ
   await expect(license).toContainText('THIRD-PC')
 
   await page.goto('/account/downloads')
-  await expect(page.getByRole('heading', { level: 2, name: 'Clokrix' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'Sample App' })).toBeVisible()
 
   for (const url of [
     '/account/licenses',

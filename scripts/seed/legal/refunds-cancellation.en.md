@@ -2,7 +2,7 @@ We are Jainav Infotech Private Limited. This page explains how cancelling and re
 
 ## Who this page covers
 
-It applies whether you buy for yourself or for a business. It does not cover project work we agree separately, or anything bought on a product's own website, such as [menumesh.in](https://menumesh.in). For a purchase on a product's own website, follow that website's policy, or [contact us](/contact?topic=support) if you cannot find it.
+It applies whether you buy for yourself or for a business. It does not cover project work we agree separately, or anything bought on a product's own website, such as [menumesh.in](https://menumesh.in) or [clokrix.jainavinfotech.in](https://clokrix.jainavinfotech.in). For a purchase on a product's own website, follow that website's policy, or [contact us](/contact?topic=support) if you cannot find it.
 
 Free downloads and anything else we give you free involve no payment, so there is nothing to refund. If a free app gives you trouble, [tell us](/contact?topic=support).
 

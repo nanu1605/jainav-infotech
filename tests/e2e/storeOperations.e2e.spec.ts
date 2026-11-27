@@ -63,14 +63,15 @@ test('the Owner sends a waitlist email test to themselves', async ({ page }) => 
   await signInToAdmin(page)
   const subject = `Launch news ${Date.now()}`
   const id = await page.evaluate(async (subject) => {
-    const products = await (await fetch('/api/products?where[slug][equals]=vyro&depth=0')).json()
+    // Baby has no build yet, so its page takes waitlist sign-ups.
+    const products = await (await fetch('/api/products?where[slug][equals]=baby&depth=0')).json()
     const res = await fetch('/api/waitlist-emails', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         product: products.docs[0].id,
         subject,
-        body: 'VYRO is nearly here.\n\nThank you for waiting.',
+        body: 'Baby is nearly here.\n\nThank you for waiting.',
       }),
     })
     return ((await res.json()) as { doc: { id: number } }).doc.id

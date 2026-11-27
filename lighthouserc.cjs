@@ -12,7 +12,7 @@ const local = ['localhost', '127.0.0.1'].includes(new URL(base).hostname)
 module.exports = {
   ci: {
     collect: {
-      url: ['/', '/products', '/products/vyro', '/products/baby'].map((path) => base + path),
+      url: ['/', '/products', '/products/clokrix', '/products/baby'].map((path) => base + path),
       numberOfRuns: 1,
     },
     assert: {

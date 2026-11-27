@@ -17,10 +17,12 @@ const noContent = () =>
   new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } })
 
 /**
- * Tauri v2 update feed (spec §12.5), URL frozen before the first public VYRO build:
+ * Tauri v2 update feed (spec §12.5) for desktop apps released on this site. App builds embed the
+ * URL, so it never changes:
  * GET /api/v1/updates/{product}/{target}/{arch}/{current_version}?channel=stable
  * → 200 { version, notes, pub_date, url, signature } for a newer release, otherwise 204.
  * Unknown products and malformed versions also answer 204, so old clients never error.
+ * Clokrix doesn't use it: it updates from its own site (docs/decisions.md, 2026-11-27).
  */
 export async function GET(req: NextRequest, ctx: { params: Promise<Record<string, string>> }) {
   const p = params.safeParse(await ctx.params)

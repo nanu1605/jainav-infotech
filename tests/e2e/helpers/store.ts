@@ -1,6 +1,7 @@
 /**
  * Store helpers shared by the e2e suites (spec §19): email-code sign-in from the outbox, the
- * checkout form and a payment through the development stand-in gateway.
+ * checkout form and a payment through the development stand-in gateway. Purchases buy the Sample
+ * App's Pro plan, which `pnpm seed:store` adds (development and e2e databases only).
  */
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -61,7 +62,7 @@ export async function signIn(page: Page, email: string, next = '/account') {
 }
 
 export async function fillCheckout(page: Page) {
-  await page.goto('/checkout/vyro/pro')
+  await page.goto('/checkout/sample-app/pro')
   const main = page.locator('main')
   await main.getByLabel('Full name').fill('Priya Sharma')
   await main.getByLabel('State').selectOption({ label: 'Maharashtra' })

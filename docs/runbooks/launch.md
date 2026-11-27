@@ -12,9 +12,9 @@ Phase 6 in order (spec §20). Each step names who does it. Details are in the ot
   - phone and email addresses, business days;
   - the Grievance Officer's name and title.
 - [ ] Legal texts reviewed, ideally by a lawyer: drafts are in `scripts/seed/legal/`, and the seed
-      loads them. The refund window is 7 days (2026-11-26); fill the other `{{PLACEHOLDERS}}`. The
-      EULA waits for Clokrix Pro: released builds are MIT or Apache-2.0
-      ([decisions](../decisions.md), "Legal drafts").
+      loads them. The refund window is 7 days (2026-11-26); fill the other `{{PLACEHOLDERS}}`.
+      There is no EULA to review: since 2026-11-27 Clokrix is sold and licensed on its own site,
+      and the seed has no EULA ([decisions](../decisions.md), "Clokrix sells on its own site").
 
 ## The server in short
 
@@ -77,9 +77,10 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
      staging's basic auth: the first user becomes the Owner;
    - publish what the seed saved as drafts: Products (sidebar group Products), Services and Pages
      (group Content). Per collection, tick the header checkbox, click Publish, then
-     "Confirm publish" in the drawer; it publishes English and Hindi together. Team, FAQs and
-     plans are seeded published, and posts, jobs and docs stay empty. Legal Pages stay drafts
-     until step 9, so their footer links answer 404 on staging;
+     "Confirm publish" in the drawer; it publishes English and Hindi together. Team and FAQs are
+     seeded published, the seed creates no plans, and posts, jobs and docs stay empty. Legal
+     Pages stay drafts until step 9, so their footer links answer 404 on staging. The `/clokrix`,
+     `/vyro` and `/products/vyro` redirects work once Clokrix is published;
    - click through it.
 8. **Production:**
    - the apex and `www` DNS records, proxied; the Access check on the apex
@@ -95,12 +96,15 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
 9. **Legal pages:**
    - on staging, in a fresh browser profile, list the cookies and storage on the main pages and
      compare them with the Cookie Policy: the development check can't see Cloudflare or Umami;
-   - the Owner publishes the reviewed texts with their effective date (spec §8.13), all but the
-     EULA, and sets the Terms version in Commerce settings to match;
+   - the Owner publishes the reviewed texts with their effective date (spec §8.13), and sets the
+     Terms version in Commerce settings to match. The seed has had no EULA since 2026-11-27, so
+     there is none to hold back;
    - Razorpay's activation asks for About us, Contact us, Pricing, Terms, Privacy and Refunds, plus
-     a sample invoice. Shipping stays live too.
-10. **Clokrix download** (if it goes live): `sudo app-compose jainav tools production - pnpm import:release <tag>`
-    ([server.md §8](server.md#8-one-off-commands)), then the Owner publishes the release.
+     a sample invoice. Shipping stays live too. The activation itself waits for a product this
+     store sells ("After launch", below).
+10. **Clokrix download:** nothing to import. Clokrix's Download link goes to its own site,
+    `https://clokrix.jainavinfotech.in/download`, which always serves the newest build, the copy
+    the app updates from (2026-11-27).
 11. **Email** ([cloudflare.md](cloudflare.md#email)): Resend domain verified, the mailbox
     addresses, SPF, DKIM, and our DMARC record (`p=none`) in place of GoDaddy's. The emails'
     header icon shows in the first production mail (staging's basic auth blocks it there).
@@ -145,6 +149,9 @@ steps are in [server.md](server.md) and [edge.md](edge.md); this list gives the 
 - [ ] Lighthouse on the production URLs: `LHCI_BASE_URL=https://jainavinfotech.in pnpm lhci` (spec
       §15; Phase 5 measured locally only).
 
-**After launch (Tanishq):** once the pricing page shows real Clokrix prices, apply for Razorpay
-activation using this website. First get Razorpay's written confirmation that one-time software
-licenses are accepted ([decisions](../decisions.md), "Legal drafts").
+**After launch (Tanishq):** Razorpay's activation for this website waits for a product this store
+sells. Clokrix doesn't count: since 2026-11-27 it is sold on its own site
+([decisions](../decisions.md), "Clokrix sells on its own site"), so Launch 2 is on hold. Once such
+a product's pricing page shows its real prices, apply for the activation using this website. First
+get Razorpay's written confirmation that one-time software licenses are accepted
+([decisions](../decisions.md), "Legal drafts").

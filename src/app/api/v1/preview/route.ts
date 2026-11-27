@@ -13,7 +13,7 @@ const pathParam = z
 
 /**
  * Live preview entry (spec §20 Phase 3): the admin's preview iframe opens
- * /api/v1/preview?path=/hi/products/vyro. A signed-in admin gets Next.js draft mode (pages then
+ * /api/v1/preview?path=/hi/products/clokrix. A signed-in admin gets Next.js draft mode (pages then
  * read drafts with that admin's access) and is sent to the page; anyone else gets 401.
  */
 export async function GET(req: NextRequest) {

@@ -40,7 +40,7 @@ const COPY = {
   downloadWindows: { en: 'Download for Windows', hi: 'Windows के लिए डाउनलोड करें' },
   version: { en: 'Version 1.4.0 · 8.2 MB', hi: 'वर्शन 1.4.0 · 8.2 MB' },
   downloading: { en: 'Downloading…', hi: 'डाउनलोड हो रहा है…' },
-  buy: { en: 'Buy Clokrix Pro', hi: 'Clokrix Pro ख़रीदें' },
+  buy: { en: 'Buy Pro', hi: 'Pro ख़रीदें' },
   soon: { en: 'Available soon', hi: 'जल्द उपलब्ध' },
   waitlist: { en: 'Join the waitlist', hi: 'वेटलिस्ट में शामिल हों' },
   visit: { en: 'Visit MenuMesh', hi: 'MenuMesh पर जाएँ' },
@@ -134,7 +134,7 @@ export default function ActionsSection() {
           </a>
         </Button>
         <Button asChild variant="link">
-          <Link href="/products/vyro/docs">{c(COPY.docs)}</Link>
+          <Link href="/products/sample-app/docs">{c(COPY.docs)}</Link>
         </Button>
       </Group>
 

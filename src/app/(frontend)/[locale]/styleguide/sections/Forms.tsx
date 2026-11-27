@@ -245,12 +245,12 @@ type Copy = (typeof COPY)['en']
 const PRODUCTS = {
   en: [
     { value: 'menumesh', label: 'MenuMesh', description: 'QR table ordering for restaurants.' },
-    { value: 'vyro', label: 'Clokrix', description: 'Know your machine.' },
+    { value: 'clokrix', label: 'Clokrix', description: 'Know your machine.' },
     { value: 'baby', label: 'Baby', description: 'Your private voice assistant for Windows.' },
   ],
   hi: [
     { value: 'menumesh', label: 'MenuMesh', description: 'रेस्तराँ के लिए QR टेबल ऑर्डरिंग।' },
-    { value: 'vyro', label: 'Clokrix', description: 'अपनी मशीन को जानिए।' },
+    { value: 'clokrix', label: 'Clokrix', description: 'अपनी मशीन को जानिए।' },
     { value: 'baby', label: 'Baby', description: 'Windows के लिए आपका निजी वॉइस असिस्टेंट।' },
   ],
 }
@@ -467,7 +467,7 @@ export default function FormsSection() {
             <Input defaultValue="Jainav Infotech Private Limited" disabled />
           </FormField>
           <FormField label={c.licence}>
-            <Input defaultValue="VYRO-XXXX-XXXX-XXXX" readOnly className="font-mono" />
+            <Input defaultValue="CLKX-XXXX-XXXX-XXXX" readOnly className="font-mono" />
           </FormField>
         </div>
       </Block>
@@ -528,7 +528,7 @@ export default function FormsSection() {
           <RadioGroup
             name={`${uid}-product`}
             options={products}
-            defaultValue="vyro"
+            defaultValue="clokrix"
             className="sm:grid-cols-3"
           />
         </FormField>
