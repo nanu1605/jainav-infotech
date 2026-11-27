@@ -3,6 +3,7 @@ import { getPayload, type Payload } from 'payload'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import config from '@/payload.config'
+import type { Product } from '@/payload-types'
 
 import { legalPages } from '../../scripts/seed/content'
 import { legalBody, seed } from '../../scripts/seed/seed'
@@ -13,14 +14,38 @@ beforeAll(async () => {
   payload = await getPayload({ config })
 })
 
+/** The seeded Clokrix draft in one language, without falling back to English. */
+const clokrix = async (locale: 'en' | 'hi') =>
+  (
+    await payload.find({
+      collection: 'products',
+      where: { slug: { equals: 'clokrix' } },
+      draft: true,
+      locale,
+      fallbackLocale: false,
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+  ).docs[0]
+
 describe('seed', () => {
   it('runs twice safely and keeps English and Hindi values apart', async () => {
     await seed(payload)
     const counts = async () =>
       Promise.all(
-        (['products', 'plans', 'services', 'pages', 'faqs', 'legal-pages', 'team'] as const).map(
-          async (collection) => (await payload.count({ collection })).totalDocs,
-        ),
+        (
+          [
+            'products',
+            'plans',
+            'services',
+            'pages',
+            'faqs',
+            'legal-pages',
+            'team',
+            'redirects',
+          ] as const
+        ).map(async (collection) => (await payload.count({ collection })).totalDocs),
       )
     const before = await counts()
 
@@ -28,16 +53,7 @@ describe('seed', () => {
     expect(second.created).toEqual([])
     expect(await counts()).toEqual(before)
 
-    const find = (locale: 'en' | 'hi') =>
-      payload.find({
-        collection: 'products',
-        where: { slug: { equals: 'vyro' } },
-        draft: true,
-        locale,
-        fallbackLocale: false,
-        depth: 0,
-      })
-    const [en, hi] = [(await find('en')).docs[0], (await find('hi')).docs[0]]
+    const [en, hi] = [await clokrix('en'), await clokrix('hi')]
     expect(en?.tagline).toBe('Know your machine.')
     expect(hi?.tagline).toBe('अपनी मशीन को जानिए।')
     expect(hi?.hiStatus).toBe('draft')
@@ -51,7 +67,54 @@ describe('seed', () => {
       blockType: 'productHero',
       heading: 'अपनी मशीन को जानिए।',
     })
-    expect(en?.secondaryButton).toMatchObject({ type: 'buy' })
+  })
+
+  it('shows Clokrix as an external product that links to its own site', async () => {
+    await seed(payload)
+    const [en, hi] = [await clokrix('en'), await clokrix('hi')]
+    expect(en).toMatchObject({
+      hostingMode: 'external',
+      externalUrl: 'https://clokrix.jainavinfotech.in',
+      primaryButton: { type: 'visit' },
+      secondaryLinks: [
+        { kind: 'other', label: 'Buy Pro', url: 'https://clokrix.jainavinfotech.in/buy' },
+        { kind: 'other', label: 'Download', url: 'https://clokrix.jainavinfotech.in/download' },
+      ],
+    })
+    expect(hi?.secondaryLinks?.map((link) => link.label)).toEqual(['Pro ख़रीदें', 'डाउनलोड करें'])
+
+    // Display-only tiers; Pro is bought, and Clokrix downloaded, on the Clokrix site.
+    const pricing = (doc?: Product) => doc?.layout?.find((block) => block.blockType === 'pricing')
+    expect(pricing(en)).toMatchObject({
+      source: 'manual',
+      fullPricingUrl: 'https://clokrix.jainavinfotech.in/buy',
+      tiers: [
+        { name: 'Free', price: '₹0' },
+        { name: 'Pro', price: '₹10,000', highlight: true },
+      ],
+    })
+    expect(pricing(hi)).toMatchObject({ tiers: [{ name: 'फ़्री' }, { name: 'प्रो' }] })
+    expect(en?.layout?.some((block) => block.blockType === 'download')).toBe(false)
+
+    const redirect = async (from: string) =>
+      (
+        await payload.find({
+          collection: 'redirects',
+          where: { from: { equals: from } },
+          limit: 1,
+          depth: 0,
+          overrideAccess: true,
+        })
+      ).docs[0]
+    for (const from of ['/clokrix', '/products/vyro']) {
+      expect(await redirect(from), from).toMatchObject({
+        type: '308',
+        to: { type: 'reference', reference: { relationTo: 'products', value: en?.id } },
+      })
+    }
+    // A database seeded before the rename keeps its /vyro redirect to the old VYRO product (the
+    // seed never overwrites), so only its presence is checked.
+    expect(await redirect('/vyro')).toBeDefined()
   })
 
   it('has every legal page in both languages, with the same structure and placeholders', async () => {
