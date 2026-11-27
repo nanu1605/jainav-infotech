@@ -90,7 +90,7 @@ On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/la
 - [ ] SPF / DKIM / DMARC; mail-tester ≥ 9/10.
 - [ ] Legal review (docs/decisions.md, "Legal drafts"): blanks filled, then the Owner publishes every legal page (§8.13; the seed has had no EULA since 2026-11-27). Final content check. The company blanks and the refund window (7 days) are filled (2026-11-26); the lawyer's and the CA's are left.
 - [x] Clokrix (formerly VYRO) download: done by linking to the Clokrix site's download, `https://clokrix.jainavinfotech.in/download`, which always serves the newest build; nothing is imported (2026-11-27, docs/decisions.md "Clokrix sells on its own site").
-- [ ] Staging's Clokrix updated to the new seed (Tanishq; the steps are in docs/decisions.md, "Clokrix sells on its own site"). Staging was seeded earlier and keeps the old `vyro` product until then.
+- [x] Staging's Clokrix updated to the new seed (Tanishq, 2026-11-27, with the steps in docs/decisions.md, "Clokrix sells on its own site"): `/products/clokrix` shows Visit Clokrix, Buy Pro and Download, `/clokrix`, `/vyro` and `/products/vyro` redirect to it, `/go/clokrix` opens the Clokrix site, and Custom software & SaaS lists Clokrix again.
 - [ ] From the Clokrix team: whether the product copy's version-0.2 CPU figure, the MSI-only fan control and the PawnIO driver note still hold.
 - [ ] Lighthouse on the production URLs (§15); LCP is judged only there. Locally `pnpm lhci` serves HTTP/1.1, reads LCP above 2.5 s and only warns on it; over HTTP/2 the four pages are under it (docs/decisions.md, "LCP budget").
 
