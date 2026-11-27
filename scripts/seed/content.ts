@@ -463,7 +463,7 @@ export const products: SeedDoc<'products'>[] = [
       slug: 'clokrix',
       tagline: 'Know your machine.',
       summary:
-        'A light Windows hardware monitor: animated CPU and GPU speedometers, sensors for each part of your PC, history, health and alerts. It reads the sensors directly, with no third-party monitoring app or library.',
+        'A light Windows hardware monitor: animated CPU and GPU speedometers, sensors for each part of your PC, history, health and alerts. It reads the sensors directly, with no other hardware monitoring app.',
       type: 'desktop',
       category: 'pc-tools',
       platforms: ['windows'],
@@ -514,7 +514,7 @@ export const products: SeedDoc<'products'>[] = [
             {
               icon: 'scan-search',
               title: 'Reads sensors directly',
-              text: 'No third-party monitoring app or library.',
+              text: 'No other hardware monitoring app needed.',
             },
             {
               icon: 'feather',
@@ -639,7 +639,7 @@ export const products: SeedDoc<'products'>[] = [
     hi: {
       tagline: 'अपनी मशीन को जानिए।',
       summary:
-        'Windows के लिए एक हल्का हार्डवेयर मॉनिटर: एनिमेटेड CPU और GPU स्पीडोमीटर, आपके PC के हर हिस्से के सेंसर, हिस्ट्री, हेल्थ चेक और अलर्ट। यह सेंसर सीधे पढ़ता है, किसी थर्ड-पार्टी मॉनिटरिंग ऐप या लाइब्रेरी के बिना।',
+        'Windows के लिए एक हल्का हार्डवेयर मॉनिटर: एनिमेटेड CPU और GPU स्पीडोमीटर, आपके PC के हर हिस्से के सेंसर, हिस्ट्री, हेल्थ चेक और अलर्ट। यह सेंसर सीधे पढ़ता है, किसी दूसरे हार्डवेयर मॉनिटरिंग ऐप के बिना।',
       secondaryLinks: [{ label: 'Pro ख़रीदें' }, { label: 'डाउनलोड करें' }],
       layout: [
         {
@@ -665,11 +665,11 @@ export const products: SeedDoc<'products'>[] = [
             { title: 'वोल्टेज और क्लॉक' },
             {
               title: 'सेंसर सीधे पढ़ता है',
-              text: 'किसी थर्ड-पार्टी मॉनिटरिंग ऐप या लाइब्रेरी के बिना।',
+              text: 'किसी दूसरे हार्डवेयर मॉनिटरिंग ऐप की ज़रूरत नहीं।',
             },
             {
               title: 'आपके PC पर हल्का',
-              text: 'यह तभी एनिमेट करता है जब रीडिंग बदलती है, ट्रे में बंद करने पर अपनी विंडो रोक देता है, और डैशबोर्ड पर अपना CPU और मेमोरी उपयोग दिखाता है।',
+              text: 'यह तभी एनिमेट करता है जब रीडिंग बदलती है, विंडो को ट्रे में बंद करने पर उसे रोक देता है, और डैशबोर्ड पर अपना CPU और मेमोरी इस्तेमाल दिखाता है।',
             },
           ],
         },
@@ -681,7 +681,7 @@ export const products: SeedDoc<'products'>[] = [
             { title: 'सिंगल और मल्टी-मॉनिटर जानकारी' },
             {
               title: '7 दिन की हिस्ट्री',
-              text: 'पिछले 5 मिनट से 7 दिन तक के चार्ट, जिन्हें Clokrix Sensor Service ऐप बंद होने पर भी रिकॉर्ड करती है। फ़्री में भी रिकॉर्डिंग चलती रहती है, इसलिए प्रो लेने पर आपकी हिस्ट्री मौजूद रहती है।',
+              text: 'पिछले 5 मिनट से 7 दिन तक के चार्ट, जिन्हें Clokrix Sensor Service ऐप बंद होने पर भी रिकॉर्ड करती है। फ़्री वर्ज़न में भी रिकॉर्डिंग चलती रहती है, इसलिए प्रो लेने पर आपकी हिस्ट्री पहले से मौजूद मिलती है।',
             },
             {
               title: 'हेल्थ चेक और अलर्ट',
@@ -689,7 +689,7 @@ export const products: SeedDoc<'products'>[] = [
             },
             {
               title: 'फ़ैन कंट्रोल और GPU ट्यूनिंग',
-              text: 'सुरक्षा सीमाओं के साथ अपने फ़ैन कर्व और GPU ट्यूनिंग। एक क्लिक में फ़ैन BIOS सेटिंग पर और GPU स्टॉक सेटिंग पर लौट आते हैं। फ़ैन और पंप कंट्रोल अभी MSI B650M GAMING PLUS WIFI पर; हर बोर्ड की जाँच के बाद और बोर्ड जुड़ते जाएँगे।',
+              text: 'सुरक्षा सीमाओं के साथ अपने फ़ैन कर्व और GPU ट्यूनिंग। एक क्लिक में फ़ैन BIOS सेटिंग पर और GPU स्टॉक सेटिंग पर लौट आते हैं। फ़ैन और पंप कंट्रोल अभी MSI B650M GAMING PLUS WIFI पर; जैसे-जैसे दूसरे बोर्ड जाँचे जाएँगे, वे भी जुड़ते जाएँगे।',
             },
             { title: 'डेस्कटॉप विजेट' },
             { title: 'फ़ोन ऐप', text: 'आपके PC की रीडिंग, आपके फ़ोन पर।' },
@@ -704,7 +704,7 @@ export const products: SeedDoc<'products'>[] = [
             },
             {
               title: 'अपने-आप बदलने वाली गेम प्रोफ़ाइल',
-              text: 'फ़ुलस्क्रीन या बॉर्डरलेस गेम शुरू करते ही Clokrix अपनी Gaming प्रोफ़ाइल पर, या उस गेम के लिए आपकी सेव की गई सेटिंग पर चला जाता है। गेम बंद करते ही वापस।',
+              text: 'फ़ुलस्क्रीन या बॉर्डरलेस गेम शुरू करते ही Clokrix अपनी Gaming प्रोफ़ाइल पर, या उस गेम के लिए आपकी सेव की गई सेटिंग पर चला जाता है। गेम बंद करते ही यह पहले वाली सेटिंग पर लौट आता है।',
             },
             {
               title: 'सेशन रीप्ले',
@@ -743,7 +743,7 @@ export const products: SeedDoc<'products'>[] = [
               name: 'फ़्री',
               price: '₹0',
               features: [
-                { text: 'डैशबोर्ड, उसके लेआउट और एडिटिंग के साथ, और सेटिंग' },
+                { text: 'डैशबोर्ड (उसके लेआउट और एडिटिंग के साथ) और सेटिंग्स' },
                 {
                   text: 'हर PC पर Clokrix के पहली बार शुरू होने से 7 दिन तक प्रो मुफ़्त, कार्ड की ज़रूरत नहीं',
                 },
