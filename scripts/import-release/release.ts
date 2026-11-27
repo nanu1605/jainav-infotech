@@ -1,14 +1,15 @@
 /**
- * Importing a VYRO release from GitHub (spec §12.5): the pure checks on GitHub's JSON, the Tauri
- * `latest.json` and `SHA256SUMS.txt`, and the idempotent CMS writes. The network and temp-file
- * side lives in scripts/import-release.ts.
+ * Importing a Clokrix release from GitHub (spec §12.5): the pure checks on GitHub's JSON, the
+ * Tauri `latest.json` and `SHA256SUMS.txt`, and the idempotent CMS writes. The network and
+ * temp-file side lives in scripts/import-release.ts. Unused since 2026-11-27: that file's header
+ * says why.
  */
 import type { Payload } from 'payload'
 import semver from 'semver'
 import { z } from 'zod'
 
 export const REPO = 'nanu1605/vyro-releases'
-export const PRODUCT_SLUG = 'vyro'
+export const PRODUCT_SLUG = 'clokrix'
 /** Tauri's `${target}-${arch}` key in latest.json, and the release's `platform`. */
 export const PLATFORM = 'windows-x86_64'
 export const MANIFEST = 'latest.json'

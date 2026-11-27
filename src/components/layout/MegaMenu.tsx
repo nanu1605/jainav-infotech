@@ -22,7 +22,7 @@ export type MenuProduct = Pick<Product, 'name' | 'slug' | 'tagline' | 'status'> 
   logo?: Media | null
 }
 
-/** True on `href` itself and on pages below it (`/products` is current on `/products/vyro`). */
+/** True on `href` itself and on pages below it (`/products` is current on `/products/clokrix`). */
 export const isCurrent = (pathname: string, href: string) =>
   href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)
 

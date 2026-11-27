@@ -245,7 +245,7 @@ export default function ContentSection() {
               <StatusBadge status="live" />
               <PlatformBadge platform="windows" />
             </div>
-            <CardTitle href="/products/vyro">Clokrix</CardTitle>
+            <CardTitle href="/products/clokrix">Clokrix</CardTitle>
             <CardDescription>{c(COPY.vyro)}</CardDescription>
           </Card>
           <Card variant="interactive" className="sm:col-span-2">

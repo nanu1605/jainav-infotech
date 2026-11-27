@@ -77,7 +77,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
         status: 'beta',
         tagline: 'QR table ordering for restaurants.',
       },
-      { name: 'Clokrix', slug: 'vyro', status: 'live', tagline: 'Know your machine.' },
+      { name: 'Clokrix', slug: 'clokrix', status: 'live', tagline: 'Know your machine.' },
       {
         name: 'Baby',
         slug: 'baby',
@@ -90,7 +90,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
         title: 'Products',
         links: [
           { label: 'MenuMesh', href: '/products/menumesh' },
-          { label: 'Clokrix', href: '/products/vyro' },
+          { label: 'Clokrix', href: '/products/clokrix' },
           { label: 'Baby', href: '/products/baby' },
           { label: 'All products', href: '/products' },
         ],
@@ -160,7 +160,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
       [
         { label: 'Home', href: '/' },
         { label: 'Products', href: '/products' },
-        { label: 'Clokrix', href: '/products/vyro' },
+        { label: 'Sample App', href: '/products/sample-app' },
         { label: 'Pricing' },
       ],
       [
@@ -187,7 +187,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
         status: 'beta',
         tagline: 'रेस्टोरेंट के लिए QR से टेबल पर ऑर्डर।',
       },
-      { name: 'Clokrix', slug: 'vyro', status: 'live', tagline: 'अपनी मशीन को पहचानें।' },
+      { name: 'Clokrix', slug: 'clokrix', status: 'live', tagline: 'अपनी मशीन को पहचानें।' },
       {
         name: 'Baby',
         slug: 'baby',
@@ -200,7 +200,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
         title: 'प्रोडक्ट',
         links: [
           { label: 'MenuMesh', href: '/products/menumesh' },
-          { label: 'Clokrix', href: '/products/vyro' },
+          { label: 'Clokrix', href: '/products/clokrix' },
           { label: 'Baby', href: '/products/baby' },
           { label: 'सभी प्रोडक्ट', href: '/products' },
         ],
@@ -264,7 +264,7 @@ const COPY: Record<'en' | 'hi', Copy> = {
       [
         { label: 'होम', href: '/' },
         { label: 'प्रोडक्ट', href: '/products' },
-        { label: 'Clokrix', href: '/products/vyro' },
+        { label: 'Sample App', href: '/products/sample-app' },
         { label: 'कीमतें' },
       ],
       [
@@ -390,10 +390,10 @@ export default function NavigationSection() {
       <Demo demo={c.demos.subNav}>
         <div className="space-y-3">
           <div className={`${frame} overflow-hidden`}>
-            <ProductSubNav slug="vyro" name="Clokrix" active="pricing" />
+            <ProductSubNav slug="sample-app" name="Sample App" active="pricing" />
           </div>
           <div className={`${frame} max-w-xs overflow-hidden`}>
-            <ProductSubNav slug="vyro" name="Clokrix" active="support" />
+            <ProductSubNav slug="sample-app" name="Sample App" active="support" />
           </div>
         </div>
       </Demo>

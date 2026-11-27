@@ -21,9 +21,9 @@ const SIGN_IN = '/account/sign-in'
 
 /**
  * Where to go after signing in (open-redirect guard): a local, locale-less path such as
- * `/checkout/vyro/pro`, else `/account`. No `//` or `/\` (other hosts), no whitespace or control
- * characters (browsers drop tabs and newlines, which would turn `/\t/x` into `//x`), and never the
- * sign-in page itself, which would redirect to itself.
+ * `/checkout/sample-app/pro`, else `/account`. No `//` or `/\` (other hosts), no whitespace or
+ * control characters (browsers drop tabs and newlines, which would turn `/\t/x` into `//x`), and
+ * never the sign-in page itself, which would redirect to itself.
  */
 export function safeNext(value: unknown): string {
   if (typeof value !== 'string' || !/^\/(?![/\\])[^\\\s\p{Cc}]*$/u.test(value)) return '/account'
@@ -43,7 +43,9 @@ export async function requireCustomer(locale: Locale, path: string): Promise<Cus
   return customer
 }
 
-/** "VYRO Pro" per item, as the customer bought it (the invoice text when a name is missing). */
+/**
+ * "Sample App Pro" per item, as the customer bought it (the invoice text when a name is missing).
+ */
 export const orderLabel = (order: Order) =>
   order.items
     .map((item) => {

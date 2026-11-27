@@ -122,7 +122,7 @@ const redirectTarget = (to: Redirect['to']): string | null => {
 }
 
 /**
- * Redirect stored for a public (unprefixed) path, e.g. /vyro → /products/vyro (spec §8.6).
+ * Redirect stored for a public (unprefixed) path, e.g. /vyro → /products/clokrix (spec §8.6).
  * Redirects are staff-only in the API (they are config, not content), so this lookup reads them
  * with access off; it only ever returns where the path points.
  */

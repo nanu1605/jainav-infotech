@@ -1,5 +1,10 @@
 /**
- * Imports a VYRO release from GitHub (nanu1605/vyro-releases) as an installer + release, so the
+ * Unused since 2026-11-27: Clokrix (formerly VYRO) is sold, downloaded and updated on its own
+ * site, and none of its releases are imported here (docs/decisions.md, "Clokrix sells on its own
+ * site (2026-11-27)"). Its release repository, nanu1605/vyro-releases, is now private, and this
+ * script can't read it: its asset downloads send no token.
+ *
+ * Imports a Clokrix release from GitHub (nanu1605/vyro-releases) as an installer + release, so the
  * download page and the Tauri update feed serve it (spec §12.5).
  *
  *   pnpm payload run scripts/import-release.ts [tag]        # tag: v0.3.0, default: latest
@@ -12,11 +17,11 @@
  * uploaded, never opened or run. The installer must match SHA256SUMS.txt (and GitHub's digest)
  * and latest.json must carry a windows-x86_64 signature, or nothing is written. Re-running for
  * an imported version changes nothing. The release stays a draft unless publishing is asked
- * for: the Owner decides when a VYRO download goes live.
+ * for: the Owner decides when a download goes live.
  *
- * Publishing here serves the release in the update feed and /api/v1/downloads/vyro/latest at once, but
- * this process can't expire the site's cached pages (the download page shows it after the next
- * deploy or release save). Publishing in the admin does both.
+ * Publishing here serves the release in the update feed and /api/v1/downloads/clokrix/latest at
+ * once, but this process can't expire the site's cached pages (the download page shows it after
+ * the next deploy or release save). Publishing in the admin does both.
  */
 import { createHash } from 'node:crypto'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'

@@ -34,11 +34,15 @@ if (!values['signing-only']) {
 }
 
 console.log(`# Server env (production.env or staging.env, never committed):\n${lines.join('\n')}\n`)
-console.log('# Public key for VYRO to embed (GET /api/v1/licensing/keys serves the same):')
+// For the apps this site sells and licenses. Clokrix licenses itself on its own site and embeds
+// its own key, not this one (docs/decisions.md, 2026-11-27).
+console.log(
+  '# Public key for an app sold here to embed (GET /api/v1/licensing/keys serves the same):',
+)
 console.log(JSON.stringify({ kty, crv, x, kid, alg: 'EdDSA', use: 'sig' }, null, 2))
 console.warn(`
 WARNING
 - LICENSE_KEY_ENCRYPTION_KEY and DEVICE_ID_PEPPER must never change once licenses exist:
   a new encryption key loses every stored key copy, a new pepper every device match.
-- A new signing key needs a new kid and a VYRO build that embeds its public key; builds that
+- A new signing key needs a new kid and app builds that embed its public key; builds that
   only know the old kid reject its tokens. See docs/runbooks/licensing.md before rotating.`)
