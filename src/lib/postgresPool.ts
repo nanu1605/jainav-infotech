@@ -2,9 +2,9 @@
  * pg's pool keeps an unused connection open for 10 seconds (pg-pool's default). When Postgres closes
  * one in that time (a restart ends them all with 57P01; a reset connection gives ECONNRESET), the
  * pool discards it and emits 'error'. With no listener the emit throws, as an uncaught exception:
- * Next logs it and carries on, a script stops. Payload's Postgres adapter listens only on the one
- * connection it holds itself, so `src/payload.config.ts` adds this listener in `onInit`
- * (docs/decisions.md).
+ * Next logs it and carries on, a script stops. Payload's Postgres adapter listens only on the
+ * connection it checks out while connecting, so `src/payload.config.ts` adds this listener in
+ * `onInit` (docs/decisions.md).
  */
 
 /** What this needs from pg's `Pool`, which Payload's adapter creates (pg is its dependency). */
