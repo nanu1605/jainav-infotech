@@ -24,8 +24,8 @@ const draftHi = { hiStatus: 'draft' } as const
 // Product copy checked against each product's own code, site and releases on 2026-10-16
 // (MenuMesh: its repo and menumesh.in; Baby: nanu1605/baby v6.0.1; Clokrix, then called VYRO:
 // nanu1605/vyro and vyro-releases v0.3.0). Clokrix was rechecked on 2026-11-27 against its own
-// site (clokrix.jainavinfotech.in) and the Clokrix team's website copy. MenuMesh's Hindi follows
-// MenuMesh's own approved words (ग्राहक, डिश).
+// site (clokrix.jainavinfotech.in), the Clokrix team's website copy and the team's answers for
+// version 2.5.5. MenuMesh's Hindi follows MenuMesh's own approved words (ग्राहक, डिश).
 export const products: SeedDoc<'products'>[] = [
   {
     en: {
@@ -463,7 +463,7 @@ export const products: SeedDoc<'products'>[] = [
       slug: 'clokrix',
       tagline: 'Know your machine.',
       summary:
-        'A light Windows hardware monitor: animated CPU and GPU speedometers, sensors for each part of your PC, history, health and alerts. It reads the sensors directly, with no third-party monitoring app or library.',
+        'A light Windows hardware monitor: animated CPU and GPU speedometers, sensors for each part of your PC, history, health and alerts. It reads the sensors directly, with no other hardware monitoring app.',
       type: 'desktop',
       category: 'pc-tools',
       platforms: ['windows'],
@@ -489,9 +489,11 @@ export const products: SeedDoc<'products'>[] = [
           subheading: 'Live temperatures, fan speeds, voltages and clocks in a light, fast app.',
           animation: 'vyro',
         },
+        // The Clokrix team's answers for 2.5.5 (2026-11-27): Free is the Dashboard and Settings,
+        // everything else is Pro, so the grids say which is which.
         {
           blockType: 'featureGrid',
-          heading: 'Your PC at a glance',
+          heading: 'Free: your PC at a glance',
           items: [
             {
               icon: 'gauge',
@@ -501,30 +503,37 @@ export const products: SeedDoc<'products'>[] = [
             {
               icon: 'thermometer',
               title: 'Temperatures',
-              text: 'GPU and drives. CPU on AMD Ryzen, DDR5 memory on AMD systems, and the motherboard on supported MSI boards.',
+              text: 'GPU and drives. CPU on AMD Ryzen and Intel Core. DDR5 memory on Ryzen 7000 and later, and DDR4 modules that have a sensor on AM4 and Intel 12th to 14th gen. The motherboard on boards with Nuvoton or ITE chips.',
             },
             {
               icon: 'fan',
               title: 'Fan and pump speeds',
-              text: 'GPU fans, plus motherboard fans and pumps on supported MSI boards.',
+              text: 'GPU fans, plus motherboard fans and pumps on boards with Nuvoton chips (many MSI, most ASUS, many ASRock) or ITE chips (Gigabyte).',
             },
             { icon: 'zap', title: 'Voltages and clocks' },
-            { icon: 'cpu', title: 'Full system information' },
-            { icon: 'monitor', title: 'Single and multi-monitor details' },
             {
               icon: 'scan-search',
               title: 'Reads sensors directly',
-              text: 'No third-party monitoring app or library.',
+              text: 'No other hardware monitoring app needed.',
             },
             {
               icon: 'feather',
-              title: 'Low CPU and memory use',
-              text: 'Under 1% CPU on average with the window open, measured on our test PC with version 0.2.',
+              title: 'Light on your PC',
+              text: 'It animates only while readings change, pauses its window when closed to the tray, and shows its own CPU and memory use on the Dashboard.',
             },
+          ],
+        },
+        {
+          blockType: 'featureGrid',
+          heading: 'Pro: every part of Clokrix',
+          intro: 'Every PC gets Pro free for 7 days from Clokrix’s first start.',
+          items: [
+            { icon: 'cpu', title: 'Full system information' },
+            { icon: 'monitor', title: 'Single and multi-monitor details' },
             {
               icon: 'chart-line',
               title: '7 days of history',
-              text: 'Charts from the last 5 minutes to the last 7 days, recorded even while the app is closed.',
+              text: 'Charts from the last 5 minutes to the last 7 days, recorded by the Clokrix Sensor Service even while the app is closed. Free keeps recording too, so your history is there when you get Pro.',
             },
             {
               icon: 'bell',
@@ -534,7 +543,7 @@ export const products: SeedDoc<'products'>[] = [
             {
               icon: 'sliders-horizontal',
               title: 'Fan control and GPU tuning',
-              text: 'Your own fan curves and GPU tuning, with safety limits. One click returns the fans to the BIOS settings and the GPU to stock. Fan control only on the MSI B650M GAMING PLUS WIFI for now.',
+              text: 'Your own fan curves and GPU tuning, with safety limits. One click returns the fans to the BIOS settings and the GPU to stock. Fan and pump control on the MSI B650M GAMING PLUS WIFI for now, with more boards as each is checked.',
             },
             { icon: 'app-window', title: 'Desktop widgets' },
             { icon: 'smartphone', title: 'Phone app', text: 'Your PC’s readings on your phone.' },
@@ -542,22 +551,22 @@ export const products: SeedDoc<'products'>[] = [
         },
         {
           blockType: 'featureGrid',
-          heading: 'Made for gaming',
+          heading: 'Pro: made for gaming',
           items: [
             {
               icon: 'gamepad-2',
               title: 'Frame rate and overlay',
-              text: 'FPS, 1% lows and frame time, shown over borderless and windowed games. Nothing is injected into the game.',
+              text: 'FPS, 1% lows and frame time, measured with Intel’s PresentMon. The overlay shows over borderless and windowed games, not exclusive fullscreen, and nothing is injected into the game.',
             },
             {
               icon: 'repeat',
               title: 'Automatic game profiles',
-              text: 'Start a game and Clokrix switches its profile, fan settings and overlay. Quit, and everything goes back.',
+              text: 'Start a fullscreen or borderless game and Clokrix switches to its Gaming profile, or to the settings you saved for that game. Quit, and it switches back.',
             },
             {
               icon: 'rewind',
               title: 'Session replay',
-              text: 'Replay your last 100 game sessions with markers for frame-rate drops, stutters and heat or power limits.',
+              text: 'Replay your last 100 game sessions: frame rate, frame time, usage, temperatures and power on one timeline, with markers for drops, stutters and heat or power limits.',
             },
             { icon: 'timer', title: 'Benchmark' },
           ],
@@ -574,19 +583,21 @@ export const products: SeedDoc<'products'>[] = [
             {
               label: 'CPU sensors',
               minimum: 'Any 64-bit CPU: usage and clocks',
-              recommended: 'AMD Ryzen: also temperature, power and voltage',
+              recommended:
+                'AMD Ryzen: also temperature, power and voltage; Intel Core: also temperature',
             },
             {
               label: 'Motherboard sensors',
-              minimum: 'MSI board with a Nuvoton NCT6687 chip',
+              minimum:
+                'A board with a Nuvoton chip (many MSI, most ASUS, many ASRock) or an ITE chip (Gigabyte)',
               recommended: 'MSI B650M GAMING PLUS WIFI: also fan and pump control',
             },
             { label: 'Install', minimum: 'Administrator rights' },
-            { label: 'Disk space', minimum: 'Up to 200 MB for history' },
+            { label: 'Disk space', minimum: 'Up to 200 MB for history and game sessions' },
           ],
         },
         {
-          // As the Clokrix site's /buy page states them (2026-11-27); Pro is bought there.
+          // As the Clokrix site's home and /buy pages state them (2026-11-27); Pro is bought there.
           blockType: 'pricing',
           heading: 'Free and Pro',
           source: 'manual',
@@ -595,8 +606,10 @@ export const products: SeedDoc<'products'>[] = [
               name: 'Free',
               price: '₹0',
               features: [
-                { text: 'The Dashboard, with its layouts and editing' },
-                { text: 'Pro free for 7 days from Clokrix’s first start, with no card needed' },
+                { text: 'The Dashboard, with its layouts and editing, and Settings' },
+                {
+                  text: 'Pro free for 7 days on every PC from Clokrix’s first start, with no card needed',
+                },
               ],
             },
             {
@@ -606,7 +619,7 @@ export const products: SeedDoc<'products'>[] = [
               features: [
                 { text: 'Once, for life, including all taxes ($100 outside India)' },
                 {
-                  text: 'Everything in Free, plus health and alerts, insights, history, gaming, the benchmark, fan control, GPU tuning, desktop widgets, the game overlay, profiles and the phone app',
+                  text: 'Everything in Free, plus health and alerts, insights, history, system details for every part of your PC, gaming, the benchmark, fan control, GPU tuning, desktop widgets, the game overlay, profiles and the phone app',
                 },
                 { text: 'One PC at a time: you can move it to another PC once every 30 days' },
                 { text: 'Every update, for good: one payment, not a subscription' },
@@ -618,7 +631,7 @@ export const products: SeedDoc<'products'>[] = [
         {
           blockType: 'ctaBand',
           heading: 'Get Clokrix',
-          text: 'Clokrix is free to download from its own website. The installer isn’t code-signed yet, so Windows SmartScreen may warn before it runs. Setup also installs the PawnIO driver, which Clokrix uses to read CPU, fan and memory sensors.',
+          text: 'Clokrix is free to download from its own website. The installer isn’t code-signed yet, so Windows SmartScreen may warn before it runs. Setup also installs the PawnIO driver (CPU, motherboard and memory sensors; it stays if Clokrix is removed) and Intel’s PresentMon (frame rates).',
           useProductButtons: true,
         },
       ],
@@ -626,7 +639,7 @@ export const products: SeedDoc<'products'>[] = [
     hi: {
       tagline: 'अपनी मशीन को जानिए।',
       summary:
-        'Windows के लिए एक हल्का हार्डवेयर मॉनिटर: एनिमेटेड CPU और GPU स्पीडोमीटर, आपके PC के हर हिस्से के सेंसर, हिस्ट्री, हेल्थ चेक और अलर्ट। यह सेंसर सीधे पढ़ता है, किसी थर्ड-पार्टी मॉनिटरिंग ऐप या लाइब्रेरी के बिना।',
+        'Windows के लिए एक हल्का हार्डवेयर मॉनिटर: एनिमेटेड CPU और GPU स्पीडोमीटर, आपके PC के हर हिस्से के सेंसर, हिस्ट्री, हेल्थ चेक और अलर्ट। यह सेंसर सीधे पढ़ता है, किसी दूसरे हार्डवेयर मॉनिटरिंग ऐप के बिना।',
       secondaryLinks: [{ label: 'Pro ख़रीदें' }, { label: 'डाउनलोड करें' }],
       layout: [
         {
@@ -635,7 +648,7 @@ export const products: SeedDoc<'products'>[] = [
           subheading: 'लाइव तापमान, फ़ैन स्पीड, वोल्टेज और क्लॉक, एक हल्के और तेज़ ऐप में।',
         },
         {
-          heading: 'आपका PC, एक नज़र में',
+          heading: 'फ़्री: आपका PC, एक नज़र में',
           items: [
             {
               title: 'लाइव डैशबोर्ड',
@@ -643,26 +656,32 @@ export const products: SeedDoc<'products'>[] = [
             },
             {
               title: 'तापमान',
-              text: 'GPU और ड्राइव; AMD Ryzen पर CPU, AMD सिस्टम पर DDR5 मेमोरी, और सपोर्टेड MSI बोर्ड पर मदरबोर्ड।',
+              text: 'GPU और ड्राइव। AMD Ryzen और Intel Core पर CPU। Ryzen 7000 और उसके बाद के प्रोसेसर पर DDR5 मेमोरी, और AM4 व Intel की 12वीं से 14वीं पीढ़ी पर सेंसर वाले DDR4 मॉड्यूल। Nuvoton या ITE चिप वाले बोर्ड पर मदरबोर्ड।',
             },
             {
               title: 'फ़ैन और पंप की स्पीड',
-              text: 'GPU फ़ैन, और सपोर्टेड MSI बोर्ड पर मदरबोर्ड के फ़ैन और पंप भी।',
+              text: 'GPU फ़ैन, और Nuvoton चिप (कई MSI, ज़्यादातर ASUS, कई ASRock) या ITE चिप (Gigabyte) वाले बोर्ड पर मदरबोर्ड के फ़ैन और पंप भी।',
             },
             { title: 'वोल्टेज और क्लॉक' },
+            {
+              title: 'सेंसर सीधे पढ़ता है',
+              text: 'किसी दूसरे हार्डवेयर मॉनिटरिंग ऐप की ज़रूरत नहीं।',
+            },
+            {
+              title: 'आपके PC पर हल्का',
+              text: 'यह तभी एनिमेट करता है जब रीडिंग बदलती है, विंडो को ट्रे में बंद करने पर उसे रोक देता है, और डैशबोर्ड पर अपना CPU और मेमोरी इस्तेमाल दिखाता है।',
+            },
+          ],
+        },
+        {
+          heading: 'प्रो: Clokrix का हर हिस्सा',
+          intro: 'हर PC पर Clokrix के पहली बार शुरू होने से 7 दिन तक प्रो मुफ़्त।',
+          items: [
             { title: 'पूरी सिस्टम जानकारी' },
             { title: 'सिंगल और मल्टी-मॉनिटर जानकारी' },
             {
-              title: 'सेंसर सीधे पढ़ता है',
-              text: 'किसी थर्ड-पार्टी मॉनिटरिंग ऐप या लाइब्रेरी के बिना।',
-            },
-            {
-              title: 'कम CPU और मेमोरी उपयोग',
-              text: 'हमारे टेस्ट PC पर वर्ज़न 0.2 में, विंडो खुली रहने पर भी औसतन 1% से कम CPU।',
-            },
-            {
               title: '7 दिन की हिस्ट्री',
-              text: 'पिछले 5 मिनट से 7 दिन तक के चार्ट, ऐप बंद होने पर भी रिकॉर्ड होते रहते हैं।',
+              text: 'पिछले 5 मिनट से 7 दिन तक के चार्ट, जिन्हें Clokrix Sensor Service ऐप बंद होने पर भी रिकॉर्ड करती है। फ़्री वर्ज़न में भी रिकॉर्डिंग चलती रहती है, इसलिए प्रो लेने पर आपकी हिस्ट्री पहले से मौजूद मिलती है।',
             },
             {
               title: 'हेल्थ चेक और अलर्ट',
@@ -670,26 +689,26 @@ export const products: SeedDoc<'products'>[] = [
             },
             {
               title: 'फ़ैन कंट्रोल और GPU ट्यूनिंग',
-              text: 'सुरक्षा सीमाओं के साथ अपने फ़ैन कर्व और GPU ट्यूनिंग। एक क्लिक में फ़ैन BIOS सेटिंग पर और GPU स्टॉक सेटिंग पर लौट आते हैं। फ़ैन कंट्रोल अभी सिर्फ़ MSI B650M GAMING PLUS WIFI पर।',
+              text: 'सुरक्षा सीमाओं के साथ अपने फ़ैन कर्व और GPU ट्यूनिंग। एक क्लिक में फ़ैन BIOS सेटिंग पर और GPU स्टॉक सेटिंग पर लौट आते हैं। फ़ैन और पंप कंट्रोल अभी MSI B650M GAMING PLUS WIFI पर; जैसे-जैसे दूसरे बोर्ड जाँचे जाएँगे, वे भी जुड़ते जाएँगे।',
             },
             { title: 'डेस्कटॉप विजेट' },
             { title: 'फ़ोन ऐप', text: 'आपके PC की रीडिंग, आपके फ़ोन पर।' },
           ],
         },
         {
-          heading: 'गेमिंग के लिए',
+          heading: 'प्रो: गेमिंग के लिए',
           items: [
             {
               title: 'फ़्रेम रेट और ओवरले',
-              text: 'FPS, 1% low और फ़्रेम टाइम, बॉर्डरलेस और विंडो मोड वाले गेम के ऊपर। गेम के अंदर कुछ नहीं डाला जाता।',
+              text: 'FPS, 1% low और फ़्रेम टाइम, Intel के PresentMon से मापे हुए। ओवरले बॉर्डरलेस और विंडो मोड वाले गेम के ऊपर दिखता है, एक्सक्लूसिव फ़ुलस्क्रीन पर नहीं, और गेम के अंदर कुछ नहीं डाला जाता।',
             },
             {
               title: 'अपने-आप बदलने वाली गेम प्रोफ़ाइल',
-              text: 'गेम शुरू करते ही Clokrix प्रोफ़ाइल, फ़ैन सेटिंग और ओवरले बदल देता है। गेम बंद करते ही सब पहले जैसा।',
+              text: 'फ़ुलस्क्रीन या बॉर्डरलेस गेम शुरू करते ही Clokrix अपनी Gaming प्रोफ़ाइल पर, या उस गेम के लिए आपकी सेव की गई सेटिंग पर चला जाता है। गेम बंद करते ही यह पहले वाली सेटिंग पर लौट आता है।',
             },
             {
               title: 'सेशन रीप्ले',
-              text: 'अपने पिछले 100 गेम सेशन दोबारा देखें, फ़्रेम ड्रॉप, स्टटर और हीट या पावर लिमिट के मार्कर के साथ।',
+              text: 'अपने पिछले 100 गेम सेशन दोबारा देखें: फ़्रेम रेट, फ़्रेम टाइम, इस्तेमाल, तापमान और पावर एक ही टाइमलाइन पर, फ़्रेम ड्रॉप, स्टटर और हीट या पावर लिमिट के मार्कर के साथ।',
             },
             { title: 'बेंचमार्क' },
           ],
@@ -705,15 +724,16 @@ export const products: SeedDoc<'products'>[] = [
             {
               label: 'CPU सेंसर',
               minimum: 'कोई भी 64-bit CPU: इस्तेमाल और क्लॉक',
-              recommended: 'AMD Ryzen: साथ में तापमान, पावर और वोल्टेज',
+              recommended: 'AMD Ryzen: साथ में तापमान, पावर और वोल्टेज; Intel Core: साथ में तापमान',
             },
             {
               label: 'मदरबोर्ड सेंसर',
-              minimum: 'Nuvoton NCT6687 चिप वाला MSI बोर्ड',
+              minimum:
+                'Nuvoton चिप (कई MSI, ज़्यादातर ASUS, कई ASRock) या ITE चिप (Gigabyte) वाला बोर्ड',
               recommended: 'MSI B650M GAMING PLUS WIFI: साथ में फ़ैन और पंप कंट्रोल',
             },
             { label: 'इंस्टॉल', minimum: 'एडमिनिस्ट्रेटर अनुमति' },
-            { label: 'डिस्क स्पेस', minimum: 'हिस्ट्री के लिए 200 MB तक' },
+            { label: 'डिस्क स्पेस', minimum: 'हिस्ट्री और गेम सेशन के लिए 200 MB तक' },
           ],
         },
         {
@@ -723,8 +743,10 @@ export const products: SeedDoc<'products'>[] = [
               name: 'फ़्री',
               price: '₹0',
               features: [
-                { text: 'डैशबोर्ड, उसके लेआउट और एडिटिंग के साथ' },
-                { text: 'Clokrix के पहली बार शुरू होने से 7 दिन तक प्रो मुफ़्त, कार्ड की ज़रूरत नहीं' },
+                { text: 'डैशबोर्ड (उसके लेआउट और एडिटिंग के साथ) और सेटिंग्स' },
+                {
+                  text: 'हर PC पर Clokrix के पहली बार शुरू होने से 7 दिन तक प्रो मुफ़्त, कार्ड की ज़रूरत नहीं',
+                },
               ],
             },
             {
@@ -733,7 +755,7 @@ export const products: SeedDoc<'products'>[] = [
               features: [
                 { text: 'एक बार, हमेशा के लिए, सभी टैक्स सहित (भारत के बाहर $100)' },
                 {
-                  text: 'फ़्री का सब कुछ, साथ में हेल्थ चेक और अलर्ट, इनसाइट्स, हिस्ट्री, गेमिंग, बेंचमार्क, फ़ैन कंट्रोल, GPU ट्यूनिंग, डेस्कटॉप विजेट, गेम ओवरले, प्रोफ़ाइल और फ़ोन ऐप',
+                  text: 'फ़्री का सब कुछ, साथ में हेल्थ चेक और अलर्ट, इनसाइट्स, हिस्ट्री, आपके PC के हर हिस्से की सिस्टम जानकारी, गेमिंग, बेंचमार्क, फ़ैन कंट्रोल, GPU ट्यूनिंग, डेस्कटॉप विजेट, गेम ओवरले, प्रोफ़ाइल और फ़ोन ऐप',
                 },
                 { text: 'एक समय में एक PC पर: हर 30 दिन में एक बार इसे दूसरे PC पर ले जा सकते हैं' },
                 { text: 'हर अपडेट, हमेशा के लिए: एक ही भुगतान, कोई सब्सक्रिप्शन नहीं' },
@@ -743,7 +765,7 @@ export const products: SeedDoc<'products'>[] = [
         },
         {
           heading: 'Clokrix पाएँ',
-          text: 'Clokrix अपनी वेबसाइट पर मुफ़्त डाउनलोड के लिए उपलब्ध है। इंस्टॉलर अभी कोड-साइन नहीं है, इसलिए चलाने से पहले Windows SmartScreen चेतावनी दिखा सकता है। सेटअप PawnIO ड्राइवर भी इंस्टॉल करता है, जिससे Clokrix CPU, फ़ैन और मेमोरी के सेंसर पढ़ता है।',
+          text: 'Clokrix अपनी वेबसाइट पर मुफ़्त डाउनलोड के लिए उपलब्ध है। इंस्टॉलर अभी कोड-साइन नहीं है, इसलिए चलाने से पहले Windows SmartScreen चेतावनी दिखा सकता है। सेटअप PawnIO ड्राइवर (CPU, मदरबोर्ड और मेमोरी के सेंसर के लिए; Clokrix हटाने पर भी यह बना रहता है) और Intel का PresentMon (फ़्रेम रेट के लिए) भी इंस्टॉल करता है।',
         },
       ],
     },
