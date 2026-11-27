@@ -39,7 +39,8 @@ test('pages carry the security headers', async ({ request }) => {
 })
 
 test('the update feed answers', async ({ request }) => {
-  const res = await request.get('/api/v1/updates/vyro/windows/x86_64/0.0.1')
+  // Clokrix updates from its own site and has no release here, so this answers 204.
+  const res = await request.get('/api/v1/updates/clokrix/windows/x86_64/0.0.1')
   expect([200, 204]).toContain(res.status())
 })
 

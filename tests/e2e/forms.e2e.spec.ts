@@ -67,10 +67,11 @@ test('a grievance is acknowledged with a ticket number, without its text', async
 test('contact form validates, sends, confirms and emails a localized auto-reply', async ({
   page,
 }) => {
-  await page.goto('/contact?product=vyro&topic=support')
+  await page.goto('/contact?product=clokrix&topic=support')
   const form = page.locator('main form')
   await expect(form.getByLabel(/^Topic/)).toHaveValue('support')
-  await expect(form.getByLabel(/^Product/)).toHaveValue('vyro')
+  // The options' values are product slugs.
+  await expect(form.getByLabel(/^Product/)).toHaveValue('clokrix')
 
   // Presets come from the link; validation from an empty form.
   await page.goto('/contact')

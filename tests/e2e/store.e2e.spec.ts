@@ -1,8 +1,9 @@
 /**
  * Phase 7 store in a real browser (spec §19): email-code sign-in from the outbox, a purchase
  * through the development stand-in gateway (its webhooks included), the success page refusing
- * other customers, a failed payment, the GSTIN lock, Hindi pages and axe. Needs the dev server:
- * production builds have no stand-in gateway, so the file skips against E2E_BASE_URL.
+ * other customers, a failed payment, the GSTIN lock, Hindi pages and axe. It buys the Sample App's
+ * Pro plan (`pnpm seed:store`). Needs the dev server: production builds have no stand-in gateway,
+ * so the file skips against E2E_BASE_URL.
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
@@ -20,7 +21,7 @@ test.beforeEach(({ page }, info) => useOwnIp(page, info))
 
 test('signs in with an emailed code, pays and gets the invoice', async ({ page, browser }) => {
   const email = address('buyer')
-  await signIn(page, email, '/checkout/vyro/pro')
+  await signIn(page, email, '/checkout/sample-app/pro')
   await fillCheckout(page)
   const orderNumber = await pay(page)
   await expect(page.locator('h1')).toHaveText('Thank you for your purchase')
@@ -31,7 +32,7 @@ test('signs in with an emailed code, pays and gets the invoice', async ({ page, 
   expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-')
   // The license key, as in the email (spec §11.3 step 11).
   const key = page.getByRole('textbox', { name: 'License key' })
-  await expect(key).toHaveValue(/^VYRO(-[0-9A-HJKMNP-TV-Z]{5}){4}$/)
+  await expect(key).toHaveValue(/^SAMPLEAPP(-[0-9A-HJKMNP-TV-Z]{5}){4}$/)
 
   const confirmation = await mailTo(email, /is confirmed/)
   expect(confirmation.text).toContain(await key.inputValue())
@@ -58,7 +59,7 @@ test('signs in with an emailed code, pays and gets the invoice', async ({ page, 
 })
 
 test('the checkout shows the refund and delivery pages before paying', async ({ page }) => {
-  await signIn(page, address('policies'), '/checkout/vyro/pro')
+  await signIn(page, address('policies'), '/checkout/sample-app/pro')
   const main = page.locator('main')
   for (const [name, href] of [
     ['Refunds and Cancellation', '/legal/refunds-cancellation'],
@@ -88,7 +89,7 @@ test('the page after an unconfirmed payment promises no outcome', async ({ page 
 })
 
 test('a failed payment keeps the form for another try', async ({ page }) => {
-  await signIn(page, address('failed'), '/checkout/vyro/pro')
+  await signIn(page, address('failed'), '/checkout/sample-app/pro')
   const main = await fillCheckout(page)
   await main.getByRole('button', { name: /^Pay / }).click()
   await page
@@ -96,13 +97,13 @@ test('a failed payment keeps the form for another try', async ({ page }) => {
     .getByRole('button', { name: 'Fail the payment' })
     .click()
   await expect(main.getByRole('alert')).toBeVisible()
-  await expect(page).toHaveURL(/\/checkout\/vyro\/pro$/)
+  await expect(page).toHaveURL(/\/checkout\/sample-app\/pro$/)
   await expect(main.getByRole('button', { name: /^Pay / })).toBeEnabled()
 })
 
 test('a GSTIN sets the place of supply and the breakdown follows it', async ({ page }) => {
-  await signIn(page, address('gstin'), '/checkout/vyro/pro')
-  await page.goto('/checkout/vyro/pro')
+  await signIn(page, address('gstin'), '/checkout/sample-app/pro')
+  await page.goto('/checkout/sample-app/pro')
   const main = page.locator('main')
   await main.getByLabel('GSTIN').fill('29AAGCB7383J1Z4')
   await expect(main.getByLabel('State')).toHaveValue('29')
@@ -123,10 +124,10 @@ test('store pages render in Hindi and pass axe', async ({ page }) => {
     '/account',
     '/account/orders',
     '/account/settings',
-    '/checkout/vyro/pro',
+    '/checkout/sample-app/pro',
     '/hi/account',
     '/hi/account/settings',
-    '/hi/checkout/vyro/pro',
+    '/hi/checkout/sample-app/pro',
   ]) {
     const res = await page.goto(url)
     expect(res?.status(), url).toBe(200)

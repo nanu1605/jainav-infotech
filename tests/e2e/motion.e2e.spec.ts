@@ -5,8 +5,13 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 
-const PAGES = ['/', '/products/menumesh', '/products/vyro', '/products/baby']
-const ANIMATED = ['menumesh', 'vyro', 'baby']
+const PAGES = ['/', '/products/menumesh', '/products/clokrix', '/products/baby']
+/** Product slug and its hero's animation key: Clokrix's speedometers keep the key `vyro`. */
+const ANIMATED = [
+  ['menumesh', 'menumesh'],
+  ['clokrix', 'vyro'],
+  ['baby', 'baby'],
+] as const
 
 /** Infinite CSS / Web Animations currently running. */
 const loops = (page: Page) =>
@@ -18,10 +23,10 @@ const loops = (page: Page) =>
         .length,
   )
 
-for (const slug of ANIMATED) {
+for (const [slug, animation] of ANIMATED) {
   test(`${slug} shows its signature animation with a description`, async ({ page }) => {
     await page.goto(`/products/${slug}`)
-    const art = page.locator(`[data-hero-animation="${slug}"] [role="img"]`).first()
+    const art = page.locator(`[data-hero-animation="${animation}"] [role="img"]`).first()
     await expect(art).toBeVisible()
     expect((await art.getAttribute('aria-label'))?.length).toBeGreaterThan(20)
   })
@@ -89,7 +94,7 @@ test('the products menu opens from the keyboard and Escape returns focus', async
 // WCAG 2.2.2: every loop that starts on its own and runs past 5 s can be paused.
 for (const [path, control] of [
   ['/', 'checkbox'],
-  ['/products/vyro', 'button'],
+  ['/products/clokrix', 'button'],
   ['/products/baby', 'button'],
 ] as const) {
   test(`${path}: the pause control stops the hero's loops`, async ({ page }) => {

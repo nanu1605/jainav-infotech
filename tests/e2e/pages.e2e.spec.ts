@@ -1,6 +1,8 @@
 /**
  * Phase 3 public pages (spec §20): every route in both languages, SEO tags per spec §6, product
  * buttons, redirects, feeds and axe. Needs the seeded, published local content (globalSetup).
+ * Clokrix, MenuMesh and Baby are external products, so the hosted sub-pages are the Sample App's,
+ * which `pnpm seed:store` adds (development and e2e only).
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
@@ -10,12 +12,13 @@ import { settle } from './helpers/settle'
 const ROUTES = [
   '/',
   '/products',
-  '/products/vyro',
-  '/products/vyro/pricing',
-  '/products/vyro/download',
-  '/products/vyro/changelog',
-  '/products/vyro/docs',
-  '/products/vyro/support',
+  '/products/clokrix',
+  '/products/sample-app',
+  '/products/sample-app/pricing',
+  '/products/sample-app/download',
+  '/products/sample-app/changelog',
+  '/products/sample-app/docs',
+  '/products/sample-app/support',
   '/products/baby',
   '/services',
   '/services/custom-software',
@@ -24,7 +27,7 @@ const ROUTES = [
   '/careers',
   '/blog',
   '/changelog',
-  '/changelog/vyro',
+  '/changelog/sample-app',
   '/legal/privacy',
   '/legal/terms',
   '/legal/refunds-cancellation',
@@ -80,24 +83,59 @@ test('the founder section shows the photo (a local upload) with a quote', async 
 
 // Umami's tracker cancels clicks on a tracked <a> and reloads the page: tracking goes on a wrapper.
 test('tracked links keep client-side navigation', async ({ page }) => {
-  for (const path of ['/', '/products/vyro', '/products/baby']) {
+  for (const path of ['/', '/products/clokrix', '/products/baby']) {
     await page.goto(path)
     expect(await page.locator('[data-umami-event]').count()).toBeGreaterThan(0)
     await expect(page.locator('a[data-umami-event]')).toHaveCount(0)
   }
 })
 
-test('vanity /vyro redirects permanently and keeps the language', async ({ request }) => {
+// The vanity paths and the page's address before it moved from /products/vyro (2026-11-27).
+test('Clokrix’s vanity and old paths redirect permanently and keep the language', async ({
+  request,
+}) => {
   for (const [from, to] of [
-    ['/vyro', '/products/vyro'],
-    ['/hi/vyro', '/hi/products/vyro'],
+    ['/clokrix', '/products/clokrix'],
+    ['/vyro', '/products/clokrix'],
+    ['/hi/vyro', '/hi/products/clokrix'],
+    ['/products/vyro', '/products/clokrix'],
+    ['/hi/products/vyro', '/hi/products/clokrix'],
+    // An old sub-page lands on the product page: an external product has none.
+    ['/products/vyro/pricing', '/products/clokrix'],
   ]) {
     const res = await request.get(from, { maxRedirects: 0 })
-    expect(res.status()).toBe(308)
+    expect(res.status(), from).toBe(308)
     // A production cache miss repeats the (identical) Location header: compare the first value.
     const location = res.headers().location!.split(',')[0]!.trim()
-    expect(new URL(location, 'http://localhost:3000').pathname).toBe(to)
+    expect(new URL(location, 'http://localhost:3000').pathname, from).toBe(to)
   }
+})
+
+test('the external Clokrix page links to its own site', async ({ page, request }) => {
+  await page.goto('/products/clokrix')
+  const hero = page.locator('section').first()
+  await expect(hero.getByRole('link', { name: /^Visit Clokrix\b/ })).toHaveAttribute(
+    'href',
+    '/go/clokrix',
+  )
+  // Secondary links end in visually hidden "(opens in a new tab)".
+  for (const [name, href] of [
+    [/^Buy Pro\b/, 'https://clokrix.jainavinfotech.in/buy'],
+    [/^Download\b/, 'https://clokrix.jainavinfotech.in/download'],
+  ] as const) {
+    const link = hero.getByRole('link', { name })
+    await expect(link).toHaveAttribute('href', href)
+    await expect(link).toHaveAttribute('target', '_blank')
+  }
+  await expect(page.locator('#pricing')).toContainText('₹10,000')
+  // No hosted sub-pages: pricing, downloads and the rest are on the Clokrix site.
+  expect((await page.goto('/products/clokrix/pricing'))?.status()).toBe(404)
+
+  // The Visit button's short link, kept by the product's syncShortLink hook (UTM added).
+  const go = await request.get('/go/clokrix', { maxRedirects: 0 })
+  expect(go.status()).toBe(302)
+  const target = new URL(go.headers().location!)
+  expect([target.origin, target.pathname]).toEqual(['https://clokrix.jainavinfotech.in', '/'])
 })
 
 test('code-built pages pair both languages through hreflang', async ({ page }) => {
@@ -110,32 +148,34 @@ test('code-built pages pair both languages through hreflang', async ({ page }) =
 })
 
 test('Hindi pages that are not ready are noindex with a self canonical', async ({ page }) => {
-  // The seeded VYRO page's Hindi status is not "ready".
-  await page.goto('/hi/products/vyro')
+  // The seeded Clokrix page's Hindi status is not "ready".
+  await page.goto('/hi/products/clokrix')
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/)
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',
-    /\/hi\/products\/vyro$/,
+    /\/hi\/products\/clokrix$/,
   )
   await expect(page.locator('link[rel="alternate"][hreflang]')).toHaveCount(0)
 })
 
 test('product pages carry SoftwareApplication data and their share image', async ({ page }) => {
-  await page.goto('/products/vyro')
+  await page.goto('/products/clokrix')
   const ld = await page.locator('script[type="application/ld+json"]').allTextContents()
   expect(ld.some((s) => JSON.parse(s)['@type'] === 'SoftwareApplication')).toBe(true)
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
     'content',
-    /\/og\/products\/vyro\.png$/,
+    /\/og\/products\/clokrix\.png$/,
   )
 })
 
-test('VYRO without a release offers the waitlist and a disabled Buy Pro', async ({ page }) => {
-  await page.goto('/products/vyro')
+test('a hosted product without a release offers the waitlist and a disabled Buy Pro', async ({
+  page,
+}) => {
+  await page.goto('/products/sample-app')
   const hero = page.locator('section').first()
   await expect(hero.getByRole('link', { name: 'Join the waitlist' })).toHaveAttribute(
     'href',
-    '/products/vyro#waitlist',
+    '/products/sample-app#waitlist',
   )
   const buy = hero.getByRole('button', { name: /^Buy / })
   await expect(buy).toHaveAttribute('aria-disabled', 'true')
@@ -152,9 +192,9 @@ test('a beta with no published build shows only the waitlist', async ({ page }) 
 })
 
 test('language switch on a product page keeps the page', async ({ page }) => {
-  await page.goto('/products/vyro')
+  await page.goto('/products/clokrix')
   await page.getByRole('link', { name: 'हिंदी', exact: true }).first().click()
-  await expect(page).toHaveURL(/\/hi\/products\/vyro$/)
+  await expect(page).toHaveURL(/\/hi\/products\/clokrix$/)
   await expect(page.locator('html')).toHaveAttribute('lang', 'hi')
 })
 
@@ -164,8 +204,8 @@ test('sitemap lists ready pages in both languages and robots keeps crawlers out'
   const sitemap = await (await request.get('/sitemap.xml')).text()
   expect(sitemap).toContain('<loc>http://localhost:3000/products</loc>')
   expect(sitemap).toContain('<loc>http://localhost:3000/hi/products</loc>')
-  expect(sitemap).toContain('<loc>http://localhost:3000/products/vyro</loc>')
-  expect(sitemap).not.toContain('<loc>http://localhost:3000/hi/products/vyro</loc>')
+  expect(sitemap).toContain('<loc>http://localhost:3000/products/clokrix</loc>')
+  expect(sitemap).not.toContain('<loc>http://localhost:3000/hi/products/clokrix</loc>')
   const robots = await (await request.get('/robots.txt')).text()
   expect(robots).toMatch(/Disallow: \/admin/)
   expect(robots).toMatch(/Disallow: \/api\//)
@@ -184,8 +224,8 @@ test('feeds and the update endpoint answer', async ({ request }) => {
 for (const url of [
   '/',
   '/products',
-  '/products/vyro',
-  '/products/vyro/pricing',
+  '/products/clokrix',
+  '/products/sample-app/pricing',
   '/about',
   '/contact',
   '/services',

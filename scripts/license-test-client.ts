@@ -1,6 +1,8 @@
 /**
- * pnpm license-test-client <command> — behaves like VYRO against any environment (spec §19,
- * docs/licensing-api.md, docs/runbooks/licensing.md). `--help` lists the commands.
+ * pnpm license-test-client <command> — behaves like an app that uses this site's licensing API,
+ * against any environment (spec §19, docs/licensing-api.md, docs/runbooks/licensing.md). Clokrix
+ * has its own licensing since 2026-11-27, so the default product is the local Sample App
+ * (`pnpm seed:store`). `--help` lists the commands.
  */
 import 'dotenv/config' // only `validate --age-days` reads it: the local signing key
 
@@ -24,7 +26,8 @@ import { licensingConfigFrom } from '../src/lib/licensing/keyMaterial'
 
 const HELP = `Usage: pnpm license-test-client <command> [options]
 
-Behaves like VYRO: every token it receives is verified offline the way the app must.
+Behaves like an app that uses this site's licensing API: every token it receives is verified
+offline the way the app must.
 State per server and device (license key, current token): .license-client/<host>-<product>-<device>.json
 
 Commands
@@ -51,7 +54,7 @@ Commands
 
 Options
   --base URL         server, default http://localhost:3000
-  --product SLUG     default vyro
+  --product SLUG     default sample-app (the local Sample App that pnpm seed:store adds)
   --device NAME      default test-1; deviceId = hex sha256("license-test-client:" + NAME
                      + "vyro-device-v1")
   --version X.Y.Z    app version sent and asked about, default 1.0.0`
@@ -60,7 +63,7 @@ const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
     base: { type: 'string', default: 'http://localhost:3000' },
-    product: { type: 'string', default: 'vyro' },
+    product: { type: 'string', default: 'sample-app' },
     device: { type: 'string', default: 'test-1' },
     version: { type: 'string', default: '1.0.0' },
     key: { type: 'string' },
@@ -95,6 +98,7 @@ async function api(method: 'GET' | 'POST', route: string, body?: object): Promis
     method,
     headers: {
       'Content-Type': 'application/json',
+      // The format docs/licensing-api.md asks apps to send.
       'User-Agent': `VYRO/${version} (license-test-client; ${OS})`,
     },
     body: body && JSON.stringify(body),
@@ -183,6 +187,7 @@ const stateFile = (d: Device) =>
   path.join(STATE_DIR, `${base.host.replace(/[^\w.-]/g, '_')}-${product}-${d.name}.json`)
 const device = (name: string): Device => ({
   name,
+  // The device-id salt docs/licensing-api.md defines: part of the licensing contract.
   id: createHash('sha256').update(`license-test-client:${name}vyro-device-v1`).digest('hex'),
   state: {},
 })
