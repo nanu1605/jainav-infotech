@@ -613,4 +613,14 @@ Clokrix, once VYRO, is sold, licensed, downloaded and updated on its own site, `
   2. Run `sudo app-compose jainav tools staging - pnpm seed`. It creates Clokrix, the three redirects and the four legal drafts.
   3. Publish Clokrix, which also makes `/go/clokrix`.
   4. Add Clokrix again to the related products of Custom software & SaaS, which lost it with the old product. The footer link and the home page's "My PC" chip may keep `/products/vyro`: it redirects.
-- **Still to confirm with the Clokrix team:** whether the copy's version-0.2 CPU figure, the MSI-only fan control and the PawnIO driver note still hold (`PROGRESS.md`).
+- **The Clokrix team's answers changed the page's copy** (2026-11-27, for version 2.5.5; the same holds for 2.5.4):
+  - **No CPU figure.** The only figures written down are from version 0.2.0, and nothing has been measured since 1.4.1, so "Light on your PC" says what keeps it light instead: it animates only while readings change, pauses its window when closed to the tray, and shows its own CPU and memory use on the Dashboard.
+  - **Motherboard sensors on more boards:** boards with Nuvoton chips (many MSI, most ASUS, many ASRock) or ITE chips (Gigabyte), no longer only MSI. Fan and pump control stays on the MSI B650M GAMING PLUS WIFI, because the team enables a board only after a check on real hardware.
+  - **CPU and memory temperatures:** CPU temperatures on AMD Ryzen and Intel Core; DDR5 memory on Ryzen 7000 and later, and DDR4 modules that have a sensor on AM4 and Intel 12th to 14th gen.
+  - **What setup installs:** the PawnIO driver (CPU, motherboard and memory sensors; it stays when Clokrix is removed), the Clokrix Sensor Service (history while the app is closed) and Intel's PresentMon (frame rates). The overlay doesn't show over exclusive-fullscreen games.
+  - **Free is the Dashboard and Settings; everything else is Pro,** with 7 days of Pro on every PC. The page's feature grids are grouped that way: "Free: your PC at a glance", "Pro: every part of Clokrix" and "Pro: made for gaming". Full system information and the monitor details count as Pro: the Clokrix site lists "My PC, every part of this PC" among Pro's features.
+- **Staging keeps the copy it was seeded with,** because the seed only creates; production's first seed has the new copy. To update staging (rehearsed on a copy of a local database seeded with the old copy), either edit the page by hand in both languages, or:
+  1. In staging's admin, delete the Clokrix product and its three redirects (`/clokrix`, `/vyro`, `/products/vyro`). On a seeded site nothing else points at the product but Custom software & SaaS's related products; the `/go/clokrix` short link goes by slug and stays.
+  2. Run `sudo app-compose jainav tools staging - pnpm seed`. It creates Clokrix with the new copy, and the three redirects.
+  3. Publish Clokrix.
+  4. Add Clokrix again to the related products of Custom software & SaaS.

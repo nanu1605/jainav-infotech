@@ -91,7 +91,7 @@ On the server and in accounts (needs Tanishq's inputs; order in docs/runbooks/la
 - [ ] Legal review (docs/decisions.md, "Legal drafts"): blanks filled, then the Owner publishes every legal page (§8.13; the seed has had no EULA since 2026-11-27). Final content check. The company blanks and the refund window (7 days) are filled (2026-11-26); the lawyer's and the CA's are left.
 - [x] Clokrix (formerly VYRO) download: done by linking to the Clokrix site's download, `https://clokrix.jainavinfotech.in/download`, which always serves the newest build; nothing is imported (2026-11-27, docs/decisions.md "Clokrix sells on its own site").
 - [x] Staging's Clokrix updated to the new seed (Tanishq, 2026-11-27, with the steps in docs/decisions.md, "Clokrix sells on its own site"): `/products/clokrix` shows Visit Clokrix, Buy Pro and Download, `/clokrix`, `/vyro` and `/products/vyro` redirect to it, `/go/clokrix` opens the Clokrix site, and Custom software & SaaS lists Clokrix again.
-- [ ] From the Clokrix team: whether the product copy's version-0.2 CPU figure, the MSI-only fan control and the PawnIO driver note still hold.
+- [x] From the Clokrix team (2026-11-27, for version 2.5.5): the version-0.2 CPU figure is gone, motherboard sensors cover boards with Nuvoton or ITE chips, fan and pump control stays on the MSI B650M GAMING PLUS WIFI, and setup installs PawnIO and PresentMon. The page now groups its features into Free and Pro (docs/decisions.md, "Clokrix sells on its own site").
 - [ ] Lighthouse on the production URLs (§15); LCP is judged only there. Locally `pnpm lhci` serves HTTP/1.1, reads LCP above 2.5 s and only warns on it; over HTTP/2 the four pages are under it (docs/decisions.md, "LCP budget").
 
 ## Milestone C — Store live (Launch 2): on hold
@@ -168,7 +168,7 @@ With inputs (steps in docs/runbooks/retention.md):
 - [ ] Owner publishes the final Terms, Refunds, Shipping and the product's EULA (the checkout refuses orders until all four are live). The Clokrix EULA no longer applies: it left the seed on 2026-11-27.
 - [ ] Production smoke tests; set `storeEnabled = true`.
 
-Input still missing: a product to sell here. The signed Clokrix build that uses the licensing API no longer applies (2026-11-27): Clokrix 2.5.4 licenses with its own `CLKX-` keys on its own site. Its installer is not Authenticode-signed, so SmartScreen warns on a fresh install.
+Input still missing: a product to sell here. The signed Clokrix build that uses the licensing API no longer applies (2026-11-27): Clokrix (2.5.4 and later) licenses with its own `CLKX-` keys on its own site. Its installer is not Authenticode-signed, so SmartScreen warns on a fresh install.
 
 ## Milestone D — Growth (Phase 11+; order agreed after Launch 2)
 
